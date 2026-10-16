@@ -4,3 +4,13 @@ node_modules/
 package-lock.json
 
 *.db
+# agent harness (working state; contracts are committed)
+.agent/plan.md
+.agent/stamps/
+.agent/scratch/
+.agent/logs/
+.claude/settings.local.json
+.claude/worktrees/
+.claude/agent-memory-local/
+CLAUDE.local.md
+.DS_Store

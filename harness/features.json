@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "note": "Filled by the initializer session from docs/DESIGN.md §20. Agents may change only `passes` and `evidence` (checked by the tamper audit).",
+  "features": []
+}

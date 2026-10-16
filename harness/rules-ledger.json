@@ -1,0 +1,317 @@
+{
+ "note": "Evidence and counters for each rule ID. Never loaded into agent context; maintained by the curator (human-approved).",
+ "rules": {
+  "AI-001": {
+   "file": "ai.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "AI-002": {
+   "file": "ai.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "AI-003": {
+   "file": "ai.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "AI-004": {
+   "file": "ai.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "DET-001": {
+   "file": "detect.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "DET-002": {
+   "file": "detect.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "DET-003": {
+   "file": "detect.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "DET-004": {
+   "file": "detect.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "DET-005": {
+   "file": "detect.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "GO-001": {
+   "file": "go.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "GO-002": {
+   "file": "go.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "GO-003": {
+   "file": "go.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "GO-004": {
+   "file": "go.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "GO-005": {
+   "file": "go.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "GO-006": {
+   "file": "go.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "Q-001": {
+   "file": "queue.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "Q-002": {
+   "file": "queue.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "Q-003": {
+   "file": "queue.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "Q-004": {
+   "file": "queue.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "Q-005": {
+   "file": "queue.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "SQL-001": {
+   "file": "sql.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "SQL-002": {
+   "file": "sql.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "SQL-003": {
+   "file": "sql.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "SQL-004": {
+   "file": "sql.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "SQL-005": {
+   "file": "sql.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "SQL-006": {
+   "file": "sql.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "T-001": {
+   "file": "tests.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "T-002": {
+   "file": "tests.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "T-003": {
+   "file": "tests.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "T-004": {
+   "file": "tests.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "T-005": {
+   "file": "tests.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "WA-001": {
+   "file": "whatsmeow.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "WA-002": {
+   "file": "whatsmeow.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "WA-003": {
+   "file": "whatsmeow.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "WA-004": {
+   "file": "whatsmeow.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "WA-005": {
+   "file": "whatsmeow.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "WA-006": {
+   "file": "whatsmeow.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "WA-007": {
+   "file": "whatsmeow.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  },
+  "WA-008": {
+   "file": "whatsmeow.md",
+   "source": "seed: docs/DESIGN.md",
+   "helpful": 0,
+   "harmful": 0,
+   "last_cited": null,
+   "status": "active"
+  }
+ }
+}

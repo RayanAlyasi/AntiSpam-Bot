@@ -1,0 +1,18 @@
+{
+  "note": "Composite score weights (human-controlled). Each component is 0..1, higher is better; the composite is the weighted mean of the components that are known.",
+  "weights": {
+    "human_verdict": 0.25,
+    "judge_first_pass": 0.20,
+    "acceptance_first_pass": 0.15,
+    "gate_efficiency": 0.10,
+    "integrity": 0.15,
+    "mutation_score": 0.10,
+    "cost_efficiency": 0.05
+  },
+  "alarms": {
+    "composite_drop_pct": 10,
+    "judge_fail_rate_over_5": 0.5,
+    "any_tamper_hit": true
+  },
+  "window": 10
+}

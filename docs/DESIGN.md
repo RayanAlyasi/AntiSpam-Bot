@@ -1,6 +1,6 @@
 # WhatsApp Anti-Spam Bot: Design Document
 
-**Status:** Draft for review (revision 9: context bundle for the AI, explicit AI cost controls, provider-neutral AI classifier; revision 8: spam-only bootstrap, no collection of normal messages, certainty routing as the core flow; revision 7: generic labeled-dataset import replaces the old-database import, and a manual phone-number blacklist; revision 6: AI and learning in the first version; revision 5: new enforcement model with instant delete + ban by default, no trust grace on detection, silent bot, auto-ban matrix and ask-admins mode; revision 4: adds hacked-account handling, one-number capacity model, unbounded queue with slow-down-only pacing and capped kick batches, and the open-source/self-hosting framing to revision 3's network bans and spammer intelligence). Nothing is built yet.
+**Status:** Draft for review (revision 10: tech stack decided (Go modular monolith, Postgres only, River), no embeddings in the core, frontend decided later; revision 9: context bundle for the AI, explicit AI cost controls, provider-neutral AI classifier; revision 8: spam-only bootstrap, no collection of normal messages, certainty routing as the core flow; revision 7: generic labeled-dataset import replaces the old-database import, and a manual phone-number blacklist; revision 6: AI and learning in the first version; revision 5: new enforcement model with instant delete + ban by default, no trust grace on detection, silent bot, auto-ban matrix and ask-admins mode; revision 4: adds hacked-account handling, one-number capacity model, unbounded queue with slow-down-only pacing and capped kick batches, and the open-source/self-hosting framing to revision 3's network bans and spammer intelligence). Nothing is built yet.
 **Stack:** Go + [whatsmeow](https://github.com/tulir/whatsmeow) (`go.mau.fi/whatsmeow`), PostgreSQL, Docker Compose (ARM64 + AMD64); runs anywhere Docker does (the user's own instance runs on Coolify).
 **Scope:** A from-scratch rewrite. The existing Baileys/Node code in this repo is ignored.
 **Project type:** **open source and self-hosted**, aimed at big groups and communities. Anyone can run their own instance with one `docker compose up`. Throughout this document, **"operator" means whoever deploys an instance**, and "global" means "across all groups of that one deployment".
@@ -127,7 +127,7 @@ Legend: ✅ supported directly · ⚠️ supported with caveats · 🔧 needs a 
 
 | Topic | Finding |
 |---|---|
-| Store | `store/sqlstore.Container` works on **PostgreSQL** (pgx) or SQLite. `Container.GetAllDevices()` / `NewDevice()` manage **multiple bot numbers in one database**. |
+| Store | `store/sqlstore.Container` works on **PostgreSQL** (pgx) or SQLite; **we use Postgres only** (§4.1). `Container.GetAllDevices()` / `NewDevice()` manage **multiple bot numbers in one database**. |
 | Pairing | QR (`GetQRChannel`) or **phone-number pair code** (`PairPhone`), which is nicer for headless servers. |
 | Event delivery | Handlers run **synchronously** on the receive loop. `AddEventHandlerWithSuccessStatus` and `SynchronousAck` let us ack a message only after we have durably stored it. Handlers must return fast, so we hand work off to a queue. |
 | Reconnect | `EnableAutoReconnect` (default on), `AutoReconnectHook`, `KeepAliveTimeout`/`KeepAliveRestored` events. |
@@ -191,13 +191,79 @@ servers          │   whatsmeow.Client ── event handler ── Inbox writer
 | **Decision engine** | Combines signals, trust and group policy into a verdict and an **action plan** using the routing in §8.3: delete, ban, ask admins, policy delete, or nothing (warn/mute only with the optional ladder). Writes `detections` and enqueues actions. |
 | **Action executor** | The *only* code that performs WhatsApp writes. Serial per bot number, with priorities, pacing, backoff, a circuit breaker and coalescing (§10). |
 | **Web/API** | Dashboard, OTP login, settings, review queue, appeals, audit log, metrics. |
-| **Scheduler** | Periodic jobs: group info refresh, cache warm-up, retro-cleanup, data retention purge, list updates (URLhaus etc.), join-request polling. |
+| **Jobs (River)** | Background and periodic jobs (§4.1): group info refresh, cache warm-up, retro-cleanup, data retention purge, list updates (URLhaus etc.), join-request polling. |
 
 ### Why this shape
 
-- **Postgres as the only required dependency.** It covers queues (`FOR UPDATE SKIP LOCKED`), settings change notifications (`LISTEN/NOTIFY`), the whatsmeow store and app data. Coolify runs it with one click. Redis is added only when we go multi-node.
+- **Postgres as the only required dependency.** It covers queues (River for background jobs, `FOR UPDATE SKIP LOCKED` for WhatsApp actions), settings change notifications (`LISTEN/NOTIFY`), the whatsmeow store and app data. Coolify runs it with one click. Details and alternatives in §4.1.
 - **Single binary** keeps deployment on the 2 vCPU VM trivial and makes ARM64 builds easy (pure Go where possible, §19).
 - The **replayable inbox** gives us offline evaluation and regression testing on real traffic (§18).
+
+### 4.1 Technical architecture and stack
+
+#### Language: Go
+
+- **whatsmeow is Go-only**, and it's the most actively maintained WhatsApp multi-device library.
+- **One static binary:** a ~25 MB distroless image, `CGO_ENABLED=0` for the core, and easy **multi-arch builds (ARM64 + AMD64)**.
+- **Low memory**, and **goroutines** for the many concurrent, mostly I/O-bound tasks (one connector per number, analysis workers, enrichment).
+- Go's `regexp` is **RE2**: linear time, so admin-supplied patterns can't cause catastrophic backtracking.
+- **Python is used only for the private, offline dataset preparation** (§7.8), which isn't part of the bot or the repository.
+
+#### Architecture: a modular monolith
+
+One Go codebase with **strict internal modules behind interfaces** (connector, ingestion, analyzers, decision engine, action executor, AI gateway, learning, web API, jobs). It runs as one binary in **roles** (`connector`, `workers`, `api`), all together by default or split across processes later (§15).
+
+**Why not microservices:**
+- **The bottleneck is WhatsApp's per-number write pace** (§10.3), not compute. More services don't make the bot faster.
+- **The connector can't be split.** Each number must be owned by exactly one process (§3, §15).
+- A message broker plus many containers is a real **burden for self-hosters**.
+- Network hops between services add **latency** to the fast lane.
+- **Dual writes** to a database and a broker invite consistency bugs. With Postgres as the queue, enqueuing an action is part of the same transaction as the detection that caused it.
+
+**Natural external pieces:** the **AI provider** (a hosted API or a local server such as Ollama, §7.4) and **media tools** (`ffmpeg`/`tesseract`, run as subprocesses in the optional `-media` image).
+
+#### Database: PostgreSQL only
+
+One Postgres holds the **whatsmeow store**, **app data** and **queues**. There's **no SQLite "lite mode"**: one engine to support, test and migrate.
+
+| Option | Verdict | Why |
+|---|---|---|
+| **PostgreSQL** | **chosen** | whatsmeow supports it; transactional queues (`SKIP LOCKED`, `LISTEN/NOTIFY`); JSONB for settings and signals; arrays + GIN for fingerprints; partitioning for growth; one-click on Coolify and every host |
+| SQLite | rejected | single writer; weak for concurrent workers and queue polling; a second engine to test; no `LISTEN/NOTIFY` |
+| MongoDB | rejected | whatsmeow has no Mongo store; no transactional job queue with the app data; it adds a second database anyway |
+| Redis / Valkey | not needed | the queues and cache are covered by Postgres + an in-process cache. It's only an option later for multi-node rate-limit buckets (§15). |
+| A separate vector DB | not needed | there are no embeddings in the core (§7.4); a future `Embedder` wouldn't justify a new service |
+
+#### Queues and jobs
+
+- **Background jobs** use **[River](https://github.com/riverqueue/river)**, a Postgres-backed Go job queue with **transactional enqueue**, retries with backoff, priorities, scheduled/periodic jobs and unique jobs. That covers enrichment, retention purges, nightly jobs, imports, group-info refresh, list updates and join-request polling.
+- The **WhatsApp action executor stays custom** (§10). Strict **per-number serial pacing** with jitter, the fixed ceiling and slow-down is the core ban protection, and River's concurrency-limiting features are in its paid Pro tier. It's still Postgres-backed (`actions` table, `SKIP LOCKED`).
+- **No external broker** (Kafka, RabbitMQ, NATS).
+
+#### Libraries
+
+| Concern | Choice |
+|---|---|
+| WhatsApp | `go.mau.fi/whatsmeow` (+ its `sqlstore` on Postgres) |
+| DB access | `jackc/pgx` v5 + **sqlc** (typed queries from SQL) |
+| Migrations | **goose**, migrations embedded in the binary and run on start |
+| Jobs | **River** (background jobs); custom executor for WhatsApp actions |
+| Cache | **otter** (in-process, TTL + size bounds) |
+| Logs / metrics | **zerolog** (as whatsmeow uses) + **Prometheus** client |
+| Text | Aho-Corasick (keyword lists), Go `regexp` (RE2), `golang.org/x/text` (NFKC, normalization), embedded TR39 confusables |
+| Phone numbers / domains | `nyaruka/phonenumbers`, `golang.org/x/net/publicsuffix` |
+| Images | `corona10/goimagehash` (pHash/dHash), `golang.org/x/image/webp` (static WebP) |
+| AI | thin adapters per provider (Anthropic, OpenAI-compatible, Google) behind `AIClassifier` (§7.4) |
+| Tests | standard `testing` + fuzzing, **testcontainers-go** (real Postgres in tests), a **fake `WAClient`** so most tests need no WhatsApp account |
+
+#### Deployment shape and resources
+
+- **Docker Compose:** `bot` + `postgres`, plus an optional **local AI server** (e.g. Ollama) profile and the optional `-media` and monitoring profiles (§19).
+- **Resource estimate on the 2-vCPU / 11 GB ARM VM:**
+  - the bot: ~100–300 MB RAM;
+  - Postgres: ~0.5–1 GB;
+  - the CPU is mostly idle between messages.
+- **AI tier hardware:** a **local chat LLM on 2 ARM cores is slow** (seconds to tens of seconds per call). It's workable only because AI calls are rare and queued. For the AI tier, a **hosted provider or bigger hardware** (more cores or a GPU) is recommended.
 
 ---
 
@@ -320,8 +386,8 @@ Every suspicious message ends up in one of three bands. This is the backbone of 
 
 | Band | What puts a message here | What happens |
 |---|---|---|
-| **CERTAIN** | **Exact or near-exact known spam:** media/sticker SHA256; pHash within a tight distance; SimHash within a **tight** Hamming distance (default ≤ 3 of 64 bits); embedding similarity ≥ 0.97 to a confirmed-spam entry. **Blocklisted** URL, domain, advertised number, channel, invite or media hash. The **manual blacklist** (§9.8). **Hard policy violations** (the group's content rules, §9.3). | Act at once. Spam (confidence source `known`) follows the **auto-ban matrix** (§9.2). Rule-breaking follows the group's policy action, by default a silent delete. |
-| **UNCERTAIN** | Anything suspicious (score ≥ `T_review`) that isn't certain: similarity below the tight thresholds, heuristics, unknown or new links and domains, enrichment results, behaviour signals | **The AI verifies** (T3, §7.4). It gets the message plus a few of the **nearest confirmed-spam examples** (few-shot), and returns spam / not spam / unsure with a confidence and a reason. **Spam with confidence ≥ 0.9:** the message is deleted, and under the early-AI safety rule the **ban goes to admins** until the AI has a track record (§9.2). **Not spam with confidence ≥ 0.9:** nothing happens; it's logged. |
+| **CERTAIN** | **Exact or near-exact known spam:** media/sticker SHA256; pHash within a tight distance; SimHash within a **tight** Hamming distance (default ≤ 3 of 64 bits), or MinHash Jaccard ≥ 0.9, to a confirmed-spam entry. **Blocklisted** URL, domain, advertised number, channel, invite or media hash. The **manual blacklist** (§9.8). **Hard policy violations** (the group's content rules, §9.3). | Act at once. Spam (confidence source `known`) follows the **auto-ban matrix** (§9.2). Rule-breaking follows the group's policy action, by default a silent delete. |
+| **UNCERTAIN** | Anything suspicious (score ≥ `T_review`) that isn't certain: SimHash/MinHash closeness below the tight thresholds, heuristics, unknown or new links and domains, enrichment results, behaviour signals | **The AI verifies** (T3, §7.4). It gets the message plus a few **related confirmed-spam examples** (few-shot, chosen by shared fingerprints, keywords, campaign or category; §7.4), and returns spam / not spam / unsure with a confidence and a reason. **Spam with confidence ≥ 0.9:** the message is deleted, and under the early-AI safety rule the **ban goes to admins** until the AI has a track record (§9.2). **Not spam with confidence ≥ 0.9:** nothing happens; it's logged. |
 | **STILL UNCERTAIN** | The AI says unsure, or its confidence is below 0.9, or AI isn't configured or is out of budget | **Ask admins** (§9.5). The message stays visible by default (`uncertain.delete_while_pending: false`). Admins decide delete and ban. |
 
 **Why "certain" is tight.** The bot keeps **no normal-message data** (§7.5, §17), so there's no ham set to calibrate against. The "certain" thresholds are therefore deliberately **tight and conservative**, and anything looser goes to the AI. They can only be loosened by an operator, based on review outcomes.
@@ -335,8 +401,7 @@ Every suspicious message ends up in one of three bands. This is the backbone of 
 | Tier | Budget | What runs | Typical outcome |
 |---|---|---|---|
 | **T0: Policy & exact** | < 1 ms, no I/O beyond cache | content-type policy (blocked types), allow-lists (member/admin/domain), exact blocklists (keywords, regex, domains, channel IDs, numbers, media SHA256, sticker SHA256), known-spam fingerprints | The **CERTAIN** band: hard policy violations and known spam are decided here (~60–80% of spam in practice is repeats). |
-| **T1: Cheap heuristics** | < 5 ms, cached I/O only | normalized + fuzzy text matching, thumbnail pHash, URL canonical/reputation (cached), rate/flood/behaviour counters, trust score, cross-group campaign check | Most normal messages are cleared here with a low score. Suspicious ones go on to verification. |
-| **T1.5: Corpus similarity** | 5–30 ms (local embedding) | nearest neighbours of the message in the **confirmed-spam corpus** via pgvector (§7.5), after a fingerprint allow-list check | Above the tight threshold it's **CERTAIN**. Below it, the nearest examples become the AI's few-shot examples. Runs only for suspicious messages. |
+| **T1: Cheap heuristics** | < 5 ms, cached I/O only | normalized + fuzzy text matching, **SimHash/MinHash near-duplicate matching** against the confirmed-spam corpus (after the fingerprint allow-list check), thumbnail pHash, URL canonical/reputation (cached), rate/flood/behaviour counters, cross-group campaign check | Most normal messages are cleared here with a low score. Suspicious ones go on to verification. |
 | **T2: Enrichment** | 50 ms–3 s, network (rate-limited, cached) | profile fetch (picture hash, about, business profile), invite/channel resolution, URL unshortening/RDAP, full media download + pHash, OCR | Resolves mid-confidence cases. Async: a **first fast verdict is allowed** if T1 is already decisive. |
 | **T3: Text AI** | 0.5–3 s, paid | LLM classification of the normalized text surfaces + context (structured output) | The verifier for the **UNCERTAIN** band (§7.0). Unsure or low-confidence answers go to admins. |
 | **T4: Vision AI** | 1–5 s, paid | vision model on image/sticker/thumbnail/profile picture | Only when visual evidence is decisive and cheaper tiers are inconclusive. |
@@ -371,8 +436,8 @@ Matching on `Norm`:
 - **Spam score vs. policy.** Content-type rules ("no videos here") aren't spam signals. They're evaluated separately as **policy violations**, which by default lead to a silent delete with no ban (§9.3). If a message is both, the spam route applies.
 - **Confidence source.** Each verdict records the strongest kind of evidence behind it, so the auto-ban matrix can be strict about which evidence is enough to ban (§9.2):
   - `known`: exact or near-duplicate fingerprint of known spam, or a blocklisted or learned domain, URL, advertised number, channel, invite or media/sticker hash, a campaign artifact, or a **blacklisted phone number** in a vCard, `wa.me` link or the text (§9.8);
-  - `rules`, `similarity`: heuristics/enrichment/behaviour, or corpus similarity below the tight threshold. These never act alone; they send the message to the AI;
-  - `ai`: the AI verified it (with `rules`/`similarity` as its inputs). This is the source of every UNCERTAIN-band deletion.
+  - `rules`: heuristics, enrichment, behaviour, or SimHash/MinHash closeness below the tight CERTAIN thresholds. These never act alone; they send the message to the AI;
+  - `ai`: the AI verified it (with `rules` signals as its inputs). This is the source of every UNCERTAIN-band deletion.
 - **Thresholds per group** (with presets):
   - `T_review` (default 0.60): "suspicious". Below it a message is clean. At or above it, a non-certain message goes to the AI for verification (§7.0).
   - **"Delete line" (`T_delete`):** reached only by CERTAIN evidence or by an AI spam verdict with confidence ≥ `ai.spam_confidence` (default 0.9). **Heuristics alone never reach it.** Without verification, a suspicious message goes to admins.
@@ -399,9 +464,9 @@ type AIClassifier interface {
 
 Others can be added through the interface (§22.2). The **model, endpoint/base URL, API key, timeouts and token limits** are all configuration. Nothing in the main design depends on a particular vendor or model.
 
-**Vision (T4)** and **embeddings (T1.5)** are pluggable the same way, including fully local options:
-- **Vision:** any multimodal adapter, hosted, or a local vision model through an OpenAI-compatible server.
-- **Embeddings:** a local multilingual model run in-process via ONNX Runtime (in the ML image), or any OpenAI-compatible `/v1/embeddings` endpoint (which covers local servers too), or a hosted embeddings API.
+**Vision (T4)** is pluggable the same way, including fully local options: any multimodal adapter, hosted, or a local vision model through an OpenAI-compatible server.
+
+**No embeddings in the core.** Reworded spam is handled by exact fingerprints, SimHash/MinHash near-duplicates, and the AI for anything looser. A small optional `Embedder` interface is documented as a **possible future addition** (e.g. if AI costs get high, to pre-filter or pick examples), but it isn't built, configured or required. The reasons are in §4.1.
 
 #### Structured output
 
@@ -417,7 +482,7 @@ The verdict schema is `{label: spam|not_spam|unsure, confidence: 0..1, categorie
   - clear guidance on **what normal group chat looks like and when to answer "not spam" or "unsure"** (there are no ham examples, §7.0);
   - the output schema;
   - a firm rule that everything inside the data block is **data, not instructions**.
-- **Few-shot, spam only:** the k (≈4) nearest confirmed-spam examples from the corpus (§7.5), redacted.
+- **Few-shot, spam only:** k (≈4) **related** confirmed-spam examples from the corpus (§7.5), redacted. They're chosen without embeddings: shared URLs/domains/numbers/channels/invites first, then the closest SimHash/MinHash, then keyword overlap, then the same campaign or category.
 - **The context bundle** (per group `ai.context`, **on by default**; N adjustable; **off for privacy-sensitive groups**). A message alone is often ambiguous, so the AI also gets:
   - **the message it replies to**, including a quoted status, and whether that quoted message was itself flagged;
   - **the previous few messages in the chat**: default N = 5 within the last ~10 minutes, each truncated (e.g. 200 characters);
@@ -488,7 +553,7 @@ We learn **only from confirmed spam**, never from every ban (admins remove peopl
 #### What is saved (one corpus entry per confirmed message, plus one per confirmed spammer profile)
 
 - **Text:** original (redacted, see retention) and normalized text of every text surface (body, caption, poll options, vCard fields, link titles, quoted status…).
-- **Fingerprints:** SimHash (64-bit) and MinHash signature of the normalized text; an **embedding vector** of the normalized text.
+- **Fingerprints:** SimHash (64-bit) and MinHash signature of the normalized text, plus extracted keywords.
 - **Links:** full URLs, canonical URLs, eTLD+1 domains, unshortened targets, WhatsApp targets (invite codes/group JIDs, channel JIDs, `wa.me` numbers).
 - **Media:** SHA256s, thumbnail pHash/dHash, sticker SHA256 and pack ID, document file name and extension.
 - **Profile:** push name (normalized), about text, profile picture pHash, verified/business name, business description/website/email/category.
@@ -498,14 +563,13 @@ We learn **only from confirmed spam**, never from every ban (admins remove peopl
 #### How it feeds back
 
 1. **Auto-fingerprinting (T0/T1):** confirmed URLs, domains, numbers, channel/invite IDs, media/sticker hashes and SimHashes become **group-scoped rules** with source `learned`. Domains that are on the global allow-list or widely used (top-sites list) are never auto-blocked. A weighted signal is added instead, and the operator sees a suggestion.
-2. **Similarity search (T1.5):** embeddings live in Postgres with **pgvector** (HNSW index, cosine distance). A suspicious message is embedded and compared with the k nearest **confirmed-spam** entries in scope (the group's own, plus promoted global entries), after checking the **fingerprint allow-list** (overturned patterns, below). Similarity above the tight threshold is CERTAIN (§7.0). Anything below goes to the AI with those nearest examples as few-shot. There's no ham corpus to compare against.
-   - *Embedding model (pluggable, §7.4; open question §21):* a small multilingual model run locally (e.g. a ~384-dimension E5/MiniLM-class model via ONNX Runtime, in the ML image), or any OpenAI-compatible or hosted embeddings endpoint. Embeddings are computed only for suspicious messages and for corpus entries, not for every message.
-3. **LLM few-shot (T3):** the nearest confirmed-**spam** examples are passed to the AI (§7.4). There are no ham examples.
+2. **Near-duplicate matching (T1):** new messages are compared against the confirmed-spam corpus by **SimHash** (LSH bands for fast lookup) and **MinHash** (Jaccard), after checking the **fingerprint allow-list** (overturned patterns, below). Within the tight thresholds it's CERTAIN (§7.0); a looser match is a `rules` signal that sends the message to the AI. This catches the common case (templates reused with small edits) in microseconds, without an embedding model.
+3. **LLM few-shot (T3):** related confirmed-**spam** examples (by shared fingerprints, SimHash/MinHash closeness, keywords, or campaign/category) are passed to the AI (§7.4). There are no ham examples.
 4. **Periodic re-weighting:** a weekly job fits per-signal weights (logistic regression) on decided reviews and confirmed/overturned detections. Each weight can change by at most ±20% per cycle. The new weights are replayed against recent review decisions and shadow-mode outcomes (§18), and only applied if the measured overturn rate doesn't rise and recall on the spam hold-out doesn't drop. Global weight changes need operator approval. Per-group offsets are only applied once a group has enough labels (e.g. ≥ 50).
 
 #### Local first, global later (global = across this deployment)
 
-A learned pattern is **group-local** at first. It's **promoted to global** (affecting all groups that opted into network intelligence) only when the same pattern (same domain/number/channel/hash, or embedding/SimHash within the threshold) is confirmed in **≥ 3 unrelated groups** within 30 days. "Unrelated" means different owners/superadmins, member overlap under 20%, not in the same community, and different deciding admins. High-impact pattern types (domains, common short phrases) also need operator approval before going global.
+A learned pattern is **group-local** at first. It's **promoted to global** (affecting all groups that opted into network intelligence) only when the same pattern (same domain/number/channel/hash, or SimHash/MinHash within the threshold) is confirmed in **≥ 3 unrelated groups** within 30 days. "Unrelated" means different owners/superadmins, member overlap under 20%, not in the same community, and different deciding admins. High-impact pattern types (domains, common short phrases) also need operator approval before going global.
 
 #### Poisoning protection (malicious or careless admins)
 
@@ -523,7 +587,7 @@ An admin "not spam" (review ❌, `.notspam`, website button, or an upheld appeal
 #### Retention and privacy
 
 - Raw text in corpus entries is **redacted on save** (third-party phone numbers, emails and @mentions masked; the spam's own advertised contact numbers are kept only as keyed hashes) and kept for **180 days** (configurable).
-- Fingerprints, hashes and embeddings are kept while they keep matching, and expire after 180 days without a hit.
+- Fingerprints and hashes are kept while they keep matching, and expire after 180 days without a hit.
 - Spammer profile data (name, about, picture hash) is stored only for *confirmed* spammers, and expires the same way.
 - Groups that opt out of network intelligence contribute **nothing** to the global corpus. Their learning stays group-local.
 - A privacy note (linked in the onboarding DM, the bot's profile text and on the website) explains what's stored, why and for how long. Group owners can delete their group's corpus at any time, and it's deleted automatically when the bot leaves a group.
@@ -631,18 +695,18 @@ One record per line (JSONL) or per row (CSV with a header). Only `text` is requi
 | `language` | no | e.g. `ar`, `en` (detected if missing) |
 | `category` | no | e.g. `crypto`, `jobs`, `adult`, `promo` |
 | `source` | no | free-form provenance note (e.g. "spam-only group export, 2026-10") |
-| `cluster_id` | no | campaign/cluster identifier. Records with the same id are kept together when splitting train/hold-out. If missing, the importer clusters near-duplicates itself (SimHash/MinHash + embeddings). |
+| `cluster_id` | no | campaign/cluster identifier. Records with the same id are kept together when splitting train/hold-out. If missing, the importer clusters near-duplicates itself (SimHash/MinHash). |
 
 The format, with examples, is documented in `docs/CORPUS_FORMAT.md`.
 
 #### What import does
 
 1. **Validate** each record and report rejected lines. `--dry-run` shows what would happen without writing anything.
-2. **Normalize and fingerprint** (§7.2): normalized text, extracted URLs/domains, invites, channel IDs, numbers (stored as keyed hashes); SimHash, MinHash and an **embedding**; plus any media hashes provided.
+2. **Normalize and fingerprint** (§7.2): normalized text, extracted URLs/domains, invites, channel IDs, numbers (stored as keyed hashes); SimHash and MinHash; plus any media hashes provided.
 3. **Dedupe** against the existing corpus and within the file. Exact and near-duplicates are merged and counted, not stored twice.
 4. **Split** a hold-out slice for evaluation (default 20%, stratified by category and kind) **by cluster/campaign, not by message**. Near-duplicates of a test record can't leak into the corpus, which would inflate scores. The hold-out is spam-only, so it measures **recall** (§18).
 5. **Store** the rest as corpus entries with `source = import` in the **scope the operator picks**: instance-wide, or one group.
-   - Imported spam produces fingerprints and similarity entries like confirmed spam (§7.5). Exact and near-duplicate matches count as `known` evidence (§7.3); anything weaker is an ordinary weighted signal, and, like all similarity, never auto-bans until it has a track record (§9.2).
+   - Imported spam produces fingerprints and SimHash/MinHash entries like confirmed spam (§7.5). Exact and tight near-duplicate matches count as `known` evidence (§7.3). Looser closeness is a `rules` signal that sends the message to the AI, so it never bans on its own.
    - **Optional `ham` records are never stored as text.** They're only used in memory during the import, to report how many would have been caught (a rough false-positive check), and, if the operator chooses, to add **fingerprint allow-list entries**.
 6. **Report:** records imported, duplicates merged, clusters, the hold-out size, any categories or languages with too few examples to be useful, and, if ham records were given, the in-memory false-positive check.
 
@@ -650,7 +714,7 @@ Imports can be **undone** (`antispam corpus remove --import <id>`): every entry 
 
 #### Spam-only by design
 
-The corpus holds **confirmed spam only**. That's enough for fingerprints (the CERTAIN band), similarity search and few-shot examples. What the corpus can't do without ham, the design covers elsewhere:
+The corpus holds **confirmed spam only**. That's enough for fingerprints and near-duplicate matching (the CERTAIN band) and few-shot examples. What the corpus can't do without ham, the design covers elsewhere:
 - **normal-chat guidance** for the AI lives in its system prompt (§7.0);
 - **false positives** are measured from admin reviews and shadow mode, not from a ham set (§18);
 - **poisoning protection** uses in-memory checks against recent traffic (§7.5).
@@ -737,7 +801,7 @@ The default mode is `auto` (the routing table above). The "Ask admins" preset (�
   - Optional per group, **off by default**: DM the removed person once with an appeal link (`appeals.notify_removed`). It's off because an unsolicited DM to a stranger is a ban risk (§3).
 
   An appeal is routed like any review (§9.5). Approval lifts the ban, clears strikes, sets a temporary allow-list, and gives the member an invite link, sent as a reply in their **existing** DM thread, so it's never unsolicited.
-- **Feedback loop:** every confirm/overturn is a labeled example that feeds the learning system ([§7.5](#75-learning-from-confirmed-spam)): fingerprints, the similarity corpus, LLM examples and rule weights. Rules with an overturn rate above x% are auto-disabled and the operator is alerted.
+- **Feedback loop:** every confirm/overturn is a labeled example that feeds the learning system ([§7.5](#75-learning-from-confirmed-spam)): fingerprints and near-duplicate entries, LLM examples and rule weights. Rules with an overturn rate above x% are auto-disabled and the operator is alerted.
 
 ### 8.6 Global safety rails
 
@@ -810,9 +874,9 @@ For **spam from new/unknown senders**, each content type has its own action. Est
 | `delete_only` | delete, never ban |
 | `allow` | spam detection doesn't act on this type (it's still recorded for stats and learning) |
 
-**Evidence refinement (optional per cell):** `auto_ban` lists which confidence sources (§7.3) may ban. The default is `auto_ban if source = known, else ask`: only CERTAIN evidence (§7.0) bans automatically. Heuristics and similarity never act alone; they go to the AI, and an AI-verified (`ai`) ban goes to admins.
+**Evidence refinement (optional per cell):** `auto_ban` lists which confidence sources (§7.3) may ban. The default is `auto_ban if source = known, else ask`: only CERTAIN evidence (§7.0) bans automatically. Heuristics and looser near-duplicate matches never act alone; they go to the AI, and an AI-verified (`ai`) ban goes to admins.
 
-**Early-AI safety: an AI "spam" verdict can't auto-ban until it has a track record.** In every preset, a ban resting on the AI's verdict (source `ai`) routes to **ask admins**. Similarity below the tight CERTAIN threshold never bans either, because it only feeds the AI. The website greys these sources out of the "auto-ban" choice, and `.autoban … auto ai` is refused, until that source has a **track record on this instance**: at least 200 admin decisions on reviews where it was the deciding source, with ≥ 98% of them confirmed as spam over the last 30 days (both configurable), plus the measured shadow-mode precision (§18). Even then, enabling it is an explicit operator/admin choice, never automatic. Every admin decision on these reviews feeds the learning loop (§7.5) and the track record.
+**Early-AI safety: an AI "spam" verdict can't auto-ban until it has a track record.** In every preset, a ban resting on the AI's verdict (source `ai`) routes to **ask admins**. A near-duplicate match below the tight CERTAIN thresholds never bans either, because it only feeds the AI. The website greys these sources out of the "auto-ban" choice, and `.autoban … auto ai` is refused, until that source has a **track record on this instance**: at least 200 admin decisions on reviews where it was the deciding source, with ≥ 98% of them confirmed as spam over the last 30 days (both configurable), plus the measured shadow-mode precision (§18). Even then, enabling it is an explicit operator/admin choice, never automatic. Every admin decision on these reviews feeds the learning loop (§7.5) and the track record.
 
 **Presets fill the matrix**, so non-technical admins never have to touch it:
 
@@ -1117,6 +1181,7 @@ All WhatsApp **writes** (and expensive IQ reads) go through here. It's the main 
 
 ### 10.1 Structure
 
+- **Custom, not River** (§4.1): strict per-number serial pacing is the core ban protection.
 - **Persistent** table `actions` (Postgres): `id, bot, group, kind, payload, priority, status, attempts, not_before, dedupe_key, created_at, reason_detection_id`.
 - **One executor goroutine per bot number** (strictly serial, one action at a time) pulls with `SELECT … FOR UPDATE SKIP LOCKED ORDER BY priority, not_before, id`.
 - In memory: a priority heap holds only the next few hundred actions per priority, refilled from the table. The table is the source of truth (crash-safe).
@@ -1261,7 +1326,7 @@ Settings are a versioned JSON document per group (validated against a Go struct 
     "thresholds": { "review": 0.60, "delete": 0.85, "ban": 0.95 },
     "ai": { "enabled": true, "vision": false, "daily_budget_calls": 200,
             "spam_confidence": 0.90, "not_spam_confidence": 0.90 },        // the AI verification (§7.0)
-    "certain": { "simhash_max_distance": 3, "embedding_min_similarity": 0.97, "phash_max_distance": 4 },  // tight; operator-only
+    "certain": { "simhash_max_distance": 3, "minhash_min_jaccard": 0.9, "phash_max_distance": 4 },  // tight; operator-only
     "network_intelligence": true,       // share and consume cross-group reputation
     "languages": ["ar", "en"]
   },
@@ -1341,7 +1406,13 @@ A non-technical admin can run a group with commands alone. The website is where 
 
 ### 13.1 Tech choice
 
-**Recommendation:** a Go server-rendered UI (`templ` + `htmx` + a small CSS framework). It's a single binary with no Node build in CI, fast on phones, and enough for forms/tables/review queues. Alternative: an SPA (SvelteKit/React) talking to a JSON API, which is better if you want a richer UI later. Either way, the backend exposes a clean JSON API (`/api/v1/...`) so the UI can be swapped (open question §21).
+**Decided later; the API comes first.** The website will be a **separate frontend app** (React, Svelte or Next.js, to be chosen when the full version is built), talking to the bot's **versioned JSON API (`/api/v1`)**. The Go binary serves the API, and can **optionally serve the static frontend build** from the same origin. What this implies:
+- **The API is a first-class contract.** It's described by an **OpenAPI spec** in the repo, and the commands and the website share the same settings keys and permission checks (§13.0). Third-party tools can use it too.
+- **Same-origin by default.** Serving the frontend build from the Go binary (or behind the same reverse proxy) avoids **CORS** entirely. If a deployer hosts the frontend on another origin, CORS must be configured explicitly (allowed origins, credentials), and cookies need `SameSite=None; Secure`.
+- **Sessions:** server-side sessions in an `HttpOnly` cookie stay the default (simplest and safest for a same-origin web app). Short-lived **API tokens** are available for non-browser clients and other-origin setups. CSRF protection applies to cookie sessions.
+- **CI:** a **separate frontend build** (its own package manager and lint/test steps) produces static files that are copied into the image or published as their own artifact.
+
+Phase 1 needs no frontend: everything works by command (§13.7), and the API is built alongside.
 
 The dashboard is **mobile-first** (most admins will open it from WhatsApp on their phone), **RTL-aware**, and **Arabic + English** from day one (assumed; to confirm).
 
@@ -1358,7 +1429,7 @@ The dashboard is **mobile-first** (most admins will open it from WhatsApp on the
 
 **Safer alternative (recommended as the default, with the above as a fallback; open question §21): "message the bot to log in."** The dashboard shows a code and a button that opens `https://wa.me/<botnumber>?text=LOGIN%20482913`. The user taps it and sends. The bot receives an **inbound** DM, checks the sender's number matches, and the browser session (waiting via SSE/polling) is logged in. It's one tap on a phone, proves phone ownership just as well, and the bot never initiates a conversation, so there's zero ban risk from logins. Once a user has messaged the bot, later outbound OTPs to them are also much lower risk.
 
-**Sessions:** an opaque random session ID in an `HttpOnly; Secure; SameSite=Lax` cookie, stored server-side (Postgres) with a 30-day sliding expiry. "Log out other devices" is supported. CSRF tokens are used for htmx/form posts.
+**Sessions:** an opaque random session ID in an `HttpOnly; Secure; SameSite=Lax` cookie (same-origin default, §13.1), stored server-side (Postgres) with a 30-day sliding expiry. "Log out other devices" is supported. CSRF tokens are used for htmx/form posts.
 
 ### 13.3 Permissions
 
@@ -1487,7 +1558,7 @@ message_index(group_jid, msg_id, sender_person, ts, fingerprint, simhash bigint,
 
 -- detection and actions
 detections(id, group_jid, msg_id, person_id, score, tier_reached, signals jsonb, verdict /*spam|policy|clean*/,
-           confidence_source /*known|rules|similarity|ai*/, route /*auto_ban|ask|delete_only|allow|policy|none*/,
+           confidence_source /*known|rules|ai*/, route /*auto_ban|ask|delete_only|allow|policy|none*/,
            rule_version, action_plan jsonb, mode /*shadow|enforce|network_rescan*/, network_ban_id NULL, evidence_ref, created_at)
 actions(id, bot_id, group_jid, kind, payload jsonb, priority smallint, status, attempts,
         not_before, deadline, dedupe_key UNIQUE, detection_id, last_error, created_at, done_at)
@@ -1529,7 +1600,7 @@ manual_actions(id, group_jid, actor_person_id, target_person_id, kind /*ban|kick
 corpus_entries(id, kind /*message|profile*/, label /*spam only*/, scope /*group|global*/, group_jid,
         status /*provisional|active|retracted|promoted|expired*/, source /*review|command|auto|import*/, import_batch_id NULL, source_review_id, source_action_id,
         decided_by_person NULL, text_raw_redacted, text_norm, simhash bigint, minhash bytea,
-        embedding vector(384), urls text[], domains text[], number_hashes bytea[], channel_jids text[],
+        keywords text[], urls text[], domains text[], number_hashes bytea[], channel_jids text[],
         invite_codes text[], media_sha256 bytea[], phashes bigint[], profile jsonb, biz jsonb,
         confidence float, hits int, last_hit_at, created_at, expires_at)
 corpus_confirmations(pattern_key, group_jid, admin_person_id, corpus_entry_id, at,
@@ -1597,9 +1668,9 @@ otp_challenges(id, phone_e164, code_hmac, method /*outbound|inbound*/, browser_b
                attempts, expires_at, consumed_at)
 ```
 
-Indexes: `identities(kind, value)`, `identities(person_id)`, `network_bans(person_id, status)`, `identity_watch(kind, value)`, `profile_snapshots(picture_phash)` (BK-tree in memory for Hamming search), `actions(bot_id, status, priority, not_before)`, `detections(group_jid, created_at DESC)`, `message_index(simhash)` (plus an LSH-band table if needed), `members(person_id)`, `reviews(status, deadline)`, `corpus_entries USING hnsw (embedding vector_cosine_ops)` (pgvector), GIN on `corpus_entries(domains)`, `(number_hashes)` and `(channel_jids)`.
+Indexes: `identities(kind, value)`, `identities(person_id)`, `network_bans(person_id, status)`, `identity_watch(kind, value)`, `profile_snapshots(picture_phash)` (BK-tree in memory for Hamming search), `actions(bot_id, status, priority, not_before)`, `detections(group_jid, created_at DESC)`, `message_index(simhash)` (plus an LSH-band table if needed), `members(person_id)`, `reviews(status, deadline)`, SimHash LSH-band table for `corpus_entries` (or an in-memory index), GIN on `corpus_entries(domains)`, `(number_hashes)` and `(channel_jids)`.
 
-**Postgres extension:** `pgvector` is required for T1.5. Use the `pgvector/pgvector:pg16` image instead of the plain Postgres image (§19).
+**Postgres:** the plain official image (`postgres:16`); no extensions are required.
 
 **Retention defaults:** raw inbox 72 h; message fingerprints/metadata 7 d for normal messages and 30 d for spam/actioned ones (no text in either); spammer profiles while the network ban is active, plus 12 months after last activity (details §17.1); evidence snapshots (redacted text + thumbnail) 30 d; corpus raw text 180 d, corpus fingerprints 180 d after the last hit; reviews, votes, detections and audit 180 d; aggregates forever. All configurable.
 
@@ -1609,7 +1680,7 @@ Indexes: `identities(kind, value)`, `identities(person_id)`, `network_bans(perso
 
 ### Capacity model: one bot number
 
-**Compute is not the bottleneck.** whatsmeow uses tens of MB of RAM per number. The cheap tiers take ~0.1–2 ms of CPU per message, so even 200 messages/s fits in one core of the 2 vCPU ARM VM. AI and embeddings run only for the ambiguous few percent.
+**Compute is not the bottleneck.** whatsmeow uses tens of MB of RAM per number. The cheap tiers take ~0.1–2 ms of CPU per message, so even 200 messages/s fits in one core of the 2 vCPU ARM VM. The AI runs only for the uncertain few percent.
 
 **The real budget is WhatsApp writes.** One write is one action: a delete, one kick call (up to `max_kick_batch` members), a lockdown toggle, a review message or a notice. The bot's **ceiling** (§10.3) is fixed and never rises on its own:
 
@@ -1683,7 +1754,7 @@ Feeds are plain files over HTTPS (versioned, signed with the publisher's key). I
   - AI: **calls per 1,000 messages** (target ≤ 20–50, i.e. 2–5%), calls by provider/model, latency, tokens, **cost per day/group** (or compute time for local models), cache and cluster-reuse hit rate, invalid-output retries, share of "unsure", budget remaining;
   - quality: review decisions, **overturn rate** (false-positive proxy), appeals upheld;
   - reviews: items opened by kind, time-to-decision, % timed out, invalid votes (non-admin/late), reviewers pending opt-in;
-  - learning: corpus entries added/retracted/promoted, T1.5 hit rate, poisoning-guard rejections, weight-change deltas.
+  - learning: corpus entries added/retracted/promoted, near-duplicate (SimHash/MinHash) hit rate, poisoning-guard rejections, weight-change deltas.
 - **Health:** `/healthz` (process), `/readyz` (DB + at least one bot connected). Coolify health checks use these.
 - **Alerts** (Grafana or a built-in notifier → Telegram/email/webhook): bot disconnected > 2 min, temp ban, breaker open, repeated slow-down events, daily writes above the alert level (7,500 by default), ceiling changed by an operator, queue wait > 60 s, overturn rate spike, AI budget at 80%, "bot lost admin" in many groups.
 - **Tracing:** optional OpenTelemetry spans per message through the tiers (useful while tuning, off by default).
@@ -1743,7 +1814,7 @@ Storing phone numbers, names, profile photos and message content of identifiable
 | **Normalizers / extractors** | Table-driven tests with real-world evasion samples (zero-width, homoglyphs, Arabic variants, spaced phone numbers). **Go fuzz tests** (`testing.F`) to ensure no panics on hostile input. |
 | **Envelope builder** | Fixtures: one serialized `waE2E.Message` per message type (captured in the spike), plus golden-file envelope output. A test fails if a new proto field type appears unhandled (reflection-based coverage). |
 | **Analyzers** | Unit tests per analyzer with fixed clocks and fakes for enrichment. |
-| **Scoring / decision** | Property tests (all in CI): **only CERTAIN evidence can auto-ban by default**; **heuristics and below-threshold similarity never delete or ban on their own** (they go to the AI or admins); **an AI "spam" verdict alone never auto-bans** until the track record is met; **the AI unsure, low confidence, timeout or AI off → admins, nothing deleted by default**; **no code path writes normal-message text to the corpus, the evidence store after an overturn, or any table outside the 72 h inbox**; **ask-admins mode never auto-bans** (neither variant, nor via timeout fallback or incoming network bans); **a policy violation alone never bans by default**; **established members are never auto-banned and always go to review**; **possibly hacked accounts are never auto-banned**; spam ≥ `T_delete` is deleted whatever the sender's trust (no trust bonus); a matrix cell `delete_only` never bans and `allow` never deletes spam; `auto_ban` with `require_source` never bans on other evidence sources; thresholds are monotonic; the ladder is inert unless enabled. |
+| **Scoring / decision** | Property tests (all in CI): **only CERTAIN evidence can auto-ban by default**; **heuristics and looser near-duplicate matches never delete or ban on their own** (they go to the AI or admins); **an AI "spam" verdict alone never auto-bans** until the track record is met; **the AI unsure, low confidence, timeout or AI off → admins, nothing deleted by default**; **no code path writes normal-message text to the corpus, the evidence store after an overturn, or any table outside the 72 h inbox**; **ask-admins mode never auto-bans** (neither variant, nor via timeout fallback or incoming network bans); **a policy violation alone never bans by default**; **established members are never auto-banned and always go to review**; **possibly hacked accounts are never auto-banned**; spam ≥ `T_delete` is deleted whatever the sender's trust (no trust bonus); a matrix cell `delete_only` never bans and `allow` never deletes spam; `auto_ban` with `require_source` never bans on other evidence sources; thresholds are monotonic; the ladder is inert unless enabled. |
 | **Silent mode** | With `silent: true`, no code path sends a message to a protected group (checked at the action-queue level against the protected-group list); in-group commands are acted on, deleted, and answered by DM; onboarding DMs are only sent to admins with an open thread (except the documented one-per-day command reply). |
 | **Spam-only evaluation & replay** | Two measurements, because there's no ham set. **Recall:** a replay harness runs the **spam-only hold-out slice** of the imported dataset (§7.8; split by cluster/campaign, so near-duplicates can't leak) through the full pipeline, reporting the share caught per band (CERTAIN / AI-verified / sent to admins / missed), per type and per preset, with diffs between rule versions. CI blocks a change that lowers recall. **Precision and false positives:** measured live from **shadow mode** and **admin review decisions**. Every action (or would-be action in shadow mode) that an admin overturns counts as a false positive, reported per band, source, type and group. Rule packs carry synthetic must-not-match examples (§22). The hold-out is versioned and never used for learning. |
 | **Review flow** | Table-driven tests with a fake WA client: reaction/reply parsing (English + Arabic keywords, removed reactions), non-admin and late votes rejected, first-wins under concurrent votes (parallel goroutines against Postgres), edit-within-20-min vs. follow-up, timeout fallbacks, reviewer opt-in gating, fallback chain when the review group is gone. |
@@ -1754,7 +1825,7 @@ Storing phone numbers, names, profile photos and message content of identifiable
 | **Learning** | Promotion only after ≥ 3 unrelated groups; overturn retracts rules and index entries and stores only a fingerprint allow-list entry (no text); the in-memory recent-traffic check rejects "good morning" marked as spam; per-admin rate limits; rollback by admin/group; replay-corpus gate on re-weighting. |
 | **Status/broadcast** | Fixtures captured in the spike for status shares, replies quoting a status, status mentions, Group Status posts, and DM broadcasts. Asserts that the quoted/wrapped content reaches the envelope. |
 | **Action queue** | Deterministic tests with a fake clock and a fake WA client: pacing, jitter bounds, priorities, coalescing, dedup, deadlines, warning signs → slow-down, with a **property test that the effective rate never exceeds the ceiling** and that recovery stops at the ceiling; kick batches never exceed `max_kick_batch`; every JID in a batch is individually eligible; the hourly kick cap defers rather than drops; breaker transitions, crash/restart recovery. |
-| **WhatsApp interface** | All whatsmeow calls go through a narrow `WAClient` interface, so everything above runs without WhatsApp. |
+| **WhatsApp interface** | All whatsmeow calls go through a narrow `WAClient` interface, so everything above runs without WhatsApp. Database-backed tests use **testcontainers-go** with a real Postgres. |
 | **Staging** | A second number in a private test group with a few real phones. A scripted checklist for each release: every message type, delete/kick, edits, raid simulation, OTP login. whatsmeow updates often, so pin versions and run this checklist before bumping. |
 | **Load** | A synthetic event generator at 10× expected peak to check CPU, memory, inbox lag and queue behaviour on ARM64. |
 | **Dataset import** | JSONL and CSV parsing with required/optional fields and clear rejection reports; spam-only files import without warnings (`label` defaults to `spam`); `--dry-run` writes nothing; dedupe within the file and against the corpus; the hold-out split never puts two records with the same `cluster_id` (or the same computed near-duplicate cluster) on both sides; optional `ham` records are never written as text (only allow-list fingerprints if requested); stored text is redacted; `corpus remove --import <id>` removes every entry and fingerprint from that batch. |
@@ -1770,9 +1841,9 @@ Self-hosting is the main way to run the project, not an afterthought. The user's
 
 ### 19.1 What a deployer gets
 
-- **One `docker-compose.yml`** with two services: `bot` (all roles: connector, workers, web) and `postgres` (`pgvector/pgvector:pg16`). Optional profiles add `media` (OCR, video frames, local embeddings), `local-ai` (an Ollama container, for deployers who want models on their own server), and `monitoring` (Prometheus + Grafana).
-- **`.env.example`**, with every variable documented: `DATABASE_URL`, `PUBLIC_URL`, `OPERATOR_PHONES`, `SESSION_SECRET`, optional AI settings (`AI_PROVIDER` = anthropic / openai_compatible / google, `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY`, `AI_TIMEOUT`; the AI tier stays off without them, and uncertain cases go to admins), optional embedding and vision settings in the same shape, `LOG_LEVEL`, retention overrides.
-- **`config.yaml`** (optional) for defaults: the AI/vision/embeddings providers (§7.4), presets, scoring weights, pacing parameters (ceiling, burst, slow-down/recovery, kick batch cap, daily alert level; raising the ceiling is marked as risky), rule-pack subscriptions, feed subscriptions, languages. Each setting has a comment and a safe default, and the bot starts with **no config file at all**.
+- **One `docker-compose.yml`** with two services: `bot` (all roles: connector, workers, web) and `postgres` (plain `postgres:16`). Optional profiles add `media` (OCR, video frames), `local-ai` (an Ollama container, for deployers who want models on their own server), and `monitoring` (Prometheus + Grafana).
+- **`.env.example`**, with every variable documented: `DATABASE_URL`, `PUBLIC_URL`, `OPERATOR_PHONES`, `SESSION_SECRET`, optional AI settings (`AI_PROVIDER` = anthropic / openai_compatible / google, `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY`, `AI_TIMEOUT`; the AI tier stays off without them, and uncertain cases go to admins), optional vision settings in the same shape, `LOG_LEVEL`, retention overrides.
+- **`config.yaml`** (optional) for defaults: the AI and vision providers (§7.4), presets, scoring weights, pacing parameters (ceiling, burst, slow-down/recovery, kick batch cap, daily alert level; raising the ceiling is marked as risky), rule-pack subscriptions, feed subscriptions, languages. Each setting has a comment and a safe default, and the bot starts with **no config file at all**.
 - **A setup guide** (`docs/SELF_HOSTING.md`):
   1. requirements (a dedicated phone number, a small VM, 1 vCPU / 1 GB minimum, 2 vCPU recommended);
   2. `docker compose up -d`;
@@ -1785,8 +1856,10 @@ Self-hosting is the main way to run the project, not an afterthought. The user's
 
 ### 19.2 Build
 
-- Multi-stage Dockerfile. Pure Go (`CGO_ENABLED=0`) with `jackc/pgx`, pure-Go image decoders (`image/jpeg`, `image/png`, `golang.org/x/image/webp` for static WebP) and `corona10/goimagehash`. The result is a ~25 MB distroless image.
-- **`-media` variant:** animated WebP stickers (`x/image/webp` can't decode animation), video keyframes, OCR and a local embedding model need `ffmpeg` / `libwebp` / `tesseract` / ONNX Runtime. They ship as a second image tag (Debian slim) that runs the media/ML workers, so the core image stays minimal. Phases 1–2 can do without it by using thumbnails.
+- Multi-stage Dockerfile (stack in §4.1). Pure Go (`CGO_ENABLED=0`) with `jackc/pgx`, pure-Go image decoders (`image/jpeg`, `image/png`, `golang.org/x/image/webp` for static WebP) and `corona10/goimagehash`. The result is a ~25 MB distroless image.
+- **`-media` variant:** animated WebP stickers (`x/image/webp` can't decode animation), video keyframes and OCR need `ffmpeg` / `libwebp` / `tesseract`. They ship as a second image tag (Debian slim) that runs the media workers (as subprocesses), so the core image stays minimal. Phases 1–2 can do without it by using thumbnails.
+
+- **Frontend (from Phase 3):** a separate CI build of the frontend app produces static files that are copied into the image (served same-origin by the Go binary) or published as their own artifact.
 
 ### 19.3 Running it
 
@@ -1799,17 +1872,17 @@ Self-hosting is the main way to run the project, not an afterthought. The user's
 
 ## 20. Phased roadmap
 
-Durations assume one developer and are rough. **AI and learning are in the first version (Phase 1)**, bootstrapped from existing data. Network bans and spammer intelligence stay in Phase 5. **The full scope stays:** network bans, spammer intelligence, AI similarity and learning are all planned. Phases only order the work. Evidence and identity capture start in Phase 1, so the later phases have history to learn from.
+Durations assume one developer and are rough. **AI and learning are in the first version (Phase 1)**, bootstrapped from existing data. Network bans and spammer intelligence stay in Phase 5. **The full scope stays:** network bans, spammer intelligence, AI verification and learning are all planned. Phases only order the work. Evidence and identity capture start in Phase 1, so the later phases have history to learn from.
 
 | Phase | Scope | Exit criteria |
 |---|---|---|
 | **0. Spike** (≈1 week) | Pair a test number with whatsmeow + Postgres store. Log every event type from real groups to a fixture corpus. Verify: admin revoke of others' messages, batched remove, edit/revoke events, view-once behaviour, vCard business fields, `GetNewsletterInfo*`, `GetGroupInfoFromLink`, the business profile description via raw IQ, LID/PN mapping in your groups, join-request node shape. **Also:** status shares/replies/mentions and Group Status posts as they arrive in groups (wrappers, `ForwardOrigin`, attributions), whether Group Status posts can be revoked, whether `status@broadcast` arrives from members who saved the bot, a broadcast list sent to the bot, reactions and replies on the bot's own messages in DMs and groups, and editing the bot's own message within 20 minutes. Measure safe pacing empirically (the default ceiling is set from this). **Batch-removal test:** remove dummy test accounts from a test group in batches of 1, 5, 8, 10 and 20, and record errors, ack latency, warnings and any account signals, to set `max_kick_batch`. | A written capability report; a fixtures folder; any library gaps confirmed with workarounds. |
-| **1. First version: core + AI + learning** (≈8–10 weeks, in three milestones) | **1a. Core and enforcement (≈4–5 weeks):** Connector, inbox, recursive unwrapper (including status/group-status wrappers), envelope for all types, T0 + T1 text (normalization, lists, fuzzy), URL canonicalization + domain lists, exact media/sticker hashes, **enforcement model**: routing (§8.3), per-type auto-ban matrix with evidence sources (§9.2), presets Relaxed/Standard/Strict/Ask-admins, always-ask-admins modes (a) and (b), ban = kick + rejoin block, policy violations as silent delete-only (§9.3), **silent mode** with inbound-first DM onboarding and command handling (§9.7, §13.6–13.7), the invisible "just joined" signal, policy blocks per type (including status shares/posts), action queue (complete: unbounded Postgres queue, priorities, fixed-ceiling slow-down-only pacing, kick batch cap, newest-first and deadline-aware ordering, batched kicks, backoff, breaker), members/trust as a routing input, **known spam always deleted regardless of trust** (§8.7), early lockdown on deletion backlog. **Command framework** with dotted-key `.set`/`.get` and the moderation commands (`.spam`, `.notspam`, `.ban spam\|other`, `.status`, `.mode`, `.preset`). **Reviews v1:** review group destination, reactions + reply keywords, admin-only first-wins, outcome edit/follow-up, timeout fallback. **Evidence capture** for confirmed spam starts now. **Identity and membership capture** also starts now: LID↔PN identities, join method / added-by / join-to-first-message time for every member, and name/picture history for spammers, so the network and intelligence features have history to work with later. **Local ban** with rejoin block. YAML presets. One bot number. **Open-source scaffolding:** `docker-compose.yml`, `.env.example`, analyzer registry, rule-pack file format with tests, `locales/` (ar/en), CONTRIBUTING/SECURITY, CI with replay tests, multi-arch images.  **1b. AI and learning (≈3–4 weeks):** text AI tier T3 (AI gateway, structured output, budgets, cache, prompt caching, few-shot from the corpus), learning from confirmed spam (§7.5): group-local auto-fingerprints, pgvector corpus + embeddings and the T1.5 similarity tier, overturn retraction, poisoning guards (per-admin limits, admin reputation, ham baseline, rollback), and the **early-AI safety rule** (`ai`/`similarity` → ask admins until they have a track record, §9.2). The embedding model must be chosen first (§21); a local model brings the ML image forward into this phase. **1c. Dataset import and evaluation (≈1 week):** the generic `antispam corpus import` command (JSONL/CSV, §7.8) with dedupe, cluster-aware hold-out split and undo; importing the operator's prepared spam dataset (spam-only by default); the hold-out slice as the first evaluation corpus, and a model comparison on it. **Manual phone-number blacklist** by command (§9.8). | **Before enforcing anywhere:** recall on the spam-only hold-out slice is reported per band and type; AI-only and similarity-only evidence never auto-bans, and only CERTAIN evidence auto-bans (property tests). Then **≥ 1 week of shadow mode** in your own groups with the review queue on. **Precision comes from here:** admins review what the bot would have done, and enforcement starts only when shadow-mode precision for deletions is ≥ 99% (target to confirm) with no would-be ban of an established member. Also: zero automatic bans of admins/established members; the queue never exceeds pacing limits; a review can be opened and decided entirely in WhatsApp. |
+| **1. First version: core + AI + learning** (≈8–10 weeks, in three milestones) | **1a. Core and enforcement (≈4–5 weeks):** Connector, inbox, recursive unwrapper (including status/group-status wrappers), envelope for all types, T0 + T1 text (normalization, lists, fuzzy), URL canonicalization + domain lists, exact media/sticker hashes, **enforcement model**: routing (§8.3), per-type auto-ban matrix with evidence sources (§9.2), presets Relaxed/Standard/Strict/Ask-admins, always-ask-admins modes (a) and (b), ban = kick + rejoin block, policy violations as silent delete-only (§9.3), **silent mode** with inbound-first DM onboarding and command handling (§9.7, §13.6–13.7), the invisible "just joined" signal, policy blocks per type (including status shares/posts), action queue (complete: unbounded Postgres queue, priorities, fixed-ceiling slow-down-only pacing, kick batch cap, newest-first and deadline-aware ordering, batched kicks, backoff, breaker), members/trust as a routing input, **known spam always deleted regardless of trust** (§8.7), early lockdown on deletion backlog. **Command framework** with dotted-key `.set`/`.get` and the moderation commands (`.spam`, `.notspam`, `.ban spam\|other`, `.status`, `.mode`, `.preset`). **Reviews v1:** review group destination, reactions + reply keywords, admin-only first-wins, outcome edit/follow-up, timeout fallback. **Evidence capture** for confirmed spam starts now. **Identity and membership capture** also starts now: LID↔PN identities, join method / added-by / join-to-first-message time for every member, and name/picture history for spammers, so the network and intelligence features have history to work with later. **Local ban** with rejoin block. YAML presets. One bot number. **JSON API `/api/v1` with an OpenAPI spec** (the same settings layer the commands use; the frontend builds on it later). **Open-source scaffolding:** `docker-compose.yml`, `.env.example`, analyzer registry, rule-pack file format with tests, `locales/` (ar/en), CONTRIBUTING/SECURITY, CI with replay tests, multi-arch images.  **1b. AI and learning (≈3–4 weeks):** text AI tier T3 (AI gateway, structured output, budgets, cache, prompt caching, few-shot from the corpus), learning from confirmed spam (§7.5): group-local auto-fingerprints, SimHash/MinHash near-duplicate matching against the corpus, few-shot example selection by shared fingerprints/keywords/campaign, overturn retraction, poisoning guards (per-admin limits, admin reputation, in-memory recent-traffic check, rollback), and the **early-AI safety rule** (`ai` → ask admins until it has a track record, §9.2). **1c. Dataset import and evaluation (≈1 week):** the generic `antispam corpus import` command (JSONL/CSV, §7.8) with dedupe, cluster-aware hold-out split and undo; importing the operator's prepared spam dataset (spam-only by default); the hold-out slice as the first evaluation corpus, and a model comparison on it. **Manual phone-number blacklist** by command (§9.8). | **Before enforcing anywhere:** recall on the spam-only hold-out slice is reported per band and type; AI-only evidence and looser near-duplicate matches never auto-ban, and only CERTAIN evidence auto-bans (property tests). Then **≥ 1 week of shadow mode** in your own groups with the review queue on. **Precision comes from here:** admins review what the bot would have done, and enforcement starts only when shadow-mode precision for deletions is ≥ 99% (target to confirm) with no would-be ban of an established member. Also: zero automatic bans of admins/established members; the queue never exceeds pacing limits; a review can be opened and decided entirely in WhatsApp. |
 | **2. Detection depth** (≈2–3 weeks) | Thumbnail pHash, profile scanning (name/about/picture/business, plus own status when available), invite/channel/WA-link resolution, status attribution URLs and reshared channels, shortener expansion + reputation feeds + RDAP, SimHash campaigns across groups, behaviour (flood, join-and-post, cross-group), raid mode, the optional ladder (warn/mute, off by default), join screening/approval, edits re-analysis, view-once policy. **Compromised accounts** (§8.7): behaviour baselines, the possibly-compromised signal family, the "may be hacked" admin review, optional restriction while pending, `.clear`. **Reviews v2:** DM reviewers with opt-in, fallback chain, quiet hours, digests, confirm-before-kick. | Replay corpus precision ≥ 99% at the delete threshold (target to agree on); recall measured per type. |
-| **3. Website & onboarding** (≈2–3 weeks) | OTP login (both methods), permissions, groups, settings with presets and previews, **reviews & notifications settings page, review queue, review history, learned-patterns page, blacklist page (§9.8)**, lists with dry-run, activity log, onboarding messages (including choosing a review destination), Arabic/English. Every website setting is checked against the `.set` command path for parity. **Self-hosting guide** (`docs/SELF_HOSTING.md`), operator setup flow with pairing on the website, first public release. | A non-technical admin can onboard a group, pick reviewers and change settings from a phone without help. |
-| **4. Vision AI & learning at scale** (≈2–3 weeks) | Vision AI tier (T4) for images/stickers/profile pictures, weekly bounded re-weighting gated by the replay corpus, global promotion of learned patterns (≥ 3 unrelated groups) with operator approval, track-record tracking and the opt-in to let `similarity`/`ai` auto-ban where they've earned it, appeals end to end. | Vision used only on the ambiguous few percent; re-weighting never lowers hold-out precision; overturn rate dashboard; promotion and unlock flows tested. |
+| **3. Website & onboarding** (≈2–3 weeks) | The separate frontend app (framework chosen then, §13.1) on top of the `/api/v1` API, served same-origin by the Go binary; OTP login (both methods), permissions, groups, settings with presets and previews, **reviews & notifications settings page, review queue, review history, learned-patterns page, blacklist page (§9.8)**, lists with dry-run, activity log, onboarding messages (including choosing a review destination), Arabic/English. Every website setting is checked against the `.set` command path for parity. **Self-hosting guide** (`docs/SELF_HOSTING.md`), operator setup flow with pairing on the website, first public release. | A non-technical admin can onboard a group, pick reviewers and change settings from a phone without help. |
+| **4. Vision AI & learning at scale** (≈2–3 weeks) | Vision AI tier (T4) for images/stickers/profile pictures, weekly bounded re-weighting gated by the replay corpus, global promotion of learned patterns (≥ 3 unrelated groups) with operator approval, track-record tracking and the opt-in to let `ai` auto-ban where it has earned it, appeals end to end. | Vision used only on the ambiguous few percent; re-weighting never lowers hold-out precision; overturn rate dashboard; promotion and unlock flows tested. |
 | **5. Network bans & spammer intelligence** (≈3 weeks) | Organisations and scope settings (`off`/`org`/`all`), quorum rule with operator approval queue, network-ban jobs (identity resolution incl. "identity pending" watches, batched kicks, re-scan of recorded messages that deletes only spam-matching ones within WhatsApp's delete window, rejoin kick, join-request rejection, admin re-add override), network-wide unban/appeal, audit. Spammer intelligence: profiles, snapshots, campaigns graph, number-prefix/picture/name/timing patterns as capped priors, website views (group and operator), privacy controls (retention jobs, access log, encryption, appeal deletion). | A test ban across ≥ 20 groups completes within pacing limits; every negative quorum case stays local; an unban fully reverses the ban; priors never act alone (property test in CI); privacy notice published. |
-| **6. Scale & polish** (optional for most deployments) | Optional cross-instance feeds (rule packs, hashed fingerprints, §15); multiple bot numbers (optional, never required) with primary/standby, failover, leases, the `-media` image (animated stickers, video keyframes, OCR, local embedding model if chosen), optional voice transcription, multi-node, partitioning. | Survives a temp ban of one number without losing protection in groups that have a standby. |
+| **6. Scale & polish** (optional for most deployments) | Optional cross-instance feeds (rule packs, hashed fingerprints, §15); multiple bot numbers (optional, never required) with primary/standby, failover, leases, the `-media` image (animated stickers, video keyframes, OCR), optional voice transcription, multi-node, partitioning. | Survives a temp ban of one number without losing protection in groups that have a standby. |
 
 ---
 
@@ -1818,7 +1891,7 @@ Durations assume one developer and are rough. **AI and learning are in the first
 ### Decisions made
 
 - **Open-source, self-hosted project** for big groups and communities. "Operator" = whoever deploys an instance, and network bans, the spammer database and learning are scoped to one deployment. Cross-instance sharing is opt-in feeds only (§15, §19, §22).
-- **Full scope stays:** network bans, spammer intelligence, AI + similarity search, learning (§20).
+- **Full scope stays:** network bans, spammer intelligence, AI verification, learning (§20).
 - **One bot number runs everything.** Multiple numbers are optional (Phase 6).
 - **The queue has no maximum length.** Pacing stays: a fixed, conservative ceiling per bot that never ramps up automatically. It only slows down on warning signs, and raising it is a manual, risky operator choice (§10.3).
 - **Kick batches are capped** (default 8 per call, to be validated in the spike), and batching never lowers the bar for kicking anyone (§10.4).
@@ -1836,10 +1909,14 @@ Durations assume one developer and are rough. **AI and learning are in the first
 - **Learning:** only from confirmed spam, group-local until confirmed in 3 unrelated groups, with poisoning guards, and overturns retract (§7.5).
 - **Network bans:** spam bans only, opt-in per group with scope, a quorum rule, network-wide undo. The cleanup deletes only spam-matching messages (§9.6).
 - **Identity:** the LID is always stored; the phone number is resolved whenever possible and back-filled; bans match on either (§7.7).
-- **AI and learning are in the first version** (Phase 1): text AI (T3), the learned corpus with similarity search (T1.5), few-shot examples, overturn retraction and poisoning guards. Vision AI, re-weighting and global promotion come in Phase 4. Network bans and spammer intelligence stay in Phase 5 (§20).
-- **Early-AI safety:** AI-only and similarity-only evidence routes to "ask admins", never auto-ban, until that source has a track record on the instance. Admin decisions on those reviews feed learning (§9.2).
+- **AI and learning are in the first version** (Phase 1): text AI (T3), the learned spam corpus with fingerprint and SimHash/MinHash matching, few-shot examples, overturn retraction and poisoning guards. Vision AI, re-weighting and global promotion come in Phase 4. Network bans and spammer intelligence stay in Phase 5 (§20).
+- **Early-AI safety:** AI-only evidence (and looser near-duplicate matches, which only feed the AI) routes to "ask admins", never auto-ban, until that source has a track record on the instance. Admin decisions on those reviews feed learning (§9.2).
 - **Bootstrap data:** spam-only. The deployer imports a prepared spam dataset with the generic `antispam corpus import` command (JSONL/CSV, cluster-aware hold-out, §7.8). Ham is optional and never stored as text. Preparing the data is a private, one-off job outside the bot. *The earlier `whatsapp_logs.db` question is withdrawn.*
 - **No collection of normal messages:** no ham corpus, no normal-message few-shot examples, no training on normal chat. Overturns store only a fingerprint allow-list entry. Normal messages exist only as the 72 h inbox and 7-day text-free fingerprints (§17).
+- **No embeddings in the core:** no embedding model, no similarity tier, no pgvector. Reworded spam is caught by exact fingerprints + SimHash/MinHash, and anything looser goes to the AI. Few-shot examples are chosen by shared fingerprints/keywords/campaign. An optional `Embedder` interface is documented for the future only (§7.4, §4.1).
+- **PostgreSQL only.** No SQLite lite mode (§4.1).
+- **Stack:** Go modular monolith (roles: connector / workers / api); River for background jobs; custom per-number WhatsApp action executor; pgx + sqlc, goose, otter, zerolog + Prometheus; no external broker (§4.1).
+- **Frontend decided later:** a separate frontend app over the versioned JSON API (`/api/v1`, OpenAPI), optionally served by the Go binary (§13.1).
 - **Certainty routing is the core flow** (§7.0): CERTAIN acts per the matrix; UNCERTAIN goes to the AI with spam-only few-shot; still uncertain goes to admins. The "certain" thresholds are tight because there's no ham to calibrate against. Precision is measured from admin reviews and shadow mode; recall from the spam-only hold-out.
 - **Manual phone-number blacklist in the first version**, by command (`.blacklist add/remove/list/check`), per group with instance-wide entries for the operator. It bans members on the list, keeps them out, and treats the number in content as known spam (§9.8).
 
@@ -1848,7 +1925,7 @@ Durations assume one developer and are rough. **AI and learning are in the first
 **Defaults for new groups** (the project ships these, and each deployment can change them):
 1. **Start mode:** shadow for 24 h (safer, but feels like "it doesn't work"), or enforce (delete + ban per the Standard matrix) immediately?
 2. **Review destination and timeout:** website-only until an admin picks one (current default), or DM the admin who promoted the bot when they have an open thread? Is "keep deleted, no ban" the right timeout fallback for ban decisions, and 15 minutes → delete for ask-admins mode (b)?
-3. **"Certain" thresholds and the Standard matrix:** are the tight CERTAIN thresholds right (SimHash ≤ 3 bits, embedding ≥ 0.97, pHash ≤ 4), and the AI confidence cut-off of 0.9? Are the Standard preset's cells (§9.2) right, especially audio, polls and locations going to `ask`?
+3. **"Certain" thresholds and the Standard matrix:** are the tight CERTAIN thresholds right (SimHash ≤ 3 bits, MinHash Jaccard ≥ 0.9, pHash ≤ 4), and the AI confidence cut-off of 0.9? Are the Standard preset's cells (§9.2) right, especially audio, polls and locations going to `ask`?
 4. **The one exception to inbound-first:** is a single DM reply (max one per admin per day) to an admin who sent a command in the group, but never messaged the bot, acceptable? Or should the bot stay silent until they DM it?
 5. **Network ban scope:** "My organisation only" (recommended) or "All groups of this deployment"? Contribute bans by default?
 6. **Number-prefix signal:** on (weak and capped) or off until the operator reviews the patterns?
@@ -1865,25 +1942,25 @@ Durations assume one developer and are rough. **AI and learning are in the first
 **Technology:**
 12. **Login method default:** "tap to message the bot" (recommended, ban-safe) or the bot sends an OTP?
 13. **AI provider and model:** which provider/model should the project's **example config** use, and which will **your instance** use: a hosted model (more accurate, but message text and context leave the server) or a local model via an OpenAI-compatible server (data stays local; accuracy varies, especially for Arabic; slow on a CPU-only VM)? The eval harness (§18) can compare candidates on the spam hold-out and in shadow mode before you choose. And should AI verification be on by default for new groups on instances that have AI configured?
-14. **Embedding model for T1.5 (needed in Phase 1):** a local multilingual model in-process (no data leaves the server; brings the ML image into Phase 1), a local OpenAI-compatible embeddings server, or a hosted embeddings API? Dataset import needs embeddings too, so this blocks Phase 1b.
-15. **AI context default:** send the context bundle (replies, the previous 5 messages, group info, sender context) by default (current), or default it off and let groups opt in? It improves accuracy but sends other members' recent messages to the AI provider.
-16. **Track-record bar:** is "≥ 200 admin decisions with ≥ 98% confirmed as spam over 30 days, plus hold-out precision" the right bar before `similarity`/`ai` may be allowed to auto-ban?
-17. **Website stack:** Go `templ` + `htmx` (one binary, recommended) or an SPA?
+14. **AI context default:** send the context bundle (replies, the previous 5 messages, group info, sender context) by default (current), or default it off and let groups opt in? It improves accuracy but sends other members' recent messages to the AI provider.
+15. **Track-record bar:** is "≥ 200 admin decisions with ≥ 98% confirmed as spam over 30 days, plus hold-out precision" the right bar before `ai` may be allowed to auto-ban?
+16. **Website frontend framework:** React, Svelte or Next.js for the separate frontend app (§13.1)? To be decided when the full version is built; the API (`/api/v1`, OpenAPI) comes first either way.
 
 **Project:**
-18. **License:** keep MIT, switch to Apache-2.0, or use AGPL-3.0 so hosted forks stay open (§22.1)?
-19. **Official feeds:** should the project itself publish a public rule-pack / fingerprint feed, and who maintains it?
-20. **Languages** beyond Arabic and English for the first release?
+17. **License:** keep MIT, switch to Apache-2.0, or use AGPL-3.0 so hosted forks stay open (§22.1)?
+18. **Official feeds:** should the project itself publish a public rule-pack / fingerprint feed, and who maintains it?
+19. **Languages** beyond Arabic and English for the first release?
 
 **Your own instance (namaa):**
-21. **Domain** for the website (Coolify's own panel stays behind the SSH tunnel), and the **bot number** to use (ideally an aged SIM, plus a spare).
-22. **Jurisdiction:** where your instance operates (e.g. Saudi PDPL), and whether you want a legal review before enabling network bans and the spammer database for groups you don't run.
+20. **Domain** for the website (Coolify's own panel stays behind the SSH tunnel), and the **bot number** to use (ideally an aged SIM, plus a spare).
+21. **Jurisdiction:** where your instance operates (e.g. Saudi PDPL), and whether you want a legal review before enabling network bans and the spammer database for groups you don't run.
 
 ### Trade-offs made (and alternatives)
 
 | Decision | Chosen | Alternative | Why |
 |---|---|---|---|
-| Queue/broker | Postgres (`SKIP LOCKED`, `LISTEN/NOTIFY`), unbounded | NATS / Redis Streams | One dependency on a small VM, easy for self-hosters. Swappable later. |
+| Queue/broker | Postgres: River for jobs, a custom paced executor for WhatsApp actions; unbounded | NATS / Kafka / RabbitMQ / Redis Streams | One dependency on a small VM, easy for self-hosters, and transactional enqueue avoids dual-write bugs. |
+| Architecture | Modular monolith with roles | Microservices | The bottleneck is WhatsApp's write pace, not compute; the connector can't be split; fewer moving parts for self-hosters (§4.1). |
 | Write pacing | Fixed conservative ceiling, slow-down only, plus early lockdown and capped batching | A rate that ramps up while things succeed; or no pacing | Success isn't proof WhatsApp is fine with a rate (bans can come without warning), so the rate never climbs on its own. Big waves are handled by lockdown, not speed. |
 | Hacked accounts | Delete + admins decide the ban (restriction optional) | Treat like any spammer; or trust them | Hijacked members are real people, but their spam must still go. |
 | Enforcement default | Instant delete + ban for confident spam from new senders; admins decide for established members | Warn → mute → kick ladder | Spammers ignore warnings; real members shouldn't be banned by a machine. The ladder stays optional. |
@@ -1902,7 +1979,7 @@ Durations assume one developer and are rough. **AI and learning are in the first
 | Network bans | Opt-in, organisation scope by default, quorum (strong evidence, or 2 unrelated groups, or operator); admins can locally override | Any admin's ban applies everywhere | One admin must not be able to evict someone from unrelated communities. |
 | Spammer intelligence | Capped "identity prior" signals that never act alone; hashes instead of photos | Use identity traits (e.g. country code) as real classifiers | Avoids false positives and discrimination by origin, and limits the personal data held. |
 | Learning | Confirmed spam only, group-local first, promoted after ≥ 3 unrelated groups | Learn from every ban, globally | Admins ban for non-spam reasons, and global learning from one group invites poisoning. |
-| Similarity search | pgvector in the existing Postgres | A separate vector DB | No new service; the corpus is small (thousands to low millions of rows). |
+| Reworded spam | Exact fingerprints + SimHash/MinHash, then the AI | Embeddings + pgvector / a vector DB | Spammers mostly reuse templates (SimHash/MinHash catch near-copies); truly reworded spam goes to the AI, which understands meaning better; without normal-message data, embedding thresholds can't be calibrated. `Embedder` stays a documented future option. |
 | Control surfaces | Website **and** commands over one settings model | Website-only or commands-only | Setup and history fit a website; daily moderation fits chat. Shared dotted keys keep them in sync. |
 
 ### Known limitations (to accept)

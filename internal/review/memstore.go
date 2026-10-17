@@ -86,6 +86,10 @@ func (m *memStore) Decide(ctx context.Context, id int64, d Decided) (Item, bool,
 		return it, false, nil
 	}
 	it.Status, it.Decision, it.DecidedBy, it.DecidedByName, it.Method, it.DecidedAt = d.Status, d.Decision, d.By, d.ByName, d.Method, d.At
+	if d.Decision == DecisionNotSpam {
+		// No text of an overturned message is kept (§7.5).
+		it.Evidence.Text, it.Evidence.Thumbnail = "", nil
+	}
 	m.items[id] = it
 	return it, true, nil
 }

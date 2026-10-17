@@ -1903,8 +1903,14 @@
         "F-004"
       ],
       "description": "Routes that ask admins create reviews (kind, subject, proposed action, deadline, on_timeout) with a unique short code such as K7Q2, and dashboard is the default destination.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/review TestOpenAssignsUniqueCodes",
+        "TestOpenRetriesTakenCodes",
+        "TestOpenPostsToReviewGroupOnly",
+        "internal/review/pgstore TestFirstVoteWinsOnPostgres",
+        "TestStoreQueries (integration)"
+      ]
     },
     {
       "id": "F-087",

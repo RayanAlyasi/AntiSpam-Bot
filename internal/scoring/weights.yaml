@@ -1,0 +1,9 @@
+# Default signal weights (DESIGN.md §7.3). Bump the version whenever a number changes: every
+# detection records the version it was scored with, so admins and replays can tell them apart.
+#
+# The score is p = sigmoid(bias + Σ weights). Analyzers declare a default weight for each signal
+# code they emit; an entry under `signals` overrides it. With no signals at all a message scores
+# sigmoid(-3.0) ≈ 0.05, far below T_review (0.60): a message is clean until evidence says otherwise.
+version: "2026-10-17.1"
+bias: -3.0
+signals: {}

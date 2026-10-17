@@ -687,8 +687,11 @@
         "F-000"
       ],
       "description": "Normalization applies NFKC and strips zero-width, bidi, tag, variation-selector, soft-hyphen and combining-mark floods, returning the stripped count as a signal input; fuzz tested.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "hidden suite (13 tests): TestRawPreserved, TestPlainTextUnchanged, TestNFKCFolding, TestInvisiblesStrippedAndCounted, TestInvisibleBetweenBaseAndMarkStillComposes, TestExemptionsDoNotCoverObfuscation, TestOnlyInvisibles, TestTagSmugglingCounted, TestZalgoFloodStripped, TestLegitimateTextNotCounted, TestIdempotent, TestLargeHostileInputLinear, FuzzText",
+        "internal/normalize: TestStripInvisibles, TestStripFloods, TestFold, TestFoldLongMarkRunLeavesNoGraphemeJoiner, FuzzFold"
+      ]
     },
     {
       "id": "F-035",
@@ -704,8 +707,10 @@
         "F-034"
       ],
       "description": "An embedded TR39 confusables table maps Cyrillic, Greek and other look-alikes to their Latin skeleton, so 'frее' with Cyrillic е matches 'free'.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/normalize: TestSkeletonMatchesLookalikes, TestSingleScriptTextKeepsNorm, TestPatternMatchesOwnConfusables, FuzzText"
+      ]
     },
     {
       "id": "F-036",
@@ -721,8 +726,10 @@
         "F-034"
       ],
       "description": "A separate leetspeak variant folds 0/1/3/4/5/$/@ without damaging numbers; f.r.e.e, f r e e and freeeee collapse to free; common spam emoji sequences map to tokens while Raw keeps them.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/normalize: TestCollapseAndSqueeze, TestLeetVariant, TestEmojiTokens, TestTextLinearOnHostileInput, FuzzText"
+      ]
     },
     {
       "id": "F-037",
@@ -738,8 +745,10 @@
         "F-034"
       ],
       "description": "Tashkeel and tatweel are removed, alef forms unified, ى→ي and ة→ه in the match variant, Persian ک/ی mapped to Arabic, and Arabic-Indic/Persian digits become ASCII.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/normalize: TestArabicFolds, FuzzText"
+      ]
     },
     {
       "id": "F-038",
@@ -756,8 +765,10 @@
         "F-037"
       ],
       "description": "Phone numbers written with spaces, separators, Arabic digits or spelled-out digits are extracted and normalized to E.164 with nyaruka/phonenumbers using the group's default country; fuzz tested.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/normalize: TestFindPhonesForms, TestFindPhonesRejects, TestFindPhonesSplitsGluedNumbers, TestFindPhonesRegion, TestFindPhonesSpans, TestParsePhone, TestFindPhonesHostileInputBounded, FuzzFindPhones"
+      ]
     },
     {
       "id": "F-039",
@@ -910,8 +921,10 @@
         "F-024"
       ],
       "description": "URLs are extracted from text, previews, vCards, locations and event links, including hxxp, example[.]com, spaced dots and IDN forms; fuzz tested.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/normalize/urls: TestExtractFinds, TestExtractDeobfuscates, TestExtractBoundaries, TestExtractIgnores, TestExtractBounded, FuzzExtract"
+      ]
     },
     {
       "id": "F-047",
@@ -927,8 +940,10 @@
         "F-046"
       ],
       "description": "URLs are canonicalized (lower-case host, punycode↔Unicode, tracking parameters stripped), get their eTLD+1 from the public suffix list, and chat.whatsapp.com, whatsapp.com/channel and wa.me links are classified as WhatsApp-native targets.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/normalize/urls: TestCanonicalize, TestCanonicalizeTracking, TestCanonicalizeTargets, TestExtractThenCanonicalize, FuzzCanonicalize"
+      ]
     },
     {
       "id": "F-048",
@@ -2057,8 +2072,10 @@
         "F-038"
       ],
       "description": "One helper masks third-party phone numbers, emails and names, keeps the spam's advertised numbers only as keyed hashes, and truncates, used by corpus, reviews and AI.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/normalize/redact: TestTextMasks, TestTextKeeps, TestAdvertisedNumbersHashed, TestPhoneHash, TestTruncate, TestTextBounded, FuzzText"
+      ]
     },
     {
       "id": "F-102",

@@ -1892,8 +1892,12 @@
         "F-004"
       ],
       "description": "`docker compose up -d` starts bot + postgres with healthchecks, .env.example documents every variable, and README (unofficial-client ban risk), CONTRIBUTING (development with the fake WAClient) and CODE_OF_CONDUCT exist.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "cmd/antispam: TestConfigReadsOnlyDocumentedVariables, TestEnvExampleDocumentsEveryVariable, TestComposeFileBasics, TestHealthzURL, TestHealthcheck, TestHealthcheckFailsWhenNothingListens, TestHealthcheckRejectsBadAddr",
+        "docker compose config validates docker-compose.yml (fails fast without POSTGRES_PASSWORD); docker compose build bot succeeds",
+        "README.md (ban risk, quick start, shadow mode first), CONTRIBUTING.md (fake WAClient, branches, Conventional Commits), CODE_OF_CONDUCT.md; template ships as env.example (harness/deviations/F-091.md)"
+      ]
     },
     {
       "id": "F-092",
@@ -1910,8 +1914,13 @@
         "F-000"
       ],
       "description": ".goreleaser.yaml and .github/workflows/release.yml build linux and darwin amd64/arm64 binaries (CGO off, -trimpath, version/commit/date ldflags) and dockers_v2 multi-arch images to ghcr.io/rayanalyasi/antispam-bot tagged X.Y.Z always and X.Y/latest only on stable releases (no bare 0 tag on 0.x), with OCI labels, SBOMs, cosign keyless signatures and actions/attest provenance; the workflow refuses a tag that isn't SemVer or whose commit isn't on main or release/*.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        ".goreleaser.yaml: goreleaser v2.18.3 check OK; snapshot build produced 4 archives and linux/amd64+arm64 images",
+        "release.yml goreleaser job: tag exists/SemVer/on-branch check, cosign, syft, actions/attest; actionlint 1.7.12 with shellcheck: 0 findings on all workflows; every action pinned to a commit SHA",
+        "dockers_v2 tags X.Y and latest drop on prereleases (tmpl.NonEmpty in goreleaser source)",
+        "judge review: .agent/logs/judge-F-092.md"
+      ]
     },
     {
       "id": "F-093",
@@ -1927,8 +1936,11 @@
         "F-092"
       ],
       "description": ".github/workflows/edge.yml publishes images from staging tagged edge and sha-<7>, never latest.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "ci.yml edge job: push to staging only, needs image (and so make check), tags edge and sha-<7>, never latest; actionlint 1.7.12 with shellcheck: 0 findings on all workflows; every action pinned to a commit SHA",
+        "judge review: .agent/logs/judge-F-092.md"
+      ]
     },
     {
       "id": "F-094",
@@ -1944,8 +1956,12 @@
         "F-092"
       ],
       "description": "A release PR on main keeps CHANGELOG.md and the version up to date from Conventional Commits (on 0.x: feat bumps the minor, fix the patch, a breaking change the minor, with the pre-major options set explicitly); merging it creates the tag that triggers the GoReleaser release. staging is promoted to main with a merge commit, never squashed, so release-please sees every feature commit. Exact configuration comes from a follow-up spec.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "release-please-config.json validates against release-please's config schema; settings match DESIGN.md §23.3",
+        "release.yml rp job with App token from the release environment; actionlint 1.7.12 with shellcheck: 0 findings on all workflows; every action pinned to a commit SHA",
+        "judge review: .agent/logs/judge-F-092.md"
+      ]
     },
     {
       "id": "F-095",
@@ -1961,8 +1977,11 @@
         "F-000"
       ],
       "description": "A CI check fails a PR whose title doesn't follow Conventional Commits (feat, fix, docs, refactor, test, build, ci, chore; ! or BREAKING CHANGE for breaking changes), since feature PRs are squash-merged with the title as the commit message.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "pr-title.yml: amannn/action-semantic-pull-request v6.1.1 on pull_request_target into staging, 10 types, lowercase subject pattern; actionlint 1.7.12 with shellcheck: 0 findings on all workflows; every action pinned to a commit SHA",
+        "judge review: .agent/logs/judge-F-092.md"
+      ]
     },
     {
       "id": "F-097",
@@ -1978,8 +1997,11 @@
         "F-094"
       ],
       "description": "After each release, a workflow opens a PR that merges main back into staging (merged with a merge commit, never squashed) so the release commit and changelog reach staging; on a conflict it leaves the PR open with a note for the maintainer.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "release.yml back-merge job: sync/main-<tag> branch via REST, PR into staging, conflict comment; actionlint 1.7.12 with shellcheck: 0 findings on all workflows; every action pinned to a commit SHA",
+        "judge review: .agent/logs/judge-F-092.md"
+      ]
     },
     {
       "id": "F-098",
@@ -1996,8 +2018,12 @@
         "F-000"
       ],
       "description": ".github/dependabot.yml updates gomod, github-actions, docker and docker-compose weekly in groups, and a weekly workflow opens a PR into staging that bumps whatsmeow to its latest commit.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        ".github/dependabot.yml validates against the schemastore dependabot-2.0 schema",
+        "whatsmeow-bump.yml weekly PR into staging; actionlint 1.7.12 with shellcheck: 0 findings on all workflows; every action pinned to a commit SHA",
+        "judge review: .agent/logs/judge-F-092.md"
+      ]
     },
     {
       "id": "F-099",
@@ -2032,8 +2058,11 @@
         "F-092"
       ],
       "description": "SECURITY.md describes private vulnerability reporting, a 'Versions & upgrading' doc explains tags, the 0.x policy and upgrade steps, and the example docker-compose.yml pins ghcr.io/rayanalyasi/antispam-bot:0.1 and a Postgres major version; the docs tell deployers to run new groups in shadow mode first, because v0.1 ships before the hold-out recall and shadow-precision gates of DESIGN.md §20.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "SECURITY.md, docs/VERSIONS.md (tags, 0.x policy, compose pinned to :0.1 and postgres:18, shadow mode first, upgrade and verify steps), docs/RELEASING.md",
+        "judge review: .agent/logs/judge-F-092.md"
+      ]
     },
     {
       "id": "F-101",

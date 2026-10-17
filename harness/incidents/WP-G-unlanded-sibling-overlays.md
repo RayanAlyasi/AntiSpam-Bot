@@ -1,0 +1,6 @@
+# WP-G: bundle built on overlays of sibling packages that had not landed
+
+- Symptom: WP-G needed code from four sibling packages (wp-a normalize/redact, wp-c store, wp-f persons, wp-k review) that were not on staging. The builder worked against uncommitted copies ("overlays") of their WIP. Overlays had to be removed before each merge or commit and re-added afterwards. The hidden blacklist tests imported WP-G packages that existed only as unstaged work, so the staged tree alone did not vet (judge merge reviews, twice). go.mod also drifted: the staged tree did not import pgx, goose or river until a later commit.
+- Root cause: the plan scheduled WP-G before its dependencies were merged; nothing checked that dependencies had landed before the bundle started.
+- Evidence: .agent/logs/judge-WP-G-merge.md (findings on go.mod and the blacklist tests); harness/progress/F-041.md (person columns have no FK because wp-f was not merged); merge commits 2375ebf, 56ea089, d752f8e, 1affeb5, 81fbe71, 7013474.
+- Would have prevented: /next-feature refusing to start a bundle whose dependencies are not merged to staging, or building only against merged code and stubbing the rest behind interfaces; committing partial work in dependency order so the staged tree always builds.

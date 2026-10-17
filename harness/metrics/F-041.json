@@ -1,0 +1,28 @@
+{
+ "feature": "F-041",
+ "branch": "feat/wp-g-detection-rules",
+ "category": "detection",
+ "core": false,
+ "harness_version": "2b4b2b9023da",
+ "commit": "6944934",
+ "gate_runs": 34,
+ "gate_first_pass": true,
+ "gate_failed_steps": [
+  "build",
+  "integration",
+  "tamper",
+  "test"
+ ],
+ "acceptance_first_pass": true,
+ "judge_rounds": 5,
+ "judge_first_verdict": "PASS",
+ "judge_final_verdict": "PASS",
+ "tamper_hits": 1,
+ "guard_blocks": 36,
+ "test_change_requests": 0,
+ "cost_usd": null,
+ "turns": null,
+ "mutation_score": null,
+ "human_verdict": null,
+ "ts": "2026-10-17T19:34:58Z"
+}

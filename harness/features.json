@@ -863,8 +863,14 @@
         "F-024"
       ],
       "description": "Each envelope text surface gets its Norm variants filled while Raw is kept for evidence, and extracted phone numbers are attached to the envelope.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/detect/textnorm: TestPrepareFillsEverySurface",
+        "TestPrepareContactNumbers",
+        "TestPrepareIsIdempotent",
+        "TestPrepareWithoutRegionFindsOnlyInternational",
+        "TestPrepareFindsCompatibilityDigits"
+      ]
     },
     {
       "id": "F-040",
@@ -904,8 +910,15 @@
         "F-040"
       ],
       "description": "Rules (scope global/bot/group, type, action class, weight, enabled) and fingerprints are loaded into memory at start and refreshed via LISTEN/NOTIFY within a second of a change.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/detect/rules: TestKeywordsAcrossVariantsAndScopes",
+        "TestCompileSkipsInvalidRules",
+        "TestHolderRunReloadsOnNotify",
+        "TestHolderRunStopsWhenChannelCloses",
+        "internal/store (integration): TestRulesStoreAndNotify",
+        "TestHitCountersDoNotNotify"
+      ]
     },
     {
       "id": "F-042",
@@ -923,8 +936,16 @@
         "F-039"
       ],
       "description": "Keyword and phrase rules match normalized text with Aho-Corasick in microseconds, emitting hard or weighted signals per rule class with the matched phrase as evidence.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/detect/textmatch: TestAutomatonFind",
+        "TestAutomatonMatchesNaiveScan",
+        "TestAutomatonManyPatternsIsFast",
+        "FuzzMatchers",
+        "internal/detect/textrules: TestKeyword",
+        "TestKeywordWeightIsCapped",
+        "internal/detect/rules: TestSkeletonOnlyMatchesCrossScriptText"
+      ]
     },
     {
       "id": "F-043",
@@ -942,8 +963,15 @@
         "F-039"
       ],
       "description": "Regex rules run with Go RE2 on normalized text, and patterns over the length or complexity limit are rejected when saved.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/detect/textmatch: TestCompileRegex",
+        "TestRegexIsLinearOnHostileInput",
+        "internal/detect/rules: TestRuleValidate",
+        "internal/detect/textrules: TestRegex",
+        "internal/detect/rules: TestRegexScansABoundedPrefix",
+        "internal/store (integration): TestRulesStoreAndNotify"
+      ]
     },
     {
       "id": "F-044",
@@ -960,8 +988,15 @@
         "F-042"
       ],
       "description": "Token-set similarity and Damerau-Levenshtein catch near-misses of short phrases and emit `rules`-source signals only, never CERTAIN evidence.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/detect/textmatch: TestDamerau",
+        "TestTokenSetSimilarity",
+        "TestFuzzyFind",
+        "internal/detect/rules: TestRegexesAndFuzzy",
+        "TestFuzzyIsBoundedAndCancellable",
+        "internal/detect/textrules: TestFuzzy"
+      ]
     },
     {
       "id": "F-045",
@@ -978,8 +1013,12 @@
         "F-040"
       ],
       "description": "Mixed scripts inside words and invisible-character counts produce weighted signals, and ordinary bilingual Arabic/English messages don't fire.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/detect/script: TestMixedWords",
+        "FuzzMixedWords",
+        "TestAnalyzer"
+      ]
     },
     {
       "id": "F-046",
@@ -1036,8 +1075,13 @@
         "F-041"
       ],
       "description": "Domains are checked against the group's allow/deny lists, then the global allow-list and deny-list; a deny hit is `known` evidence and an allow-listed domain never fires.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/detect/rules: TestDomainPrecedence",
+        "TestURLPrefix",
+        "TestWeightedEntriesDoNotHideKnownEvidence",
+        "internal/detect/domain: TestAnalyzer"
+      ]
     },
     {
       "id": "F-049",
@@ -1061,8 +1105,12 @@
         "F-039"
       ],
       "description": "Blocklisted or confirmed media/sticker SHA256s, channel JIDs, invite codes and advertised numbers (keyed hashes of E.164 from text, vCards and wa.me links) are CERTAIN `known` evidence, without downloading anything.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/detect/rules: TestExactRulesAndFingerprints",
+        "TestFingerprintNormalizeAndValidate",
+        "internal/detect/exact: TestAnalyzer"
+      ]
     },
     {
       "id": "F-050",
@@ -2249,8 +2297,15 @@
         "F-039"
       ],
       "description": "64-bit SimHash and MinHash signatures are computed from normalized text, and an in-memory LSH index finds candidates within a Hamming distance or Jaccard threshold quickly.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/detect/fingerprint: TestSimHashDistances",
+        "TestMinHashJaccard",
+        "TestArabicFingerprints",
+        "TestSimIndexMatchesBruteForce",
+        "TestMinIndexSimilar",
+        "FuzzFingerprints"
+      ]
     },
     {
       "id": "F-103",
@@ -2495,8 +2550,14 @@
         "F-102"
       ],
       "description": "corpus_entries store redacted and normalized text, fingerprints, links, hashed numbers, media hashes and provenance; corpus_confirmations and learned_rules link entries to groups and rules; label is spam only.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/detect/corpus: TestFromMessage",
+        "TestFromMessageWithoutText",
+        "TestFromMessageKeepsNoNumbersInURLs",
+        "internal/store (integration): TestCorpusStore",
+        "TestRetractKeepsRulesAnotherEntryTaught"
+      ]
     },
     {
       "id": "F-114",
@@ -2729,8 +2790,18 @@
         "F-004"
       ],
       "description": "number_blacklist stores E.164 numbers with keyed hashes, scope and reason; input in international, local-with-default-country, 00-prefixed, Arabic-digit and wa.me forms normalizes correctly, several per command, and invalid numbers are reported.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/blacklist: TestParseArgsFormats",
+        "TestParseArgsSeveralNumbersAndReason",
+        "TestParseArgsInvalidReported",
+        "TestHasherKeyedHash",
+        "TestStoreAddBlacklistIdempotent",
+        "TestStoreRemoveAndReAdd",
+        "TestStoreCheckBlacklist",
+        "TestStoreRulesLoaderActiveOnly",
+        "internal/store (integration): TestBlacklistStore"
+      ]
     },
     {
       "id": "F-124",
@@ -2824,8 +2895,16 @@
         "F-049"
       ],
       "description": "A blacklisted number in a vCard waid/TEL, a wa.me link or advertised in text is CERTAIN known evidence, and removing it from the list lifts the signal.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/blacklist: TestBlacklistedNumberInContentIsKnown",
+        "TestBlacklistNoSignal",
+        "TestBlacklistRemoveLiftsSignal",
+        "TestBlacklistEvidenceMasksNumber",
+        "TestStoreBlacklistEndToEnd",
+        "internal/detect/blacklist: TestAnalyzer",
+        "TestRemovalLiftsSignal"
+      ]
     },
     {
       "id": "F-128",

@@ -117,7 +117,7 @@ func (c *Client) Complete(ctx context.Context, req llm.Request) (llm.Response, e
 		Messages: []sdk.MessageParam{sdk.NewUserMessage(sdk.NewTextBlock(req.Data))},
 	}
 	if req.Mode == llm.ModeNative {
-		params.OutputConfig.Format = sdk.JSONOutputFormatParam{Schema: req.Schema}
+		params.OutputConfig.Format = sdk.JSONOutputFormatParam{Schema: llm.PortableSchema(req.Schema)}
 	}
 	if c.effort != "" {
 		params.OutputConfig.Effort = c.effort

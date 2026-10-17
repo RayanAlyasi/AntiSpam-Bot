@@ -1,0 +1,60 @@
+# AntiSpam Bot: the bot plus its Postgres (DESIGN.md §19.1).
+#
+#   cp env.example .env        # then set POSTGRES_PASSWORD (and anything else you need)
+#   docker compose up -d        # release image; from a source checkout: docker compose up -d --build
+#
+# Postgres holds everything: the WhatsApp session (whatsmeow store), settings, detections and
+# the action queue. Back up the `pgdata` volume (see README); losing it means pairing again.
+name: antispam
+
+services:
+  bot:
+    # Pin a minor (":0.1") or an exact version, never "latest" (DESIGN.md §23.4).
+    image: ghcr.io/rayanalyasi/antispam-bot:0.1
+    build: .
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://antispam:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/antispam?sslmode=disable
+      HTTP_ADDR: ":8080"
+      TZ: UTC
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # The API, /metrics and the health endpoints. Only reachable from this machine; put a
+    # reverse proxy in front if you need it elsewhere. Postgres is never published.
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      # The image is distroless (no shell or curl), so the binary probes its own /healthz.
+      test: ["CMD", "/antispam", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    # Enough time to finish the WhatsApp action in flight and close the session cleanly.
+    stop_grace_period: 30s
+
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: antispam
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: antispam
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      # Postgres 18 images keep their data under /var/lib/postgresql/<major>.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U antispam -d antispam"]
+      interval: 5s
+      timeout: 3s
+      start_period: 10s
+      retries: 10
+
+volumes:
+  pgdata:

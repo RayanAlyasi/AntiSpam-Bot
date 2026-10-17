@@ -19,3 +19,69 @@ type AppAuditLog struct {
 	Diff     json.RawMessage
 	At       time.Time
 }
+
+type AppDmThread struct {
+	Person          string
+	LastInboundAt   pgtype.Timestamptz
+	LastExceptionAt pgtype.Timestamptz
+}
+
+type AppEvidenceSnapshot struct {
+	GroupJid      string
+	MsgID         string
+	Sender        string
+	Text          string
+	Thumbnail     []byte
+	ThumbnailMime pgtype.Text
+	DetectionID   pgtype.Int8
+	Reason        string
+	At            time.Time
+	ExpiresAt     pgtype.Timestamptz
+}
+
+type AppReview struct {
+	ID            int64
+	ShortCode     string
+	GroupJid      string
+	GroupName     string
+	Kind          string
+	DetectionID   pgtype.Int8
+	Subject       json.RawMessage
+	MessageSender pgtype.Text
+	MessageID     pgtype.Text
+	Evidence      json.RawMessage
+	EvidenceRaw   pgtype.Text
+	Thumbnail     []byte
+	ThumbnailMime pgtype.Text
+	Proposed      string
+	Mode          string
+	Status        string
+	Deadline      time.Time
+	OnTimeout     string
+	Decision      pgtype.Text
+	DecidedBy     pgtype.Text
+	DecidedByName pgtype.Text
+	Method        pgtype.Text
+	DecidedAt     pgtype.Timestamptz
+	CreatedAt     time.Time
+}
+
+type AppReviewMessage struct {
+	ChatJid       string
+	MsgID         string
+	ReviewID      int64
+	SentAt        time.Time
+	OutcomeEdited bool
+}
+
+type AppReviewVote struct {
+	ID            int64
+	ReviewID      int64
+	Voter         string
+	Method        string
+	Raw           string
+	Decision      string
+	Valid         bool
+	InvalidReason string
+	At            time.Time
+}

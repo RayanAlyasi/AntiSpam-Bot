@@ -81,6 +81,7 @@ type AppDetection struct {
 	NetworkBanID     pgtype.Int8
 	EvidenceRef      pgtype.Text
 	CreatedAt        time.Time
+	EditSeq          int32
 }
 
 type AppDmThread struct {

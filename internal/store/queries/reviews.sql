@@ -114,3 +114,13 @@ WHERE group_jid = @group_jid AND msg_id = @msg_id;
 
 -- name: PurgeEvidence :execrows
 DELETE FROM app.evidence_snapshots WHERE expires_at IS NOT NULL AND expires_at <= @now;
+
+-- name: MarkBlacklistBan :exec
+INSERT INTO app.blacklist_bans (group_jid, person_id, ban_id) VALUES (@group_jid, @person_id, @ban_id)
+ON CONFLICT (group_jid, person_id) DO UPDATE SET ban_id = EXCLUDED.ban_id, at = now();
+
+-- name: GetBlacklistBan :one
+SELECT ban_id FROM app.blacklist_bans WHERE group_jid = @group_jid AND person_id = @person_id;
+
+-- name: ForgetBlacklistBan :exec
+DELETE FROM app.blacklist_bans WHERE group_jid = @group_jid AND person_id = @person_id;

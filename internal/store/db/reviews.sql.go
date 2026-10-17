@@ -120,6 +120,36 @@ func (q *Queries) ExpireReviewEvidence(ctx context.Context, cutoff time.Time) (i
 	return result.RowsAffected(), nil
 }
 
+const forgetBlacklistBan = `-- name: ForgetBlacklistBan :exec
+DELETE FROM app.blacklist_bans WHERE group_jid = $1 AND person_id = $2
+`
+
+type ForgetBlacklistBanParams struct {
+	GroupJid string
+	PersonID int64
+}
+
+func (q *Queries) ForgetBlacklistBan(ctx context.Context, arg ForgetBlacklistBanParams) error {
+	_, err := q.db.Exec(ctx, forgetBlacklistBan, arg.GroupJid, arg.PersonID)
+	return err
+}
+
+const getBlacklistBan = `-- name: GetBlacklistBan :one
+SELECT ban_id FROM app.blacklist_bans WHERE group_jid = $1 AND person_id = $2
+`
+
+type GetBlacklistBanParams struct {
+	GroupJid string
+	PersonID int64
+}
+
+func (q *Queries) GetBlacklistBan(ctx context.Context, arg GetBlacklistBanParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getBlacklistBan, arg.GroupJid, arg.PersonID)
+	var ban_id int64
+	err := row.Scan(&ban_id)
+	return ban_id, err
+}
+
 const getDMThread = `-- name: GetDMThread :one
 SELECT person, last_inbound_at, last_exception_at FROM app.dm_threads WHERE person = $1
 `
@@ -550,6 +580,22 @@ func (q *Queries) ListReviewVotes(ctx context.Context, reviewID int64) ([]AppRev
 		return nil, err
 	}
 	return items, nil
+}
+
+const markBlacklistBan = `-- name: MarkBlacklistBan :exec
+INSERT INTO app.blacklist_bans (group_jid, person_id, ban_id) VALUES ($1, $2, $3)
+ON CONFLICT (group_jid, person_id) DO UPDATE SET ban_id = EXCLUDED.ban_id, at = now()
+`
+
+type MarkBlacklistBanParams struct {
+	GroupJid string
+	PersonID int64
+	BanID    int64
+}
+
+func (q *Queries) MarkBlacklistBan(ctx context.Context, arg MarkBlacklistBanParams) error {
+	_, err := q.db.Exec(ctx, markBlacklistBan, arg.GroupJid, arg.PersonID, arg.BanID)
+	return err
 }
 
 const markDMException = `-- name: MarkDMException :exec

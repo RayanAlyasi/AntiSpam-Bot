@@ -64,6 +64,13 @@ type AppAuditLog struct {
 	At       time.Time
 }
 
+type AppBlacklistBan struct {
+	GroupJid string
+	PersonID int64
+	BanID    int64
+	At       time.Time
+}
+
 type AppDetection struct {
 	ID               int64
 	GroupJid         string

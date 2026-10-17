@@ -200,3 +200,15 @@ type WAClient interface {
 	// NewsletterInfoFromInvite resolves a channel invite code to the channel's metadata.
 	NewsletterInfoFromInvite(ctx context.Context, code string) (NewsletterInfo, error)
 }
+
+// Revoke is a "delete for everyone" the bot received: a sender deleting their own message or an
+// admin deleting someone's (DESIGN.md §2.1). It cancels pending actions on the target and is
+// logged, since "post, then delete fast" is an evasion pattern. The sending client sets both
+// the revoke flag and the key, so a sender revoke always has Target.Sender == By; whether the
+// server checks ByAdmin is still to be confirmed (spike).
+type Revoke struct {
+	Chat    JID
+	Target  MessageRef // the deleted message and its sender
+	By      JID        // who deleted it
+	ByAdmin bool
+}

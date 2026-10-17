@@ -230,8 +230,11 @@
         "F-000"
       ],
       "description": "internal/wa/adapter implements every WAClient method on whatsmeow (revoke via BuildRevoke, edits via BuildEdit, batched participant updates), converts JIDs both ways, and maps 429, temporary ban, not-admin, not-found and timeouts to the wa error values.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestErrorMapping, TestTemporaryBan, TestWrites, TestSend, TestParticipantResults, TestReads, TestJIDConversion",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-010",
@@ -517,8 +520,12 @@
         "F-000"
       ],
       "description": "internal/envelope defines Envelope, Kind and the text, URL, media, contact, channel, invite, quoted, status and ad references exactly as DESIGN.md §5.3 describes, with no whatsmeow import.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "hidden acceptance tests (envelope): TestKindNamesAreStable, TestTextSourceNamesAreStable, TestForwardedManyTimes, TestQuotedRefIsStatus, TestEnvelopeJSONRoundTrip, TestZeroEnvelopeHasNoSurfaces, TestEnvelopeHasNoWhatsmeowDependency",
+        "internal/envelope: TestForwardedManyTimes, TestQuotedIsStatus",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-025",
@@ -535,8 +542,11 @@
         "F-009"
       ],
       "description": "After UnwrapRaw, every remaining FutureProofMessage wrapper (found by reflection) and ProtocolMessage.EditedMessage is unwrapped up to depth 5, recording the removed wrappers; a fuzz test shows crafted nesting never panics or loops.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestUnwrap, TestUnwrapCycleAndWidth, FuzzUnwrap (30s, no failures)",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-026",
@@ -553,8 +563,11 @@
         "F-025"
       ],
       "description": "Conversation and ExtendedText messages produce body and link-preview text surfaces, preview URLs, mentions (including group mentions), the quoted message and ExternalAdReply fields.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestEnvelopeHeader, TestTextPreviewMentionsQuoteAd",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-027",
@@ -575,8 +588,11 @@
         "F-026"
       ],
       "description": "Media messages produce MediaRefs with SHA256, mimetype, size and inline thumbnail plus caption, file name, title, page count, sticker flags, accessibility label and sticker-pack text surfaces.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestMedia",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-028",
@@ -594,8 +610,11 @@
         "F-024"
       ],
       "description": "A tolerant, fuzz-tested vCard parser extracts FN, ORG, TEL waid, URL and X-WA-BIZ-* fields; contact, contacts-array and document-embedded vCards become ContactRefs with a text surface per field, waid numbers for matching and IsSelfContact recorded.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestContacts, TestParseVCardBusinessCard, TestParseVCardTolerant, TestVCardWAIDsDeduplicated, TestParseVCardBounded, FuzzParseVCard (20s, no failures)",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-029",
@@ -616,8 +635,11 @@
         "F-026"
       ],
       "description": "Forwarded-newsletter info, channel and group invites produce ChannelRefs and InviteRefs; every poll version, location, event, product, order, payment request and interactive message yields its text surfaces and URLs.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestChannelsInvitesPollsLocationsEventsCommerce",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-030",
@@ -635,8 +657,11 @@
         "F-026"
       ],
       "description": "ForwardOrigin STATUS, status source and attribution types, attribution URLs, reshared channel JIDs and Group Status authors fill StatusRef; quoted status content and status-mention/group-status wrappers reach the envelope like any other content.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestStatus",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-031",
@@ -654,8 +679,11 @@
         "F-026"
       ],
       "description": "A MESSAGE_EDIT becomes an envelope with IsEdit and the original message ID; a sender revoke becomes a revoke event; view-once and undecryptable messages become content-less envelopes with sender and ID.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestEditsRevokesViewOnceUndecryptable",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-032",
@@ -676,8 +704,11 @@
         "F-031"
       ],
       "description": "Unknown message fields have every string extracted by protoreflect into text surfaces and counted in an unknown-kind metric; a reflection test fails when a waE2E.Message field type is neither handled nor explicitly ignored.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestUnknownFieldsByReflection, TestEveryMessageFieldClassified",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-033",
@@ -1390,8 +1421,11 @@
         "F-065"
       ],
       "description": "Revoke and remove-participant actions execute only through WAClient, record their result, and dedupe on revoke:<group>:<msgid> and kick keys.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestPermanentErrorsFailFast, TestKicksCoalesce, TestDedupeAcrossAllStatuses, TestCancelPendingRevoke",
+        "internal/actions: TestErrorHandling, TestKickCoalescing"
+      ]
     },
     {
       "id": "F-067",
@@ -1408,8 +1442,11 @@
         "F-065"
       ],
       "description": "DM, review, edit and reaction actions execute at P3 through WAClient, with template variants so the same text is never sent twice in a row to different chats.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestSendVariants, TestSilentGroupRefusesEveryPost",
+        "internal/actions: TestSendVariantsNeverRepeatAcrossChats, TestReservedSubBudgetsDuringRaid"
+      ]
     },
     {
       "id": "F-068",
@@ -1425,8 +1462,11 @@
         "F-065"
       ],
       "description": "Writes are spaced with base ~1 s plus 0–1.5 s jitter under a ceiling of 20/min with a burst of 10; a property test under synctest shows the effective rate never exceeds the ceiling.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestCeilingNeverExceeded, TestBurstSpacingAndJitter, TestExecutorIsStrictlySerial",
+        "internal/actions: TestCeilingPropertyRandomWorkloads, TestSpacingBetweenWrites, TestBucketNeverExceedsCapacityPlusRate"
+      ]
     },
     {
       "id": "F-069",
@@ -1462,8 +1502,11 @@
         "F-068"
       ],
       "description": "Each group is limited to 10 writes/min with round robin within a priority, OTPs and reviews have reserved P3 sub-budgets, and reads (IQs) use separate buckets that never consume write budget.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestPerGroupCap, TestRoundRobinFairness, TestReadsUseSeparateBudget",
+        "internal/actions: TestRoundRobinAcrossGroups, TestReservedSubBudgetsDuringRaid, TestReadsHaveTheirOwnBudget"
+      ]
     },
     {
       "id": "F-071",
@@ -1479,8 +1522,11 @@
         "F-066"
       ],
       "description": "Deletes in a group run newest first, anything near WhatsApp's ~48 h delete window moves ahead, expired actions are dropped and logged, and a sender's own revoke cancels the pending delete.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestPriorityOrder, TestUrgentDeadlinesFirst, TestDeletesNewestFirstInGroup, TestExpiredActionsNeverRun, TestCancelPendingRevoke",
+        "internal/actions: TestPriorityAndNewestFirst, TestDedupeExpiryAndCancel"
+      ]
     },
     {
       "id": "F-072",
@@ -1496,8 +1542,11 @@
         "F-066"
       ],
       "description": "Kicks and join-request rejections for one group within a 2–3 s window merge into calls of at most max_kick_batch (default 8), each JID individually eligible, and larger sets split into paced calls.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestKicksCoalesce, TestKicksWithinWindowMerge",
+        "internal/actions: TestKickCoalescing, TestKickWaitsForWindow"
+      ]
     },
     {
       "id": "F-073",
@@ -1513,8 +1562,11 @@
         "F-069"
       ],
       "description": "Transient errors retry with min(2^n·2 s, 5 min) full-jitter backoff up to 6 attempts; a 429 pauses the bot's executor 60 s then slows down; not-admin and not-found fail fast and update group state.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestTransientErrorBackoff, TestTransientErrorGivesUp, TestRateLimitPausesThenSlowsDown, TestPermanentErrorsFailFast",
+        "internal/actions: TestErrorHandling, TestBackoff"
+      ]
     },
     {
       "id": "F-074",
@@ -2202,8 +2254,12 @@
         "F-105"
       ],
       "description": "An Anthropic adapter classifies with schema-constrained output and prompt caching, mapping timeouts and errors to unsure; tested against a recorded HTTP fake.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai/anthropic: TestCompleteSendsCachedSystemPromptAndSchema, TestCompleteErrorsMapToSentinels, TestCompleteDoesNotRetry, TestCompleteTimeout",
+        "internal/ai/gateway: TestClassifierModesAndRetry (provider error -> unsure), TestNewFromConfig",
+        "internal/ai/llm: TestPortableSchema, TestStatusError, TestTransportError"
+      ]
     },
     {
       "id": "F-107",
@@ -2220,8 +2276,11 @@
         "F-105"
       ],
       "description": "An OpenAI-compatible adapter works with hosted APIs and Ollama/llama.cpp/vLLM/LM Studio via base_url, using native schema when available and JSON mode otherwise.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai/openaicompat: TestCompleteNativeRequestShape, TestCompleteLocalServerWithoutKeyOrUsage, TestAutoFallsBackToJSONModeOnce, TestFallbackOnlyOnSchemaRejection, TestAutoFallbackIsSafeUnderConcurrency, TestCompleteResponseOutcomes, TestCompleteTimeoutAndCancel",
+        "internal/ai/gateway: TestNewFromConfig (local server config)"
+      ]
     },
     {
       "id": "F-108",
@@ -2240,8 +2299,10 @@
         "F-101"
       ],
       "description": "With ai.context on, the request includes the replied-to message, up to N=5 previous messages in 10 minutes, group info and allowed-content summary, sender context and existing replies, redacted, capped at ~2,000 characters and fenced as untrusted data; nothing new is stored.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai/aicontext: TestBuildContents, TestBuildOffOrNoSource, TestBuildLimitsPreviousToN, TestBuildRedactsAndTruncates, TestBuildCapsTotalDroppingOldestFirst, TestBuildIsDeterministic, FuzzBuildStaysFencedAndCapped, TestBufferKeepsRecentMessagesOnly"
+      ]
     },
     {
       "id": "F-109",
@@ -2304,8 +2365,11 @@
         "F-088"
       ],
       "description": "Only UNCERTAIN messages go to the AI; spam ≥ ai.spam_confidence is deleted with the ban sent to admins, not spam ≥ 0.9 is logged, and unsure, low confidence, timeout, error or no AI configured go to admins with nothing deleted.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/ai: TestAISpamDeletesMessageAndAsksAdminsForBan, TestAISpamConfidenceBoundary, TestCertainAndCleanMessagesNeverCallAI, TestStillUncertainAsksAdminsNothingDeleted, TestAINotSpamHighConfidenceLoggedOnly, TestAskBeforeActionModeKeepsAISpamVisible, TestRedeliveredMessageClassifiedOnce",
+        "internal/ai/gateway: TestVerifyOutcomes, TestOnlyUncertainReachesTheAI, TestAIOffGoesToAdmins, TestBudgetExhaustedGoesToAdmins, TestPropertyOnlyConfidentAISpamDeletes"
+      ]
     },
     {
       "id": "F-112",
@@ -2323,8 +2387,11 @@
         "F-058"
       ],
       "description": "A ban resting on source ai routes to ask admins in every preset until the instance meets the track-record bar; property tests show AI-only evidence and looser near-duplicates never auto-ban.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/ai: TestPropertyAISourceNeverAutoBansWithoutTrackRecord, TestPropertyLooserNearDuplicateNeverActsAlone, TestAIAutoBanOnlyWithTrackRecordAndExplicitCell, TestKnownEvidenceStillAutoBans",
+        "internal/ai/safety: TestPropertyAISourceNeverAutoBansWithoutTrackRecord, TestAISpamDeletesAndAsksAdmins, TestSettingsDoesNotModifyInput"
+      ]
     },
     {
       "id": "F-113",

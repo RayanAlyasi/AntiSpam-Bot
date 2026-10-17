@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Is the build system getting better or worse? Rolling composite scores per harness version
-and category, plus alarms. Reads harness/metrics.jsonl and harness/scoring.json.
+and category, plus alarms. Reads harness/metrics/*.json and harness/scoring.json.
 Human verdicts come from the PR state via `gh` when it's available.
 """
 import json
@@ -15,8 +15,16 @@ import hooklib as h  # noqa: E402
 root = h.repo_root(os.getcwd())
 cfg = json.load(open(os.path.join(root, "harness", "scoring.json")))
 W, window = cfg["weights"], cfg["window"]
-path = os.path.join(root, "harness", "metrics.jsonl")
-cards = [json.loads(l) for l in open(path)] if os.path.exists(path) else []
+cards = []
+mdir = os.path.join(root, "harness", "metrics")
+if os.path.isdir(mdir):
+    for fn in os.listdir(mdir):
+        if fn.endswith(".json"):
+            cards.append(json.load(open(os.path.join(mdir, fn))))
+legacy = os.path.join(root, "harness", "metrics.jsonl")
+if os.path.exists(legacy):
+    cards += [json.loads(l) for l in open(legacy) if l.strip()]
+cards.sort(key=lambda c: c.get("ts") or "")
 if not cards:
     print("No scorecards yet. They're written at the end of each /next-feature run.")
     sys.exit(0)

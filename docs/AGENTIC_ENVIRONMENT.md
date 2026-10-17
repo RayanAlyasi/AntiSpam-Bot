@@ -428,3 +428,7 @@ Implemented on branch `harness/agent-env`. Differences from the plan above:
 - **Flow:** `feat/*` → PR into `staging` → release PR into `main`.
 - **GitHub enforcement:** a ruleset on `main` and `staging` requires a PR, blocks direct and force pushes and deletion, and allows no bypass for anyone. The harness guard also refuses agent pushes to either branch, and any `gh pr create` that doesn't target `staging`.
 - **History:** commits and PRs carry no AI attribution (`attribution` is empty in `.claude/settings.json`). They follow the engineer-style rules in CLAUDE.md and `.github/pull_request_template.md`.
+
+### Parallel-safe state (2026-10-17)
+
+Per-feature files replace the shared append-only logs: `harness/progress/<ID>.md`, `harness/dead-ends/<ID>.md`, `harness/deviations/<ID>.md` and `harness/metrics/<ID>.json`. Incidents and proposals are named `<ID>-<slug>.md`. Parallel sessions each work in their own worktree, so their PRs never touch the same log file.

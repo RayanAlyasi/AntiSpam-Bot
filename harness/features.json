@@ -1849,23 +1849,6 @@
       "evidence": []
     },
     {
-      "id": "F-096",
-      "milestone": "v0.1",
-      "phase": "1a",
-      "title": "Docs drift check after merges into staging",
-      "category": "infra",
-      "core": false,
-      "design_refs": [
-        "§22"
-      ],
-      "depends_on": [
-        "F-000"
-      ],
-      "description": "After each merge into staging a workflow checks whether user-facing docs have drifted from the change and, if so, opens a docs: PR into staging. It may edit only README.md and docs/ except docs/DESIGN.md and docs/AGENTIC_ENVIRONMENT.md (never CLAUDE.md, .claude/, harness/ or other protected paths), says how the check runs and which secrets it needs, and skips runs triggered by its own docs: merges.",
-      "passes": false,
-      "evidence": []
-    },
-    {
       "id": "F-097",
       "milestone": "v0.1",
       "phase": "1a",

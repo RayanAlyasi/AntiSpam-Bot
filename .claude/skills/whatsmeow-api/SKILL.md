@@ -15,4 +15,4 @@ Verified facts and known gaps are in `docs/DESIGN.md` §2 (capability audit). Re
 - `parseBusinessProfile` doesn't return the business description or website (§2.2);
 - join-request notifications arrive as raw nodes (§2.3).
 
-If `go doc` and DESIGN.md disagree, `go doc` wins for *what the API is*. Note the difference in `harness/deviations.md`.
+If `go doc` and DESIGN.md disagree, `go doc` wins for *what the API is*. Note the difference in `harness/deviations/<ID>.md`.

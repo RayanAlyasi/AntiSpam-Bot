@@ -146,7 +146,10 @@ def guard_tests():
     case("judge writes scratch test", "Write", {"file_path": A(".agent/scratch/F-001/x_test.go")}, "allow", "judge")
     case("judge runs git add", "Bash", {"command": "git add -A"}, "block", "judge")
     case("explorer reads acceptance test", "Read", {"file_path": A("acceptance/foo/foo_test.go")}, "block", "explorer")
-    case("retro writes an incident", "Write", {"file_path": A("harness/incidents/001-F-001.md")}, "allow", "retro")
+    case("retro writes an incident", "Write", {"file_path": A("harness/incidents/F-001-gate-loop.md")}, "allow", "retro")
+    case("retro writes a dead end", "Write", {"file_path": A("harness/dead-ends/F-001.md")}, "allow", "retro")
+    case("builder writes a plan-change record", "Write", {"file_path": A("harness/plan-changes/x.md")}, "block")
+    case("builder writes its own scorecard file", "Write", {"file_path": A("harness/metrics/F-001.json")}, "block")
     case("retro edits a rules file", "Edit", {"file_path": A(".claude/rules/go.md")}, "block", "retro")
 
 
@@ -171,7 +174,8 @@ def flow_tests():
     r = git("commit", "-qm", "sneaky")
     report("change after review: git pre-commit blocks", r.returncode != 0, r.stdout + r.stderr)
     git("reset", "-q", "--hard", "HEAD")
-    open(A("harness/progress.md"), "a").write("- note\n")
+    os.makedirs(A("harness/progress"), exist_ok=True)
+    open(A("harness/progress/F-001.md"), "w").write("- note\n")
     git("add", "-A")
     r = git("commit", "-qm", "chore: progress")
     report("bookkeeping-only commit needs no stamp", r.returncode == 0, r.stderr)
@@ -220,6 +224,10 @@ def flow_tests():
     base["features"][0]["title"] = "changed"
     json.dump(base, open(fj, "w"))
     report("features.json: changing anything else fails", tamper().returncode == 1)
+    os.makedirs(A("harness/plan-changes"), exist_ok=True)
+    open(A("harness/plan-changes/2026-01-01-rescope.md"), "w").write("# rescope F-001\n")
+    report("features.json: plan change with a human record passes", tamper().returncode == 0)
+    os.remove(A("harness/plan-changes/2026-01-01-rescope.md"))
     git("checkout", "--", "harness/features.json")
 
     print("-- Stop gate")
@@ -236,7 +244,7 @@ def flow_tests():
     r = hook("session_start.py", {"source": "startup"})
     report("session start prints a state summary", "Harness state" in r.stdout, r.stdout + r.stderr)
     r = subprocess.run(["python3", "harness/scripts/scorecard.py", "F-001"], cwd=REPO, capture_output=True, text=True)
-    report("scorecard writes a line", r.returncode == 0 and os.path.exists(A("harness/metrics.jsonl")), r.stderr)
+    report("scorecard writes a line", r.returncode == 0 and os.path.exists(A("harness/metrics/F-001.json")), r.stderr)
     r = subprocess.run(["python3", "harness/scripts/report.py"], cwd=REPO, capture_output=True, text=True)
     report("report runs", r.returncode == 0 and "features scored" in r.stdout, r.stdout + r.stderr)
 

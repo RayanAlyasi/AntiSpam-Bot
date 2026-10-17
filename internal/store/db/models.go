@@ -46,3 +46,55 @@ type AppAuditLog struct {
 	Diff     json.RawMessage
 	At       time.Time
 }
+
+type AppDetection struct {
+	ID               int64
+	GroupJid         string
+	MsgID            string
+	PersonID         pgtype.Int8
+	Score            float64
+	TierReached      string
+	Signals          json.RawMessage
+	Verdict          string
+	ConfidenceSource pgtype.Text
+	Route            string
+	RuleVersion      string
+	ActionPlan       json.RawMessage
+	Mode             string
+	NetworkBanID     pgtype.Int8
+	EvidenceRef      pgtype.Text
+	CreatedAt        time.Time
+}
+
+type AppGroupBan struct {
+	ID            int64
+	GroupJid      string
+	PersonID      int64
+	Reason        string
+	DecidedBy     string
+	DeciderPerson pgtype.Int8
+	DetectionID   pgtype.Int8
+	ReviewID      pgtype.Int8
+	NetworkBanID  pgtype.Int8
+	RejoinBlock   bool
+	Active        bool
+	CreatedAt     time.Time
+	LiftedBy      pgtype.Text
+	LiftedAt      pgtype.Timestamptz
+}
+
+type AppGroupSetting struct {
+	GroupJid  string
+	Version   int32
+	Doc       json.RawMessage
+	UpdatedBy string
+	UpdatedAt time.Time
+}
+
+type AppGroupSettingsHistory struct {
+	GroupJid  string
+	Version   int32
+	Doc       json.RawMessage
+	UpdatedBy string
+	UpdatedAt time.Time
+}

@@ -3,10 +3,10 @@ package redact
 import (
 	"strings"
 	"testing"
-	"time"
 	"unicode/utf8"
 
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/normalize"
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/normalize/normtest"
 )
 
 var key = []byte("test-key")
@@ -118,18 +118,17 @@ func TestTruncate(t *testing.T) {
 }
 
 func TestTextBounded(t *testing.T) {
-	for name, in := range map[string]string{
-		"digits":  strings.Repeat("1 ", 128<<10),
-		"emails":  strings.Repeat("a@b.co ", 36<<10),
-		"names":   strings.Repeat("Ahmed ", 42<<10),
-		"at":      strings.Repeat("@", 256<<10),
-		"letters": strings.Repeat("Ahmedx", 42<<10),
+	o := Options{Region: "SA", Names: []string{"Ahmed", "Ahmedx"}}
+	for name, unit := range map[string]string{
+		"digits":  "1 ",
+		"emails":  "a@b.co ",
+		"names":   "Ahmed ",
+		"at":      "@",
+		"letters": "Ahmedx",
 	} {
-		start := time.Now()
-		Text(in, Options{Region: "SA", Names: []string{"Ahmed", "Ahmedx"}})
-		if d := time.Since(start); d > 3*time.Second {
-			t.Errorf("Text(%s) took %v, want under 3s", name, d)
-		}
+		n := (64 << 10) / len(unit)
+		normtest.Linear(t, "Text("+name+")", func(k int) string { return strings.Repeat(unit, k*n) },
+			func(in string) { Text(in, o) })
 	}
 }
 

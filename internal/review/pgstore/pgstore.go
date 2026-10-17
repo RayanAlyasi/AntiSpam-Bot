@@ -20,6 +20,10 @@ import (
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/wa"
 )
 
+// RawTextRetention is how long a review may hold the unredacted message text while it waits
+// for a decision: the raw inbox's 72 h (§17).
+const RawTextRetention = 72 * time.Hour
+
 // uniqueViolation is Postgres' SQLSTATE for a unique-constraint violation.
 const uniqueViolation = "23505"
 
@@ -364,6 +368,9 @@ func (e Evidence) Purge(ctx context.Context, now time.Time) (int, error) {
 	n, err := q.PurgeEvidence(ctx, ts(now))
 	if err != nil {
 		return 0, fmt.Errorf("purge evidence: %w", err)
+	}
+	if _, err := q.ClearStaleReviewRawText(ctx, now.Add(-RawTextRetention)); err != nil {
+		return int(n), fmt.Errorf("clear stale raw review text: %w", err)
 	}
 	if _, err := q.ExpireReviewEvidence(ctx, now.Add(-review.EvidenceRetention)); err != nil {
 		return int(n), fmt.Errorf("expire review evidence: %w", err)

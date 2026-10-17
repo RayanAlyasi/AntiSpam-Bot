@@ -28,12 +28,36 @@ def added_files():
 
 
 new_files = added_files()
+
+
+def approved_tests():
+    """Test files a human approved for change on this branch (harness/test-approvals/*.md).
+
+    A record has a `branch: <name>` line and one `- <path>` line per test file. Only the named branch
+    may change those files; in CI the branch is the PR head (GITHUB_HEAD_REF).
+    """
+    branch = os.environ.get("GITHUB_HEAD_REF") or h.branch(root)
+    allowed = set()
+    d = os.path.join(root, "harness", "test-approvals")
+    if not os.path.isdir(d):
+        return allowed
+    for fn in os.listdir(d):
+        if not fn.endswith(".md") or fn == "README.md":
+            continue
+        lines = open(os.path.join(d, fn)).read().splitlines()
+        rec_branch = next((l.split(":", 1)[1].strip() for l in lines if l.lower().startswith("branch:")), "")
+        if rec_branch and rec_branch == branch:
+            allowed |= {l[2:].strip().strip("`") for l in lines if l.startswith("- ")}
+    return allowed
+
+
+approved = approved_tests()
 current = None
 for line in diff("*_test.go").splitlines():
     if line.startswith("+++ b/"):
         current = line[6:]
         continue
-    if current is None or current in new_files:
+    if current is None or current in new_files or current in approved:
         continue
     if line.startswith("-") and not line.startswith("---") and line[1:].strip():
         problems.append(f"{current}: line removed from an existing test: {line[1:].strip()[:80]}")

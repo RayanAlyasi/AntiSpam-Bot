@@ -59,8 +59,12 @@
         "F-000"
       ],
       "description": "The binary logs JSON with zerolog, supports a log level per module, attaches a request/detection ID, and a masking helper renders phone numbers as +966 5•• ••• •12 wherever they are logged.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/logging: TestModuleLevels, TestModuleAtTraceLogsTrace, TestOutputIsJSONWithTimestampAndModule, TestIDsInContext, TestIDsMissingFromContext, TestNewIDIsRandomHex, TestMaskPhone, TestMaskJID, TestPhoneAndJIDMaskWhenLogged, FuzzMaskPhone, FuzzMaskJID",
+        "internal/config: TestParseLogLevel, TestLoadSetsLogModules",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-002",
@@ -76,8 +80,12 @@
         "F-000"
       ],
       "description": "The bot starts with no config file; an optional config.yaml sets pacing, presets, AI and scoring defaults, every key has a documented default, and environment variables override the file.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "hidden architect tests for config (17), incl. TestDefaultsMatchDesign, TestEnvOverridesFile, TestInvalidConfigIsRejected, TestSecretsNeverInFileOrErrors, TestExampleFileDocumentsEveryKey",
+        "internal/config: TestLoadFile, TestLoadRejects, TestLoadNeverEchoesSecrets, TestExampleFileLoadsDefaults, FuzzDecodeFile, TestHTTPAddr",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-003",
@@ -94,8 +102,11 @@
         "F-001"
       ],
       "description": "internal/store opens a pgx v5 pool from DATABASE_URL in UTC, exposes a transaction helper that rolls back on error, and integration tests get a fresh testcontainers Postgres through one helper.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/store (integration): TestOpenRunsInUTC, TestInTx; internal/store: TestOpenRejectsMissingOrBadURL; the storetest helper backs every integration test",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-004",
@@ -112,8 +123,11 @@
         "F-003"
       ],
       "description": "Migrations live in migrations/, are embedded in the binary and run on start; schemas app and whatsmeow exist; sqlc.yaml generates into internal/store/db and make check-gen is green.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/store (integration): TestMigrateFreshDatabase (schemas app and whatsmeow, idempotent re-run); make check sqlc step (sqlc diff) green",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-005",
@@ -129,8 +143,11 @@
         "F-004"
       ],
       "description": "River's tables are created by a goose migration, a River client starts with the workers role, jobs enqueue transactionally with InsertTx, and a periodic test job runs on schedule.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/store/jobs (integration): TestInsertTxRunsOnlyCommittedJobs, TestPeriodicHeartbeatRunsOnSchedule, TestInsertOnlyClientDoesNotWork; TestMigrateFreshDatabase checks the River schema version",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-006",
@@ -148,8 +165,11 @@
         "F-004"
       ],
       "description": "Every settings change, command, manual action and automated action can be written to audit_log with actor, group, action and a JSON diff, readable per group.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/store (integration): TestAuditLog; internal/store: TestWriteAuditValidatesBeforeTouchingTheDatabase",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-007",
@@ -166,8 +186,11 @@
         "F-003"
       ],
       "description": "The binary serves /metrics, /healthz (process alive) and /readyz (database reachable and at least one bot connected), suitable for Coolify health checks.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/api: TestOpsEndpoints, TestMetricsServesRegisteredCollectors, TestOpsRejectsOtherMethods; cmd/antispam (integration): TestServeRunsAllRolesAndStopsOnSignal",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-008",
@@ -185,8 +208,11 @@
         "F-002"
       ],
       "description": "The binary runs the connector, workers and api roles together by default or a subset via flag, and stops all of them cleanly on SIGTERM within a bounded time.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "cmd/antispam: TestParseRoles, TestRunRoles (synctest: bounded shutdown, failure propagation, stuck role), TestCLIRejectsBadFlags, TestServeWithoutDatabaseFails, TestCheckConfig, TestRun; integration: TestServeRunsAllRolesAndStopsOnSignal, TestServeSubsetOfRoles",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-009",
@@ -718,8 +744,11 @@
         "F-000"
       ],
       "description": "Normalization applies NFKC and strips zero-width, bidi, tag, variation-selector, soft-hyphen and combining-mark floods, returning the stripped count as a signal input; fuzz tested.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "hidden suite (13 tests): TestRawPreserved, TestPlainTextUnchanged, TestNFKCFolding, TestInvisiblesStrippedAndCounted, TestInvisibleBetweenBaseAndMarkStillComposes, TestExemptionsDoNotCoverObfuscation, TestOnlyInvisibles, TestTagSmugglingCounted, TestZalgoFloodStripped, TestLegitimateTextNotCounted, TestIdempotent, TestLargeHostileInputLinear, FuzzText",
+        "internal/normalize: TestStripInvisibles, TestStripFloods, TestFold, TestFoldLongMarkRunLeavesNoGraphemeJoiner, FuzzFold"
+      ]
     },
     {
       "id": "F-035",
@@ -735,8 +764,10 @@
         "F-034"
       ],
       "description": "An embedded TR39 confusables table maps Cyrillic, Greek and other look-alikes to their Latin skeleton, so 'frее' with Cyrillic е matches 'free'.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/normalize: TestSkeletonMatchesLookalikes, TestSingleScriptTextKeepsNorm, TestPatternMatchesOwnConfusables, FuzzText"
+      ]
     },
     {
       "id": "F-036",
@@ -752,8 +783,10 @@
         "F-034"
       ],
       "description": "A separate leetspeak variant folds 0/1/3/4/5/$/@ without damaging numbers; f.r.e.e, f r e e and freeeee collapse to free; common spam emoji sequences map to tokens while Raw keeps them.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/normalize: TestCollapseAndSqueeze, TestLeetVariant, TestEmojiTokens, TestTextLinearOnHostileInput, FuzzText"
+      ]
     },
     {
       "id": "F-037",
@@ -769,8 +802,10 @@
         "F-034"
       ],
       "description": "Tashkeel and tatweel are removed, alef forms unified, ى→ي and ة→ه in the match variant, Persian ک/ی mapped to Arabic, and Arabic-Indic/Persian digits become ASCII.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/normalize: TestArabicFolds, FuzzText"
+      ]
     },
     {
       "id": "F-038",
@@ -787,8 +822,10 @@
         "F-037"
       ],
       "description": "Phone numbers written with spaces, separators, Arabic digits or spelled-out digits are extracted and normalized to E.164 with nyaruka/phonenumbers using the group's default country; fuzz tested.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/normalize: TestFindPhonesForms, TestFindPhonesRejects, TestFindPhonesSplitsGluedNumbers, TestFindPhonesRegion, TestFindPhonesSpans, TestParsePhone, TestFindPhonesHostileInputBounded, FuzzFindPhones"
+      ]
     },
     {
       "id": "F-039",
@@ -941,8 +978,10 @@
         "F-024"
       ],
       "description": "URLs are extracted from text, previews, vCards, locations and event links, including hxxp, example[.]com, spaced dots and IDN forms; fuzz tested.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/normalize/urls: TestExtractFinds, TestExtractDeobfuscates, TestExtractBoundaries, TestExtractIgnores, TestExtractBounded, FuzzExtract"
+      ]
     },
     {
       "id": "F-047",
@@ -958,8 +997,10 @@
         "F-046"
       ],
       "description": "URLs are canonicalized (lower-case host, punycode↔Unicode, tracking parameters stripped), get their eTLD+1 from the public suffix list, and chat.whatsapp.com, whatsapp.com/channel and wa.me links are classified as WhatsApp-native targets.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/normalize/urls: TestCanonicalize, TestCanonicalizeTracking, TestCanonicalizeTargets, TestExtractThenCanonicalize, FuzzCanonicalize"
+      ]
     },
     {
       "id": "F-048",
@@ -1391,8 +1432,11 @@
         "F-065"
       ],
       "description": "Revoke and remove-participant actions execute only through WAClient, record their result, and dedupe on revoke:<group>:<msgid> and kick keys.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestPermanentErrorsFailFast, TestKicksCoalesce, TestDedupeAcrossAllStatuses, TestCancelPendingRevoke",
+        "internal/actions: TestErrorHandling, TestKickCoalescing"
+      ]
     },
     {
       "id": "F-067",
@@ -1409,8 +1453,11 @@
         "F-065"
       ],
       "description": "DM, review, edit and reaction actions execute at P3 through WAClient, with template variants so the same text is never sent twice in a row to different chats.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestSendVariants, TestSilentGroupRefusesEveryPost",
+        "internal/actions: TestSendVariantsNeverRepeatAcrossChats, TestReservedSubBudgetsDuringRaid"
+      ]
     },
     {
       "id": "F-068",
@@ -1426,8 +1473,11 @@
         "F-065"
       ],
       "description": "Writes are spaced with base ~1 s plus 0–1.5 s jitter under a ceiling of 20/min with a burst of 10; a property test under synctest shows the effective rate never exceeds the ceiling.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestCeilingNeverExceeded, TestBurstSpacingAndJitter, TestExecutorIsStrictlySerial",
+        "internal/actions: TestCeilingPropertyRandomWorkloads, TestSpacingBetweenWrites, TestBucketNeverExceedsCapacityPlusRate"
+      ]
     },
     {
       "id": "F-069",
@@ -1463,8 +1513,11 @@
         "F-068"
       ],
       "description": "Each group is limited to 10 writes/min with round robin within a priority, OTPs and reviews have reserved P3 sub-budgets, and reads (IQs) use separate buckets that never consume write budget.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestPerGroupCap, TestRoundRobinFairness, TestReadsUseSeparateBudget",
+        "internal/actions: TestRoundRobinAcrossGroups, TestReservedSubBudgetsDuringRaid, TestReadsHaveTheirOwnBudget"
+      ]
     },
     {
       "id": "F-071",
@@ -1480,8 +1533,11 @@
         "F-066"
       ],
       "description": "Deletes in a group run newest first, anything near WhatsApp's ~48 h delete window moves ahead, expired actions are dropped and logged, and a sender's own revoke cancels the pending delete.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestPriorityOrder, TestUrgentDeadlinesFirst, TestDeletesNewestFirstInGroup, TestExpiredActionsNeverRun, TestCancelPendingRevoke",
+        "internal/actions: TestPriorityAndNewestFirst, TestDedupeExpiryAndCancel"
+      ]
     },
     {
       "id": "F-072",
@@ -1497,8 +1553,11 @@
         "F-066"
       ],
       "description": "Kicks and join-request rejections for one group within a 2–3 s window merge into calls of at most max_kick_batch (default 8), each JID individually eligible, and larger sets split into paced calls.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestKicksCoalesce, TestKicksWithinWindowMerge",
+        "internal/actions: TestKickCoalescing, TestKickWaitsForWindow"
+      ]
     },
     {
       "id": "F-073",
@@ -1514,8 +1573,11 @@
         "F-069"
       ],
       "description": "Transient errors retry with min(2^n·2 s, 5 min) full-jitter backoff up to 6 attempts; a 429 pauses the bot's executor 60 s then slows down; not-admin and not-found fail fast and update group state.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestTransientErrorBackoff, TestTransientErrorGivesUp, TestRateLimitPausesThenSlowsDown, TestPermanentErrorsFailFast",
+        "internal/actions: TestErrorHandling, TestBackoff"
+      ]
     },
     {
       "id": "F-074",
@@ -1663,8 +1725,14 @@
         "F-006"
       ],
       "description": "Commands with prefix '.' (and Arabic aliases) are parsed in groups, review groups and DMs; non-admins are ignored; in a protected group the command message is deleted and the reply goes by DM; DMs use .use/.groups context for 1 hour; changes are audited.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/api/chat TestParse",
+        "FuzzParse",
+        "TestDMContext",
+        "TestProtectedGroupIsSilent",
+        "acceptance/wpk TestF083_NonAdminCommandsIgnored"
+      ]
     },
     {
       "id": "F-081",
@@ -1682,8 +1750,12 @@
         "F-054"
       ],
       "description": "`.set <key> <value>` validates with the same schema as the API and writes history and audit; `.get <key>` and `.settings` show values, with errors explained in the admin's language.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/api/chat TestSettingsCommands",
+        "TestSettingsErrorsAndReads",
+        "TestDocSettings"
+      ]
     },
     {
       "id": "F-082",
@@ -1703,8 +1775,12 @@
         "F-060"
       ],
       "description": ".status, .mode, .preset, .silent, .newsignal, .policy, .block/.allow/.blocknew, .autoban <type> … and .askadmins change the same dotted keys as .set; .preset resets the matrix and `.autoban … auto ai` is refused until a track record exists.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/api/chat TestSettingsCommands",
+        "TestSettingsErrorsAndReads",
+        "TestDocSettings"
+      ]
     },
     {
       "id": "F-083",
@@ -1722,8 +1798,16 @@
         "F-077"
       ],
       "description": "`.ban` requires a reason spam|other (asking, and defaulting to other), `.kick` kicks without a rejoin block, `.unban` lifts a local ban, `.allow/.unallow` manage the member allow-list, and `.undo` reverses the bot's last reversible action in the group.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/wpk TestF083_BanRequiresReason",
+        "TestF083_BanReasonUpgradedWithinWindow",
+        "TestF083_KickIsNeverABan",
+        "TestF083_UnbanAllowUnallow",
+        "TestF083_UndoReversesLastAction",
+        "TestF083_NeverActsOnAdmins",
+        "TestF083_NonAdminCommandsIgnored"
+      ]
     },
     {
       "id": "F-084",
@@ -1743,8 +1827,10 @@
         "F-015"
       ],
       "description": "`.domain allow|block` and `.word block|unblock` edit group lists, and `.word block` first replies with how many recent messages (72 h inbox, in memory) it would have matched.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/api/chat TestWordDryRunThenSave"
+      ]
     },
     {
       "id": "F-085",
@@ -1763,8 +1849,10 @@
         "F-054"
       ],
       "description": "A START DM gets the three setup steps; when the bot is promoted it DMs the promoting admin only if they have an open thread, otherwise waits; a not-admin group gets at most one reminder per day in an existing thread; a group invite link sent by an admin is joined only after checking they admin it.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/api/chat TestOnboarding"
+      ]
     },
     {
       "id": "F-086",
@@ -1800,8 +1888,10 @@
         "F-080"
       ],
       "description": "`.reviewgroup here` in a separate non-protected group sets it as the destination (a protected group is refused), `.reviewgroup off` clears it, one review group can serve several groups, and the bot warns when it contains non-admins.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/api/chat TestReviewGroupHere"
+      ]
     },
     {
       "id": "F-088",
@@ -2039,8 +2129,11 @@
         "F-004"
       ],
       "description": "On start the binary compares the database's goose version with the newest migration it embeds and exits with a clear message (which version is needed) when the database is newer, instead of running against an unknown schema.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/store (integration): TestMigrateRefusesNewerSchema; cmd/antispam (integration): TestServeRefusesNewerSchema; internal/store: TestSchemaTooNewError",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-100",
@@ -2079,8 +2172,10 @@
         "F-038"
       ],
       "description": "One helper masks third-party phone numbers, emails and names, keeps the spam's advertised numbers only as keyed hashes, and truncates, used by corpus, reviews and AI.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/normalize/redact: TestTextMasks, TestTextKeeps, TestAdvertisedNumbersHashed, TestPhoneHash, TestTruncate, TestTextBounded, FuzzText"
+      ]
     },
     {
       "id": "F-102",
@@ -2178,8 +2273,12 @@
         "F-105"
       ],
       "description": "An Anthropic adapter classifies with schema-constrained output and prompt caching, mapping timeouts and errors to unsure; tested against a recorded HTTP fake.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai/anthropic: TestCompleteSendsCachedSystemPromptAndSchema, TestCompleteErrorsMapToSentinels, TestCompleteDoesNotRetry, TestCompleteTimeout",
+        "internal/ai/gateway: TestClassifierModesAndRetry (provider error -> unsure), TestNewFromConfig",
+        "internal/ai/llm: TestPortableSchema, TestStatusError, TestTransportError"
+      ]
     },
     {
       "id": "F-107",
@@ -2196,8 +2295,11 @@
         "F-105"
       ],
       "description": "An OpenAI-compatible adapter works with hosted APIs and Ollama/llama.cpp/vLLM/LM Studio via base_url, using native schema when available and JSON mode otherwise.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai/openaicompat: TestCompleteNativeRequestShape, TestCompleteLocalServerWithoutKeyOrUsage, TestAutoFallsBackToJSONModeOnce, TestFallbackOnlyOnSchemaRejection, TestAutoFallbackIsSafeUnderConcurrency, TestCompleteResponseOutcomes, TestCompleteTimeoutAndCancel",
+        "internal/ai/gateway: TestNewFromConfig (local server config)"
+      ]
     },
     {
       "id": "F-108",
@@ -2216,8 +2318,10 @@
         "F-101"
       ],
       "description": "With ai.context on, the request includes the replied-to message, up to N=5 previous messages in 10 minutes, group info and allowed-content summary, sender context and existing replies, redacted, capped at ~2,000 characters and fenced as untrusted data; nothing new is stored.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai/aicontext: TestBuildContents, TestBuildOffOrNoSource, TestBuildLimitsPreviousToN, TestBuildRedactsAndTruncates, TestBuildCapsTotalDroppingOldestFirst, TestBuildIsDeterministic, FuzzBuildStaysFencedAndCapped, TestBufferKeepsRecentMessagesOnly"
+      ]
     },
     {
       "id": "F-109",
@@ -2280,8 +2384,11 @@
         "F-088"
       ],
       "description": "Only UNCERTAIN messages go to the AI; spam ≥ ai.spam_confidence is deleted with the ban sent to admins, not spam ≥ 0.9 is logged, and unsure, low confidence, timeout, error or no AI configured go to admins with nothing deleted.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/ai: TestAISpamDeletesMessageAndAsksAdminsForBan, TestAISpamConfidenceBoundary, TestCertainAndCleanMessagesNeverCallAI, TestStillUncertainAsksAdminsNothingDeleted, TestAINotSpamHighConfidenceLoggedOnly, TestAskBeforeActionModeKeepsAISpamVisible, TestRedeliveredMessageClassifiedOnce",
+        "internal/ai/gateway: TestVerifyOutcomes, TestOnlyUncertainReachesTheAI, TestAIOffGoesToAdmins, TestBudgetExhaustedGoesToAdmins, TestPropertyOnlyConfidentAISpamDeletes"
+      ]
     },
     {
       "id": "F-112",
@@ -2299,8 +2406,11 @@
         "F-058"
       ],
       "description": "A ban resting on source ai routes to ask admins in every preset until the instance meets the track-record bar; property tests show AI-only evidence and looser near-duplicates never auto-ban.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/ai: TestPropertyAISourceNeverAutoBansWithoutTrackRecord, TestPropertyLooserNearDuplicateNeverActsAlone, TestAIAutoBanOnlyWithTrackRecordAndExplicitCell, TestKnownEvidenceStillAutoBans",
+        "internal/ai/safety: TestPropertyAISourceNeverAutoBansWithoutTrackRecord, TestAISpamDeletesAndAsksAdmins, TestSettingsDoesNotModifyInput"
+      ]
     },
     {
       "id": "F-113",
@@ -2359,8 +2469,14 @@
         "F-114"
       ],
       "description": "Review items post as text (or the inline thumbnail with a caption) with who/what/why/score/source, third-party numbers and emails masked and text truncated to ~300 characters, and review_messages maps our message IDs to the review.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/review TestRender",
+        "TestRedact",
+        "FuzzRedact",
+        "TestMaskNumber",
+        "TestOpenPostsToReviewGroupOnly"
+      ]
     },
     {
       "id": "F-116",
@@ -2376,8 +2492,13 @@
         "F-115"
       ],
       "description": "Reactions on a review message (✅👍 ban, ❌👎 not spam, removal withdraws) and replies quoting it (ban/kick/طرد/حظر, ok/not spam/ليس سبام, delete only, clear) become votes; `.review K7Q2 ban` and `.pending` work too.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/review TestParseReplyAndReaction",
+        "FuzzParseReply",
+        "internal/api/chat TestPendingAndDecideByCode",
+        "acceptance/wpk TestF120_ReactionAndReplyKeywords"
+      ]
     },
     {
       "id": "F-117",
@@ -2417,8 +2538,13 @@
         "F-114"
       ],
       "description": "Every not-spam decision (.notspam, review ❌, an overturned .spam or bot deletion) deletes the evidence-snapshot text, removes the strike and restores trust; if the message was confirmed spam, its corpus entry leaves the matching indexes at once (NOTIFY) and only a fingerprint allow-list entry, checked first by near-duplicate matching, is kept; tests cover both cases and assert no text of the overturned message remains.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/wpk TestF118_OverturnRemovesWhatWasLearned",
+        "TestF118_OverturnLeavesOtherEntriesAlone",
+        "TestF118_OverturnIsIdempotent",
+        "internal/review TestOverturnRunsEveryStepDespiteErrors"
+      ]
     },
     {
       "id": "F-119",
@@ -2438,8 +2564,13 @@
         "F-118"
       ],
       "description": "Replying .spam deletes the message, bans the sender (allowed for established members because it's an admin decision) and records confirmed spam; .notspam/.ok restores trust, records the false positive and retracts what the confirmation added.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/wpk TestF119_SpamReplyDeletesBansAndLearns",
+        "TestF119_NotSpamOverturnsConfirmation",
+        "TestF119_NotSpamOverturnsBotDeletion",
+        "TestF119_NonAdminSpamReplyIgnored"
+      ]
     },
     {
       "id": "F-120",
@@ -2458,8 +2589,15 @@
         "F-118"
       ],
       "description": "Only current admins of the protected group can decide; the first valid vote wins atomically even under concurrent votes; late voters get one 👌 and 'already handled'; every vote is stored; the decision executes through the normal action path.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/wpk TestF120_OnlyCurrentAdminsDecide",
+        "TestF120_FirstVoteWinsUnderConcurrency",
+        "TestF120_DecisionExecutesThroughActions",
+        "TestF120_LateVotersGetOneAck",
+        "TestF120_WithdrawAfterDecisionDoesNothing",
+        "internal/review TestVoteValidation"
+      ]
     },
     {
       "id": "F-121",
@@ -2475,8 +2613,10 @@
         "F-120"
       ],
       "description": "A decided review message is edited to show who decided and what happened while within 20 minutes, and gets a quoting follow-up reply after that.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/review TestOutcomeEditOrFollowUp"
+      ]
     },
     {
       "id": "F-122",
@@ -2496,8 +2636,16 @@
         "F-087"
       ],
       "description": "Pending reviews time out (6 h, or 15 min in ask_before_action) into keep_deleted_no_ban, delete_no_ban, auto_ban or dismiss, auto_ban refused in ask modes, for established members and hacked accounts; `.review group|dashboard` and `.review timeout …` configure it.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/wpk TestF122_EffectiveTimeout",
+        "TestF122_CheckOnTimeout",
+        "TestF122_ExpireAppliesFallbackOnce",
+        "TestF122_DashboardPostsNothingInWhatsApp",
+        "TestF122_ReviewCommands",
+        "internal/review TestTimeoutNeverBansWhenNotAllowed",
+        "TestExpireDismissRestoresTrust"
+      ]
     },
     {
       "id": "F-123",
@@ -2534,8 +2682,16 @@
         "F-080"
       ],
       "description": "Admins add, remove, list (masked except the last digits) and check numbers per group; the operator adds instance-wide entries with --instance; every change is audit-logged.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/wpk TestF124_AddNormalizesAndReportsInvalid",
+        "TestF124_RemoveAndAudit",
+        "TestF124_InstanceScopeIsOperatorOnly",
+        "TestF124_CheckReportsMembership",
+        "TestF124_BlacklistCommands",
+        "internal/review/blacklist TestNormalizeNumber",
+        "FuzzNormalizeNumber"
+      ]
     },
     {
       "id": "F-125",
@@ -2554,8 +2710,12 @@
         "F-070"
       ],
       "description": "Blacklisted numbers resolve to LIDs via batched GetUserInfo within the read budget, both identities link to the person, and numbers not on WhatsApp still work as content signals.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/wpk TestF125_ResolvesInBatchesWithinReadBudget",
+        "TestF125_LinksIdentitiesAndKeepsUnknownNumbers",
+        "TestF125_NoLookupWithoutBudget"
+      ]
     },
     {
       "id": "F-126",
@@ -2574,8 +2734,13 @@
         "F-060"
       ],
       "description": "A blacklisted member is banned silently (admins never acted on, the adder told instead), a blacklisted joiner is kicked, their join requests rejected and messages deleted at P1; in ask-admins groups instance-wide entries become review items.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/wpk TestF126_AddBansListedMemberSilently",
+        "TestF126_NeverActsOnAdmins",
+        "TestF126_JoinsRequestsAndMessages",
+        "TestF126_ScopeAndAskMode"
+      ]
     },
     {
       "id": "F-127",

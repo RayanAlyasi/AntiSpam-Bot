@@ -1,6 +1,6 @@
 # WhatsApp Anti-Spam Bot: Design Document
 
-**Status:** Draft for review (revision 10: tech stack decided (Go modular monolith, Postgres only, River), no embeddings in the core, frontend decided later; revision 9: context bundle for the AI, explicit AI cost controls, provider-neutral AI classifier; revision 8: spam-only bootstrap, no collection of normal messages, certainty routing as the core flow; revision 7: generic labeled-dataset import replaces the old-database import, and a manual phone-number blacklist; revision 6: AI and learning in the first version; revision 5: new enforcement model with instant delete + ban by default, no trust grace on detection, silent bot, auto-ban matrix and ask-admins mode; revision 4: adds hacked-account handling, one-number capacity model, unbounded queue with slow-down-only pacing and capped kick batches, and the open-source/self-hosting framing to revision 3's network bans and spammer intelligence). Nothing is built yet.
+**Status:** Draft for review (revision 11: v0.1 milestone first, and the release and versioning plan in §23; revision 10: tech stack decided (Go modular monolith, Postgres only, River), no embeddings in the core, frontend decided later; revision 9: context bundle for the AI, explicit AI cost controls, provider-neutral AI classifier; revision 8: spam-only bootstrap, no collection of normal messages, certainty routing as the core flow; revision 7: generic labeled-dataset import replaces the old-database import, and a manual phone-number blacklist; revision 6: AI and learning in the first version; revision 5: new enforcement model with instant delete + ban by default, no trust grace on detection, silent bot, auto-ban matrix and ask-admins mode; revision 4: adds hacked-account handling, one-number capacity model, unbounded queue with slow-down-only pacing and capped kick batches, and the open-source/self-hosting framing to revision 3's network bans and spammer intelligence). Nothing is built yet.
 **Stack:** Go + [whatsmeow](https://github.com/tulir/whatsmeow) (`go.mau.fi/whatsmeow`), PostgreSQL, Docker Compose (ARM64 + AMD64); runs anywhere Docker does (the user's own instance runs on Coolify).
 **Scope:** A from-scratch rewrite. The existing Baileys/Node code in this repo is ignored.
 **Project type:** **open source and self-hosted**, aimed at big groups and communities. Anyone can run their own instance with one `docker compose up`. Throughout this document, **"operator" means whoever deploys an instance**, and "global" means "across all groups of that one deployment".
@@ -31,6 +31,7 @@
 20. [Phased roadmap](#20-phased-roadmap)
 21. [Open questions and trade-offs](#21-open-questions-and-trade-offs)
 22. [Open source: licensing and contributions](#22-open-source-licensing-and-contributions)
+23. [Releases and versioning](#23-releases-and-versioning)
 
 ---
 
@@ -1852,7 +1853,7 @@ Self-hosting is the main way to run the project, not an afterthought. The user's
   5. add the bot to a group and make it admin.
 
   It also covers a reverse proxy (Caddy/Traefik/nginx examples, plus a Coolify example), backups, upgrades, the privacy note (§17.1) and the ban-risk advice (§3).
-- **Images:** multi-arch (`linux/arm64`, `linux/amd64`) on GHCR, tagged by semver plus `latest`; signed (cosign) with an SBOM.
+- **Images:** multi-arch (`linux/arm64`, `linux/amd64`) at `ghcr.io/rayanalyasi/antispam-bot`, built by GoReleaser on `v*` tags, signed (cosign keyless) and attested, with SBOMs. The tag scheme is in §23.4: pin `:0.1` or an exact version, never `latest`.
 
 ### 19.2 Build
 
@@ -1866,23 +1867,74 @@ Self-hosting is the main way to run the project, not an afterthought. The user's
 - **Pairing:** the operator page on the website shows a QR or uses `PairPhone` to display a pairing code. Only operators can reach it (and it can be further restricted by IP or kept behind an SSH tunnel).
 - **Reverse proxy:** only the website is exposed (HTTPS). Postgres is never exposed. For the user's namaa VM: a Coolify Docker Compose resource, with Traefik labels for the dashboard host and automatic TLS.
 - **Backups:** a documented nightly `pg_dump` (any object storage; on namaa, Oracle Object Storage free tier). Losing the whatsmeow store means re-pairing; losing app data means losing settings and labels.
-- **Upgrades:** migrations run automatically on start, and release notes flag breaking changes. A quick stop/start is fine: messages received during a restart are delivered on reconnect (`OfflineSyncPreview`/`OfflineSyncCompleted`) and processed afterwards. Because WhatsApp changes, deployers are told to keep instances updated (whatsmeow moves fast).
+- **Upgrades:** migrations run automatically on start (forward-only), and release notes lead with breaking changes and upgrade steps (§23.7). A quick stop/start is fine: messages received during a restart are delivered on reconnect (`OfflineSyncPreview`/`OfflineSyncCompleted`) and processed afterwards. Because WhatsApp changes, deployers are told to keep instances updated (whatsmeow moves fast).
 
 ---
 
 ## 20. Phased roadmap
 
-Durations assume one developer and are rough. **AI and learning are in the first version (Phase 1)**, bootstrapped from existing data. Network bans and spammer intelligence stay in Phase 5. **The full scope stays:** network bans, spammer intelligence, AI verification and learning are all planned. Phases only order the work. Evidence and identity capture start in Phase 1, so the later phases have history to learn from.
+Durations assume one developer and are rough. **Releases come first:** v0.1 (below) is a small, stable slice for real use soon. The phases after it are the full plan, now labelled with the release they're expected to land in (tentative). Network bans and spammer intelligence stay in Phase 5. **The full scope stays:** network bans, spammer intelligence, AI verification and learning are all planned. Phases only order the work. Evidence and identity capture start in Phase 1, so the later phases have history to learn from.
+
+### v0.1: the first release (comes first)
+
+A **quick, stable first release** for a friend who needs protection soon. It's a deliberately small, well-tested slice of the design, aimed at real use in a few groups.
+
+| v0.1 contains | Design reference |
+|---|---|
+| Intake and the Content Envelope for **all** message types (recursive unwrapping, edits, status wrappers) | §5, §6 |
+| Text normalization (homoglyphs, invisible characters, Arabic, numbers) | §7.2 |
+| **Known-spam matching:** words and phrases, links and domains, phone numbers, SimHash/MinHash near-duplicates, media and sticker hashes | §7.0 (CERTAIN band), §7.1 T0/T1 |
+| The **`.blacklist`** command | §9.8 |
+| Per-group content rules, delete-only mode, and the per-type **auto-ban matrix** with presets | §9.2, §9.3, §12 |
+| **Silent** delete + ban (kick plus rejoin block) | §9.1, §9.7 |
+| **Ask-admins mode** and the **review group** with ✅/❌ reactions and reply keywords | §8.3, §9.5 |
+| Admin chat commands | §13.7 |
+| The paced action queue (fixed ceiling, slow-down only, capped kick batches) | §10 |
+| Shadow mode | §8.4 |
+| **The AI check:** the provider-neutral `AIClassifier` with **OpenAI-compatible** and **Anthropic** adapters, the context bundle, uncertain band only, cache and cluster reuse, budgets, and the early-AI safety rule | §7.0, §7.4, §9.2 |
+| The Postgres store and migrations, config, logging | §4.1, §14, §16 |
+| Docker plus `docker compose up`, and the release pipeline | §19, §23 |
+
+**Where "known spam" comes from in v0.1.** The full learning system arrives in v0.2. Until then, known spam comes from:
+- rule packs and admin-added lists (words, phrases, domains, numbers);
+- the `.blacklist`;
+- the **exact and near-duplicate fingerprints** of messages that admins confirm as spam (`.spam`, review ✅), stored as plain fingerprints;
+- AI few-shot examples drawn from those confirmed messages and the rule packs' examples.
+
+Poisoning guards, promotion and re-weighting come with learning in v0.2.
+
+**Not in v0.1 (v0.2 and later):**
+- learning and dataset import;
+- profile and link enrichment;
+- hacked-account detection;
+- the website and OTP login;
+- vision AI;
+- network bans and spammer intelligence;
+- multiple bot numbers.
+
+**Estimate:** ≈6–8 weeks for one developer, including the Phase 0 spike. It will be re-estimated after the spike.
+
+**Exit criteria for `v0.1.0`:**
+- `make check` is green, including the property tests:
+  - only CERTAIN evidence auto-bans;
+  - AI-only evidence never auto-bans;
+  - ask-admins mode never auto-bans;
+  - silent mode never posts in a protected group.
+- **≥ 1 week of shadow mode** on the friend's and your own groups, with deletion precision ≥ 99% judged by admin reviews.
+- At least one release candidate (`v0.1.0-rc.N`) tested by the friend.
+- The release pipeline produces signed, attested multi-arch images (§23).
+
+### The full plan, by phase (and the release each one is expected to land in)
 
 | Phase | Scope | Exit criteria |
 |---|---|---|
-| **0. Spike** (≈1 week) | Pair a test number with whatsmeow + Postgres store. Log every event type from real groups to a fixture corpus. Verify: admin revoke of others' messages, batched remove, edit/revoke events, view-once behaviour, vCard business fields, `GetNewsletterInfo*`, `GetGroupInfoFromLink`, the business profile description via raw IQ, LID/PN mapping in your groups, join-request node shape. **Also:** status shares/replies/mentions and Group Status posts as they arrive in groups (wrappers, `ForwardOrigin`, attributions), whether Group Status posts can be revoked, whether `status@broadcast` arrives from members who saved the bot, a broadcast list sent to the bot, reactions and replies on the bot's own messages in DMs and groups, and editing the bot's own message within 20 minutes. Measure safe pacing empirically (the default ceiling is set from this). **Batch-removal test:** remove dummy test accounts from a test group in batches of 1, 5, 8, 10 and 20, and record errors, ack latency, warnings and any account signals, to set `max_kick_batch`. | A written capability report; a fixtures folder; any library gaps confirmed with workarounds. |
-| **1. First version: core + AI + learning** (≈8–10 weeks, in three milestones) | **1a. Core and enforcement (≈4–5 weeks):** Connector, inbox, recursive unwrapper (including status/group-status wrappers), envelope for all types, T0 + T1 text (normalization, lists, fuzzy), URL canonicalization + domain lists, exact media/sticker hashes, **enforcement model**: routing (§8.3), per-type auto-ban matrix with evidence sources (§9.2), presets Relaxed/Standard/Strict/Ask-admins, always-ask-admins modes (a) and (b), ban = kick + rejoin block, policy violations as silent delete-only (§9.3), **silent mode** with inbound-first DM onboarding and command handling (§9.7, §13.6–13.7), the invisible "just joined" signal, policy blocks per type (including status shares/posts), action queue (complete: unbounded Postgres queue, priorities, fixed-ceiling slow-down-only pacing, kick batch cap, newest-first and deadline-aware ordering, batched kicks, backoff, breaker), members/trust as a routing input, **known spam always deleted regardless of trust** (§8.7), early lockdown on deletion backlog. **Command framework** with dotted-key `.set`/`.get` and the moderation commands (`.spam`, `.notspam`, `.ban spam\|other`, `.status`, `.mode`, `.preset`). **Reviews v1:** review group destination, reactions + reply keywords, admin-only first-wins, outcome edit/follow-up, timeout fallback. **Evidence capture** for confirmed spam starts now. **Identity and membership capture** also starts now: LID↔PN identities, join method / added-by / join-to-first-message time for every member, and name/picture history for spammers, so the network and intelligence features have history to work with later. **Local ban** with rejoin block. YAML presets. One bot number. **JSON API `/api/v1` with an OpenAPI spec** (the same settings layer the commands use; the frontend builds on it later). **Open-source scaffolding:** `docker-compose.yml`, `.env.example`, analyzer registry, rule-pack file format with tests, `locales/` (ar/en), CONTRIBUTING/SECURITY, CI with replay tests, multi-arch images.  **1b. AI and learning (≈3–4 weeks):** text AI tier T3 (AI gateway, structured output, budgets, cache, prompt caching, few-shot from the corpus), learning from confirmed spam (§7.5): group-local auto-fingerprints, SimHash/MinHash near-duplicate matching against the corpus, few-shot example selection by shared fingerprints/keywords/campaign, overturn retraction, poisoning guards (per-admin limits, admin reputation, in-memory recent-traffic check, rollback), and the **early-AI safety rule** (`ai` → ask admins until it has a track record, §9.2). **1c. Dataset import and evaluation (≈1 week):** the generic `antispam corpus import` command (JSONL/CSV, §7.8) with dedupe, cluster-aware hold-out split and undo; importing the operator's prepared spam dataset (spam-only by default); the hold-out slice as the first evaluation corpus, and a model comparison on it. **Manual phone-number blacklist** by command (§9.8). | **Before enforcing anywhere:** recall on the spam-only hold-out slice is reported per band and type; AI-only evidence and looser near-duplicate matches never auto-ban, and only CERTAIN evidence auto-bans (property tests). Then **≥ 1 week of shadow mode** in your own groups with the review queue on. **Precision comes from here:** admins review what the bot would have done, and enforcement starts only when shadow-mode precision for deletions is ≥ 99% (target to confirm) with no would-be ban of an established member. Also: zero automatic bans of admins/established members; the queue never exceeds pacing limits; a review can be opened and decided entirely in WhatsApp. |
-| **2. Detection depth** (≈2–3 weeks) | Thumbnail pHash, profile scanning (name/about/picture/business, plus own status when available), invite/channel/WA-link resolution, status attribution URLs and reshared channels, shortener expansion + reputation feeds + RDAP, SimHash campaigns across groups, behaviour (flood, join-and-post, cross-group), raid mode, the optional ladder (warn/mute, off by default), join screening/approval, edits re-analysis, view-once policy. **Compromised accounts** (§8.7): behaviour baselines, the possibly-compromised signal family, the "may be hacked" admin review, optional restriction while pending, `.clear`. **Reviews v2:** DM reviewers with opt-in, fallback chain, quiet hours, digests, confirm-before-kick. | Replay corpus precision ≥ 99% at the delete threshold (target to agree on); recall measured per type. |
-| **3. Website & onboarding** (≈2–3 weeks) | The separate frontend app (framework chosen then, §13.1) on top of the `/api/v1` API, served same-origin by the Go binary; OTP login (both methods), permissions, groups, settings with presets and previews, **reviews & notifications settings page, review queue, review history, learned-patterns page, blacklist page (§9.8)**, lists with dry-run, activity log, onboarding messages (including choosing a review destination), Arabic/English. Every website setting is checked against the `.set` command path for parity. **Self-hosting guide** (`docs/SELF_HOSTING.md`), operator setup flow with pairing on the website, first public release. | A non-technical admin can onboard a group, pick reviewers and change settings from a phone without help. |
-| **4. Vision AI & learning at scale** (≈2–3 weeks) | Vision AI tier (T4) for images/stickers/profile pictures, weekly bounded re-weighting gated by the replay corpus, global promotion of learned patterns (≥ 3 unrelated groups) with operator approval, track-record tracking and the opt-in to let `ai` auto-ban where it has earned it, appeals end to end. | Vision used only on the ambiguous few percent; re-weighting never lowers hold-out precision; overturn rate dashboard; promotion and unlock flows tested. |
-| **5. Network bans & spammer intelligence** (≈3 weeks) | Organisations and scope settings (`off`/`org`/`all`), quorum rule with operator approval queue, network-ban jobs (identity resolution incl. "identity pending" watches, batched kicks, re-scan of recorded messages that deletes only spam-matching ones within WhatsApp's delete window, rejoin kick, join-request rejection, admin re-add override), network-wide unban/appeal, audit. Spammer intelligence: profiles, snapshots, campaigns graph, number-prefix/picture/name/timing patterns as capped priors, website views (group and operator), privacy controls (retention jobs, access log, encryption, appeal deletion). | A test ban across ≥ 20 groups completes within pacing limits; every negative quorum case stays local; an unban fully reverses the ban; priors never act alone (property test in CI); privacy notice published. |
-| **6. Scale & polish** (optional for most deployments) | Optional cross-instance feeds (rule packs, hashed fingerprints, §15); multiple bot numbers (optional, never required) with primary/standby, failover, leases, the `-media` image (animated stickers, video keyframes, OCR), optional voice transcription, multi-node, partitioning. | Survives a temp ban of one number without losing protection in groups that have a standby. |
+| **0. Spike** (≈1 week; part of v0.1) | Pair a test number with whatsmeow + Postgres store. Log every event type from real groups to a fixture corpus. Verify: admin revoke of others' messages, batched remove, edit/revoke events, view-once behaviour, vCard business fields, `GetNewsletterInfo*`, `GetGroupInfoFromLink`, the business profile description via raw IQ, LID/PN mapping in your groups, join-request node shape. **Also:** status shares/replies/mentions and Group Status posts as they arrive in groups (wrappers, `ForwardOrigin`, attributions), whether Group Status posts can be revoked, whether `status@broadcast` arrives from members who saved the bot, a broadcast list sent to the bot, reactions and replies on the bot's own messages in DMs and groups, and editing the bot's own message within 20 minutes. Measure safe pacing empirically (the default ceiling is set from this). **Batch-removal test:** remove dummy test accounts from a test group in batches of 1, 5, 8, 10 and 20, and record errors, ack latency, warnings and any account signals, to set `max_kick_batch`. | A written capability report; a fixtures folder; any library gaps confirmed with workarounds. |
+| **1. Core + AI + learning** (≈8–10 weeks, in three milestones; **v0.1** ships the subset listed above, and the rest, mainly learning and dataset import, lands in **v0.2**) | **1a. Core and enforcement (≈4–5 weeks):** Connector, inbox, recursive unwrapper (including status/group-status wrappers), envelope for all types, T0 + T1 text (normalization, lists, fuzzy), URL canonicalization + domain lists, exact media/sticker hashes, **enforcement model**: routing (§8.3), per-type auto-ban matrix with evidence sources (§9.2), presets Relaxed/Standard/Strict/Ask-admins, always-ask-admins modes (a) and (b), ban = kick + rejoin block, policy violations as silent delete-only (§9.3), **silent mode** with inbound-first DM onboarding and command handling (§9.7, §13.6–13.7), the invisible "just joined" signal, policy blocks per type (including status shares/posts), action queue (complete: unbounded Postgres queue, priorities, fixed-ceiling slow-down-only pacing, kick batch cap, newest-first and deadline-aware ordering, batched kicks, backoff, breaker), members/trust as a routing input, **known spam always deleted regardless of trust** (§8.7), early lockdown on deletion backlog. **Command framework** with dotted-key `.set`/`.get` and the moderation commands (`.spam`, `.notspam`, `.ban spam\|other`, `.status`, `.mode`, `.preset`). **Reviews v1:** review group destination, reactions + reply keywords, admin-only first-wins, outcome edit/follow-up, timeout fallback. **Evidence capture** for confirmed spam starts now. **Identity and membership capture** also starts now: LID↔PN identities, join method / added-by / join-to-first-message time for every member, and name/picture history for spammers, so the network and intelligence features have history to work with later. **Local ban** with rejoin block. YAML presets. One bot number. **JSON API `/api/v1` with an OpenAPI spec** (the same settings layer the commands use; the frontend builds on it later). **Open-source scaffolding:** `docker-compose.yml`, `.env.example`, analyzer registry, rule-pack file format with tests, `locales/` (ar/en), CONTRIBUTING/SECURITY, CI with replay tests, multi-arch images.  **1b. AI and learning (≈3–4 weeks):** text AI tier T3 (AI gateway, structured output, budgets, cache, prompt caching, few-shot from the corpus), learning from confirmed spam (§7.5): group-local auto-fingerprints, SimHash/MinHash near-duplicate matching against the corpus, few-shot example selection by shared fingerprints/keywords/campaign, overturn retraction, poisoning guards (per-admin limits, admin reputation, in-memory recent-traffic check, rollback), and the **early-AI safety rule** (`ai` → ask admins until it has a track record, §9.2). **1c. Dataset import and evaluation (≈1 week):** the generic `antispam corpus import` command (JSONL/CSV, §7.8) with dedupe, cluster-aware hold-out split and undo; importing the operator's prepared spam dataset (spam-only by default); the hold-out slice as the first evaluation corpus, and a model comparison on it. **Manual phone-number blacklist** by command (§9.8). | **Before enforcing anywhere:** recall on the spam-only hold-out slice is reported per band and type; AI-only evidence and looser near-duplicate matches never auto-ban, and only CERTAIN evidence auto-bans (property tests). Then **≥ 1 week of shadow mode** in your own groups with the review queue on. **Precision comes from here:** admins review what the bot would have done, and enforcement starts only when shadow-mode precision for deletions is ≥ 99% (target to confirm) with no would-be ban of an established member. Also: zero automatic bans of admins/established members; the queue never exceeds pacing limits; a review can be opened and decided entirely in WhatsApp. |
+| **2. Detection depth** (≈2–3 weeks; **v0.2**: profile and link enrichment, hacked-account detection, the optional ladder) | Thumbnail pHash, profile scanning (name/about/picture/business, plus own status when available), invite/channel/WA-link resolution, status attribution URLs and reshared channels, shortener expansion + reputation feeds + RDAP, SimHash campaigns across groups, behaviour (flood, join-and-post, cross-group), raid mode, the optional ladder (warn/mute, off by default), join screening/approval, edits re-analysis, view-once policy. **Compromised accounts** (§8.7): behaviour baselines, the possibly-compromised signal family, the "may be hacked" admin review, optional restriction while pending, `.clear`. **Reviews v2:** DM reviewers with opt-in, fallback chain, quiet hours, digests, confirm-before-kick. | Replay corpus precision ≥ 99% at the delete threshold (target to agree on); recall measured per type. |
+| **3. Website & onboarding** (≈2–3 weeks; **v0.3**: the website, OTP login) | The separate frontend app (framework chosen then, §13.1) on top of the `/api/v1` API, served same-origin by the Go binary; OTP login (both methods), permissions, groups, settings with presets and previews, **reviews & notifications settings page, review queue, review history, learned-patterns page, blacklist page (§9.8)**, lists with dry-run, activity log, onboarding messages (including choosing a review destination), Arabic/English. Every website setting is checked against the `.set` command path for parity. **Self-hosting guide** (`docs/SELF_HOSTING.md`), operator setup flow with pairing on the website, first public release. | A non-technical admin can onboard a group, pick reviewers and change settings from a phone without help. |
+| **4. Vision AI & learning at scale** (≈2–3 weeks; **v0.4**) | Vision AI tier (T4) for images/stickers/profile pictures, weekly bounded re-weighting gated by the replay corpus, global promotion of learned patterns (≥ 3 unrelated groups) with operator approval, track-record tracking and the opt-in to let `ai` auto-ban where it has earned it, appeals end to end. | Vision used only on the ambiguous few percent; re-weighting never lowers hold-out precision; overturn rate dashboard; promotion and unlock flows tested. |
+| **5. Network bans & spammer intelligence** (≈3 weeks; **v0.5**) | Organisations and scope settings (`off`/`org`/`all`), quorum rule with operator approval queue, network-ban jobs (identity resolution incl. "identity pending" watches, batched kicks, re-scan of recorded messages that deletes only spam-matching ones within WhatsApp's delete window, rejoin kick, join-request rejection, admin re-add override), network-wide unban/appeal, audit. Spammer intelligence: profiles, snapshots, campaigns graph, number-prefix/picture/name/timing patterns as capped priors, website views (group and operator), privacy controls (retention jobs, access log, encryption, appeal deletion). | A test ban across ≥ 20 groups completes within pacing limits; every negative quorum case stays local; an unban fully reverses the ban; priors never act alone (property test in CI); privacy notice published. |
+| **6. Scale & polish** (optional for most deployments; **later**: multi-number, multi-node) | Optional cross-instance feeds (rule packs, hashed fingerprints, §15); multiple bot numbers (optional, never required) with primary/standby, failover, leases, the `-media` image (animated stickers, video keyframes, OCR), optional voice transcription, multi-node, partitioning. | Survives a temp ban of one number without losing protection in groups that have a standby. |
 
 ---
 
@@ -1890,6 +1942,16 @@ Durations assume one developer and are rough. **AI and learning are in the first
 
 ### Decisions made
 
+- **v0.1 first:** a quick, stable first release for a friend (known-spam matching, `.blacklist`, content rules and the auto-ban matrix, silent delete + ban, ask-admins and the review group, commands, the paced queue, shadow mode, the provider-neutral AI check with OpenAI-compatible and Anthropic adapters, Postgres, Docker and the release pipeline). Learning, import, enrichment, hacked accounts, the website, vision, network bans and multi-number come in v0.2 and later (§20).
+- **Releases and versioning** (§23):
+  - **Versions:** SemVer, staying on 0.x until the operator surface is frozen (patches are safe; minors may break, with upgrade steps); no CalVer; tags are never moved.
+  - **Release pipeline:** GoReleaser v2 on `v*` tags, multi-arch images on GHCR, SBOMs, cosign keyless signing, attestations, immutable releases.
+  - **Release notes:** generated notes by PR label plus a curated Keep a Changelog `CHANGELOG.md`.
+  - **Docker tags:** `X.Y.Z` is immutable; `X.Y`/`latest` move on stable releases only; `edge` builds from staging.
+  - **No LTS.**
+  - **Where releases are cut:** release PRs from staging into main with merge commits; `release/X.Y` branches only when needed.
+  - **Upgrade safety:** forward-only migrations, and the binary refuses a newer schema.
+  - **whatsmeow:** pinned pseudo-version with a weekly bump PR.
 - **Open-source, self-hosted project** for big groups and communities. "Operator" = whoever deploys an instance, and network bans, the spammer database and learning are scoped to one deployment. Cross-instance sharing is opt-in feeds only (§15, §19, §22).
 - **Full scope stays:** network bans, spammer intelligence, AI verification, learning (§20).
 - **One bot number runs everything.** Multiple numbers are optional (Phase 6).
@@ -1944,16 +2006,18 @@ Durations assume one developer and are rough. **AI and learning are in the first
 13. **AI provider and model:** which provider/model should the project's **example config** use, and which will **your instance** use: a hosted model (more accurate, but message text and context leave the server) or a local model via an OpenAI-compatible server (data stays local; accuracy varies, especially for Arabic; slow on a CPU-only VM)? The eval harness (§18) can compare candidates on the spam hold-out and in shadow mode before you choose. And should AI verification be on by default for new groups on instances that have AI configured?
 14. **AI context default:** send the context bundle (replies, the previous 5 messages, group info, sender context) by default (current), or default it off and let groups opt in? It improves accuracy but sends other members' recent messages to the AI provider.
 15. **Track-record bar:** is "≥ 200 admin decisions with ≥ 98% confirmed as spam over 30 days, plus hold-out precision" the right bar before `ai` may be allowed to auto-ban?
-16. **Website frontend framework:** React, Svelte or Next.js for the separate frontend app (§13.1)? To be decided when the full version is built; the API (`/api/v1`, OpenAPI) comes first either way.
+16. **v0.1 AI provider for the friend's instance:** which OpenAI-compatible or Anthropic model will the friend's instance use for the v0.1 AI check, and what budget? It's the same question as Q13, but it needs an answer before the first rc.
+17. **Release-candidate checks (§23.11):** confirm `latest=auto` behaviour on pre-releases, generated notes after a merge-commit release PR, whether notes stay editable on immutable releases, and whether `docker_signs` covers `dockers_v2`. These are verification items, not open decisions.
+18. **Website frontend framework:** React, Svelte or Next.js for the separate frontend app (§13.1)? To be decided when the full version is built; the API (`/api/v1`, OpenAPI) comes first either way.
 
 **Project:**
-17. **License:** keep MIT, switch to Apache-2.0, or use AGPL-3.0 so hosted forks stay open (§22.1)?
-18. **Official feeds:** should the project itself publish a public rule-pack / fingerprint feed, and who maintains it?
-19. **Languages** beyond Arabic and English for the first release?
+19. **License:** keep MIT, switch to Apache-2.0, or use AGPL-3.0 so hosted forks stay open (§22.1)?
+20. **Official feeds:** should the project itself publish a public rule-pack / fingerprint feed, and who maintains it?
+21. **Languages** beyond Arabic and English for the first release?
 
 **Your own instance (namaa):**
-20. **Domain** for the website (Coolify's own panel stays behind the SSH tunnel), and the **bot number** to use (ideally an aged SIM, plus a spare).
-21. **Jurisdiction:** where your instance operates (e.g. Saudi PDPL), and whether you want a legal review before enabling network bans and the spammer database for groups you don't run.
+22. **Domain** for the website (Coolify's own panel stays behind the SSH tunnel), and the **bot number** to use (ideally an aged SIM, plus a spare).
+23. **Jurisdiction:** where your instance operates (e.g. Saudi PDPL), and whether you want a legal review before enabling network bans and the spammer database for groups you don't run.
 
 ### Trade-offs made (and alternatives)
 
@@ -1980,6 +2044,7 @@ Durations assume one developer and are rough. **AI and learning are in the first
 | Spammer intelligence | Capped "identity prior" signals that never act alone; hashes instead of photos | Use identity traits (e.g. country code) as real classifiers | Avoids false positives and discrimination by origin, and limits the personal data held. |
 | Learning | Confirmed spam only, group-local first, promoted after ≥ 3 unrelated groups | Learn from every ban, globally | Admins ban for non-spam reasons, and global learning from one group invites poisoning. |
 | Reworded spam | Exact fingerprints + SimHash/MinHash, then the AI | Embeddings + pgvector / a vector DB | Spammers mostly reuse templates (SimHash/MinHash catch near-copies); truly reworded spam goes to the AI, which understands meaning better; without normal-message data, embedding thresholds can't be calibrated. `Embedder` stays a documented future option. |
+| Versioning | SemVer on 0.x, no LTS, tags immutable, `:0.1` as the stable channel | CalVer; an LTS line | One maintainer can't backport to parallel lines, and WhatsApp protocol breaks force upgrades anyway (§23.5). |
 | Control surfaces | Website **and** commands over one settings model | Website-only or commands-only | Setup and history fit a website; daily moderation fits chat. Shared dotted keys keep them in sync. |
 
 ### Known limitations (to accept)
@@ -2027,7 +2092,146 @@ Either way:
   - `CONTRIBUTING.md` (dev setup with a fake WA client, so no WhatsApp account is needed to work on most of the code), `CODE_OF_CONDUCT.md`, and `SECURITY.md` (private vulnerability reporting).
   - Issue templates for new spam patterns: contributors attach *redacted* examples only.
   - **No real message data in the repo:** fixtures are synthetic or redacted with consent.
-- **Governance (light):** maintainers review analyzers and global packs; CI runs replay and property tests (§18) on every PR; releases are semver; a public roadmap mirrors §20.
+- **Governance (light):** maintainers review analyzers and global packs; CI runs replay and property tests (§18) on every PR; releases follow §23 (SemVer, 0.x policy, release PRs into `main`); a public roadmap mirrors §20.
+
+---
+
+## 23. Releases and versioning
+
+How the project is versioned, built, released and upgraded. These are decisions from research. Brief sources are given inline, and the items to check on the first release candidate are at the end.
+
+### 23.1 Version numbers
+
+- **SemVer `vX.Y.Z`** ([semver.org](https://semver.org)). **No CalVer.**
+- **We stay on 0.x until the operator surface is frozen.** The *operator surface* is everything a deployer depends on:
+  - environment variables and config keys;
+  - chat commands;
+  - the image contract (entrypoint, ports, volumes, user);
+  - the database upgrade path.
+- **0.x policy:**
+  - a **patch** release (`0.1.N`) is **fixes only and always safe** to apply;
+  - a **minor** release (`0.Y.0`) **may break things**, and its notes list the upgrade steps.
+- **Pre-releases** look like `v0.1.0-rc.1`.
+- **Tags are permanent.** A pushed tag is never moved or deleted: the Go module proxy and checksum database treat versions as immutable ([Go modules reference](https://go.dev/ref/mod)). A bad release is fixed with a **new version**, plus a `retract` directive in `go.mod` if needed.
+- If the project ever reaches **v2**, the module path needs a **`/v2`** suffix (Go's major-version rule).
+
+### 23.2 Release mechanics
+
+- **GoReleaser v2** ([goreleaser.com](https://goreleaser.com)) runs on every `v*` tag push in GitHub Actions.
+- **Binaries:**
+  - linux and darwin × amd64 and arm64, `CGO_ENABLED=0`, `-trimpath`;
+  - `ldflags` embed the **version, commit and build date** (shown by `antispam version` and in logs and metrics).
+- **Images:** multi-arch images built with GoReleaser's **`dockers_v2`**, pushed to **`ghcr.io/rayanalyasi/antispam-bot`** (GHCR requires lowercase names).
+- **Supply-chain extras:**
+  - **SBOMs** for archives and images;
+  - **cosign keyless signing** (Sigstore) of the checksums file and the images;
+  - **build provenance** via `actions/attest`;
+  - **GitHub Immutable Releases** turned on, so published release assets and tags can't be altered ([GitHub docs: immutable releases](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/immutable-releases)).
+
+### 23.3 Release notes
+
+- **release-please is ruled out:** it needs Conventional Commits, and our commits are engineer-style messages instead.
+- **GitHub-generated release notes** are grouped by PR labels through `.github/release.yml` ([GitHub docs: automatically generated release notes](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes)). The categories are `breaking`, `security`, `feature`, `bug`, `dependencies`, and a catch-all.
+- **A hand-curated `CHANGELOG.md`** in [Keep a Changelog](https://keepachangelog.com) format, with an **"Upgrade notes"** section for each release. The changelog is what operators read; generated notes are the complete list.
+
+### 23.4 Docker tags
+
+| Tag | Meaning |
+|---|---|
+| `X.Y.Z` (e.g. `0.1.3`) | **immutable**, one per release |
+| `X.Y` (e.g. `0.1`) | moves to the newest **stable** patch of that minor. This is the "stable channel". |
+| `latest` | moves only on **stable** releases; not recommended for pinning |
+| *(no bare `0`)* | not published while on 0.x, because 0.x minors may break |
+| `edge`, `sha-<7>` | built from **every push to `staging`**, for testing only |
+| `X.Y.Z-rc.N` | pre-releases get **only their exact tag**; they never move `X.Y` or `latest` |
+
+Images carry the standard **OCI labels** (source, version, revision, created, licenses).
+
+### 23.5 No LTS
+
+There's no long-term-support line:
+- **LTS means parallel branches and backports**, which one maintainer can't promise.
+- **A WhatsApp protocol break forces everyone to upgrade anyway.** An "old but supported" version would stop connecting.
+
+The moving **`0.1` tag is the stable channel.** The docs tell deployers to pin **`:0.1`** (automatic safe patches) or an **exact version**, and **never `latest`**.
+
+### 23.6 Where releases are cut
+
+- **The normal path:**
+  1. A **release PR** from `staging` into `main` is merged **with a merge commit** (not a squash), so `main` contains the exact commits that were tested on staging.
+  2. The release tag goes on that **merge commit**.
+- **`release/X.Y` branches** are created **only when needed:** when a patch must ship while `staging` holds unshippable work.
+  - Fixes go **upstream first** (to `staging`).
+  - They're then **cherry-picked by PR** into `release/X.Y`.
+- **Repository settings:**
+  - a **tag ruleset on `v*`** that restricts creating, updating and deleting tags;
+  - `release/*` added to the **branch ruleset** (PR-only, like `main` and `staging`);
+  - the release workflow **builds only tags whose commit is on `main` or `release/*`**, and fails otherwise.
+
+### 23.7 Upgrade safety
+
+- **Migrations are forward-only** (goose, embedded and run on start, §4.1).
+- **The binary refuses to start on a schema newer than it knows**, with a clear message ("database is from a newer version; upgrade the bot or restore a backup").
+- **Skipping versions within a major is supported** (e.g. 0.1.2 → 0.3.0 directly). Migrations run in order.
+- **Patch releases must not contain migrations that block a downgrade within `X.Y`.** Going from 0.1.4 back to 0.1.3 must keep working.
+- **What counts as breaking** (minor bump in 0.x, major after 1.0):
+  - removing or renaming an env var, config key or command;
+  - changing a default in a way that changes enforcement;
+  - an image contract change (entrypoint, ports, volumes, user);
+  - a migration that can't be rolled back within the minor;
+  - dropping a supported platform;
+  - **anything that forces WhatsApp re-pairing.**
+- **Deprecations** produce a **warning for at least one minor release** before removal (logged on start, and shown on the operator page once the website exists).
+- **Release notes lead with "Breaking changes / Upgrade steps"**, then the standard procedure:
+  1. back up (`pg_dump`);
+  2. `docker compose pull`;
+  3. `docker compose up -d`.
+
+### 23.8 Keeping up with whatsmeow
+
+- **whatsmeow has no tags**, so we pin its **exact pseudo-version** in `go.mod`.
+- A **weekly workflow** (or Renovate) opens a **bump PR into `staging`**. CI and the staging checklist run on it, and it ships with the next release.
+- **The same-day patch path for protocol breaks:**
+  1. WhatsApp starts rejecting the client ("405 client outdated", `events.ClientOutdated`);
+  2. bump whatsmeow;
+  3. release **`v0.1.N`** through the hotfix path below.
+
+### 23.9 Supply chain
+
+- **Actions are pinned by commit SHA**, not by tag.
+- **Dependabot** covers `gomod`, `github-actions`, `docker` and the compose file, with updates **grouped** to limit PR noise. It doesn't bump whatsmeow's pseudo-version, so that's left to the weekly workflow.
+- **`SECURITY.md`:** private vulnerability reporting through GitHub, the supported versions (the latest minor), and the response expectations.
+
+### 23.10 The maintainer's release procedure
+
+**Normal release:**
+1. **Prepare-CHANGELOG PR** into `staging`: move "Unreleased" into the new version's section, write the "Upgrade notes", and check PR labels for the generated notes.
+2. **Release PR** `staging` → `main`, merged with a **merge commit**.
+3. **Tag the release candidate** on the merge commit: `v0.Y.Z-rc.1`.
+4. **Verify** the published artefacts:
+   - the image runs on amd64 and arm64;
+   - `cosign verify` passes on the image and the checksums;
+   - `gh attestation verify` passes;
+   - the SBOM is present.
+5. **The friend tests the rc** on their groups (shadow mode first if it's a minor release).
+6. **Tag the final release** `v0.Y.Z` on the same commit. The `X.Y` and `latest` tags move.
+7. **Reopen "Unreleased"** in `CHANGELOG.md` on `staging`.
+
+**Hotfix path:**
+1. Fix on `staging` first (upstream first).
+2. If `staging` is shippable, do a normal release PR, as above.
+3. If not:
+   - create `release/X.Y` from the last release tag;
+   - cherry-pick the fix by PR;
+   - tag `vX.Y.(Z+1)` on `release/X.Y` (an rc is optional for urgent protocol fixes);
+   - verify, then release.
+
+### 23.11 To verify on the first release candidate
+
+- How `docker/metadata-action`'s **`latest=auto`** behaves on pre-releases, so an rc never moves `latest` or `X.Y`.
+- What **generated release notes** look like after a **merge-commit** release PR (no duplicated or missing PRs).
+- Whether release notes **stay editable** on **immutable releases**.
+- Whether GoReleaser's **`docker_signs`** covers images built with **`dockers_v2`**.
 
 ---
 

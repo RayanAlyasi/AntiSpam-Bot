@@ -15,7 +15,6 @@ type Enqueuer interface {
 	Get(ctx context.Context, id int64) (actions.Action, error)
 }
 
-
 // ErrKickDropped is returned when the queue refused a kick that could no longer matter.
 var ErrKickDropped = errors.New("kick dropped by the action queue")
 

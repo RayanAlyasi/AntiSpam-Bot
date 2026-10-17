@@ -1680,6 +1680,8 @@
       "passes": true,
       "evidence": [
         "internal/policy TestLocalBanThroughTheQueue",
+        "TestReBanAfterADeadKickKicksAgain",
+        "TestQueueKickerStopsWithoutProgress",
         "TestQueueKickerErrors",
         "TestLocalBan",
         "TestBanWithoutRejoinBlock",

@@ -28,7 +28,9 @@ as its only dependency.
 - **Shadow mode** runs everything and records what it *would* have done, without acting. Use
   it first.
 
-The full design is in [docs/DESIGN.md](docs/DESIGN.md).
+The full design is in [docs/DESIGN.md](docs/DESIGN.md). How block and allow lists, the number
+blacklist and the confirmed-spam corpus match messages is in
+[docs/DETECTION-RULES.md](docs/DETECTION-RULES.md).
 
 **Status:** v0.1, the first release, is being built. This README describes v0.1 as it will
 ship; some parts below only work once they have landed (until then the binary only loads its

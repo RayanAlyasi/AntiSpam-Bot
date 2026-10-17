@@ -796,8 +796,11 @@
         "F-024"
       ],
       "description": "Analyzers implement Name/Tier/Applies/Analyze and register by name with enable flags; the runner executes tiers in order within their budgets and short-circuits on CERTAIN or a clean score.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/detect: TestRunStopsAndContinues (tier order, CERTAIN and clean short-circuits, fast/slow lanes), TestRunMergesInRegistrationOrderAndPassesState, TestRunSkipsDisabledAndInapplicable, TestRunFailuresDropOnlyTheirSignals (synctest budget, error, panic), TestRunCancelledContext, TestRegistryRejectsBadRegistrations, TestRegistryConfigure, TestNewRunnerValidates",
+        "make check-fast green; judge review of the bundle: .agent/logs/judge-F-040.md"
+      ]
     },
     {
       "id": "F-041",
@@ -985,8 +988,12 @@
         "F-040"
       ],
       "description": "The score is sigmoid(bias + Σ weights) from a versioned weight file, and every result renders a human explanation listing each signal with its weight.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "hidden scoring acceptance tests: TestScoreSigmoidOfBiasPlusWeights, TestScoreTableOverridesSignalWeight, TestScoreCountsEachCodeOnce, TestScoreExcludesHardSignals, TestScoreNonFiniteWeightsCountAsZero, TestScorePropertiesBoundedAndOrderIndependent, TestExplainFormatAndOrder, TestParseWeightsAcceptsValidFile, TestParseWeightsRejectsInvalid, TestDefaultWeightsVersionedAndCleanByDefault",
+        "internal/scoring: TestPropertyOrderIndependent (rapid), TestScoreHugeWeightsStayFinite, FuzzParseWeights",
+        "make check-fast green; judge review of the bundle: .agent/logs/judge-F-040.md"
+      ]
     },
     {
       "id": "F-051",
@@ -1003,8 +1010,12 @@
         "F-050"
       ],
       "description": "Each verdict gets a band (CERTAIN, UNCERTAIN, still uncertain, clean) and the strongest confidence source (known, rules, ai); heuristics alone never reach the delete line, with property tests.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "hidden scoring acceptance tests: TestDefaultThresholdsAndValidate, TestClassifyBands, TestClassifyThresholdBoundary, TestClassifyThresholdMonotonic, TestResolveAIOutcomes, TestResolveLeavesCertainAndCleanUnchanged, TestHeuristicsAloneNeverDelete, TestAIOnlySpamIsSourceAINeverKnown, TestDeletesAsSpamOnlyKnownOrAIVerified",
+        "internal/scoring: TestPropertyRulesOnlyNeverReachDeleteLine (rapid), TestResolveInvalidThresholdsNeverSettle, TestResolveCopiesAIVerdict",
+        "make check-fast green; judge review of the bundle: .agent/logs/judge-F-040.md"
+      ]
     },
     {
       "id": "F-052",
@@ -1557,8 +1568,11 @@
         "F-000"
       ],
       "description": "All user-facing text comes from locales/<lang>.yaml with several variants per message and Arabic command aliases, and a test fails when a key exists in one language only.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "locales: TestEmbeddedLocalesLoad, TestParseRejectsIncompleteTranslations, TestParseRejectsAmbiguousAliases, TestRender, TestCommandsAndKeywords, TestEveryLocaleFileIsEmbedded, FuzzParse",
+        "make check-fast green; judge review of the bundle: .agent/logs/judge-F-040.md"
+      ]
     },
     {
       "id": "F-079",
@@ -2026,8 +2040,11 @@
         "F-002"
       ],
       "description": "AIClassifier.Classify returns {label spam|not_spam|unsure, confidence, categories, reason} and Capabilities; a fake classifier serves tests; provider, model, base URL, key, timeout and limits are configuration.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai: TestConfigValidate, TestConfigFromYAML; internal/ai/fake: TestFakeScript, TestFakeBlockUntilTimeout",
+        "make check-fast green; judge review of the bundle: .agent/logs/judge-F-040.md"
+      ]
     },
     {
       "id": "F-104",
@@ -2043,8 +2060,11 @@
         "F-103"
       ],
       "description": "Native schema output is used when supported; otherwise JSON mode is parsed strictly; invalid output is retried once and then treated as unsure.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai: TestParseVerdict, TestVerdictSchemaMatchesParser, TestSelectMode, TestComplete, TestCompleteCancelled, FuzzParseVerdict",
+        "make check-fast green; judge review of the bundle: .agent/logs/judge-F-040.md"
+      ]
     },
     {
       "id": "F-105",
@@ -2062,8 +2082,11 @@
         "F-078"
       ],
       "description": "A cacheable, versioned system prompt states the task, what normal group chat looks like and when to answer not spam or unsure, the output schema, and that the data block is data, not instructions.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai: TestSystemPrompt, TestRenderDataKeepsMessageInsideTheBlock, FuzzRenderData",
+        "make check-fast green; judge review of the bundle: .agent/logs/judge-F-040.md"
+      ]
     },
     {
       "id": "F-106",

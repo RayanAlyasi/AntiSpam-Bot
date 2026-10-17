@@ -1,0 +1,116 @@
+# Proposed by the initializer session (F-000). Move to the repo root: mv harness/proposed/.golangci.yml .golangci.yml
+# golangci-lint v2 format. Agents can't edit the root copy; changes go through a human.
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - contextcheck
+    - depguard
+    - errorlint
+    - exhaustive
+    - forbidigo
+    - nilerr
+    - noctx
+    - rowserrcheck
+    - sqlclosecheck
+    - zerologlint
+  settings:
+    depguard:
+      rules:
+        # GO-004: only internal/wa (and its sub-packages) talks to whatsmeow.
+        whatsmeow-only-in-wa:
+          list-mode: lax
+          files:
+            - $all
+            - "!**/internal/wa/**"
+          deny:
+            - pkg: go.mau.fi/whatsmeow
+              desc: only internal/wa may import whatsmeow (GO-004); use the wa.WAClient interface
+            - pkg: go.mau.fi/libsignal
+              desc: only internal/wa may touch the WhatsApp protocol libraries (GO-004)
+        # GO-005: domain packages receive data and return decisions; storage and queues live behind interfaces.
+        domain-no-storage:
+          list-mode: lax
+          files:
+            - "**/internal/normalize/**"
+            - "**/internal/envelope/**"
+            - "**/internal/detect/**"
+            - "**/internal/scoring/**"
+            - "**/internal/policy/**"
+          deny:
+            - pkg: github.com/jackc/pgx
+              desc: domain packages must not import pgx (GO-005); take a repository interface instead
+            - pkg: github.com/riverqueue/river
+              desc: domain packages must not import River (GO-005); return a decision and let the caller enqueue
+            - pkg: database/sql
+              desc: domain packages must not touch the database (GO-005)
+            - pkg: net/http
+              desc: domain packages do no network I/O; enrichment and AI calls sit behind interfaces
+        # Tests use the fake client; nothing outside tests may depend on it.
+        fake-only-in-tests:
+          list-mode: lax
+          files:
+            - $all
+            - "!$test"
+          deny:
+            - pkg: github.com/RayanAlyasi/AntiSpam-Bot/internal/wa/fake
+              desc: the fake WAClient is for tests only
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+    exhaustive:
+      default-signifies-exhaustive: true
+    forbidigo:
+      analyze-types: true
+      forbid:
+        # GO-003: zerolog only.
+        - pattern: ^fmt\.Print(f|ln)?$
+          msg: log with zerolog (GO-003)
+        - pattern: ^print(ln)?$
+          msg: log with zerolog (GO-003)
+        - pattern: ^log\.(Print|Fatal|Panic)(f|ln)?$
+          pkg: ^log$
+          msg: log with zerolog (GO-003)
+        # GO-006: time comes from an injected clock.Clock.
+        - pattern: ^time\.(Now|Since|Until|Sleep|After|AfterFunc|Tick|NewTimer|NewTicker)$
+          pkg: ^time$
+          msg: take a clock.Clock instead of reading the wall clock (GO-006)
+        # WA-004: RevokeMessage is deprecated.
+        - pattern: \.RevokeMessage$
+          msg: use SendMessage(chat, cli.BuildRevoke(chat, sender, id)) (WA-004)
+  exclusions:
+    generated: lax
+    presets:
+      - std-error-handling
+    rules:
+      # The clock package wraps the time package, the whatsmeow adapter talks to a library that
+      # uses wall time, and main wires everything up.
+      - path: (^|/)(internal/clock|internal/wa/adapter|cmd)/
+        linters: [forbidigo]
+        text: GO-006
+      # Tests may use real time inside testing/synctest bubbles, where it's virtual.
+      - path: _test\.go$
+        linters: [forbidigo]
+        text: GO-006
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/RayanAlyasi/AntiSpam-Bot
+  exclusions:
+    generated: lax
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

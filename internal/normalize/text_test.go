@@ -4,10 +4,11 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 	"unicode/utf8"
 
 	"golang.org/x/text/unicode/norm"
+
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/normalize/normtest"
 )
 
 func TestSkeletonMatchesLookalikes(t *testing.T) {
@@ -193,19 +194,16 @@ func TestTatweelJoinedFloodCounted(t *testing.T) {
 }
 
 func TestTextLinearOnHostileInput(t *testing.T) {
-	n := 1 << 18
-	for name, in := range map[string]string{
-		"spaced letters": strings.Repeat("a ", n/2),
-		"dotted leet":    strings.Repeat("3.", n/2),
-		"repeats":        strings.Repeat("e", n),
-		"tashkeel":       strings.Repeat("ب\u064E\u0651", n/3),
-		"mixed":          strings.Repeat("f.r.3.3 💰 ", n/12),
+	for name, unit := range map[string]string{
+		"spaced letters": "a ",
+		"dotted leet":    "3.",
+		"repeats":        "e",
+		"tashkeel":       "ب\u064E\u0651",
+		"mixed":          "f.r.3.3 💰 ",
 	} {
-		start := time.Now()
-		Text(in)
-		if d := time.Since(start); d > 3*time.Second {
-			t.Errorf("Text(%s) took %v, want under 3s (normalization must stay linear)", name, d)
-		}
+		n := (64 << 10) / len(unit)
+		normtest.Linear(t, "Text("+name+")", func(k int) string { return strings.Repeat(unit, k*n) },
+			func(in string) { Text(in) })
 	}
 }
 

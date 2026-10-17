@@ -1677,8 +1677,18 @@
         "F-006"
       ],
       "description": "A ban records group_bans with reason spam/other, kicks through the queue and blocks rejoin to that group: a banned identity that joins again is kicked at P0; unban lifts the block without re-adding.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/policy TestLocalBanThroughTheQueue",
+        "TestReBanAfterADeadKickKicksAgain",
+        "TestQueueKickerStopsWithoutProgress",
+        "TestQueueKickerErrors",
+        "TestLocalBan",
+        "TestBanWithoutRejoinBlock",
+        "TestAdminReAddLiftsBan",
+        "TestBanRejects",
+        "internal/store TestGroupBansStore (integration)"
+      ]
     },
     {
       "id": "F-078",

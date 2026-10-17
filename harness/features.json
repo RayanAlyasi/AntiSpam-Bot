@@ -1078,8 +1078,17 @@
         "F-054"
       ],
       "description": "Presets fill the auto-ban matrix and extras exactly as DESIGN.md §9.2/§12.2, switching preset resets the matrix, and the diff from the preset is reported.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/policy TestPresetGrid",
+        "TestPresetExtras",
+        "TestSwitchingPresetResetsMatrixAndKeepsOverrides",
+        "TestDiffFromPreset",
+        "acceptance/policy TestPresetMatrixMatchesDesignGrid",
+        "TestApplyPresetResetsMatrix",
+        "TestPresetMatricesAreIndependent",
+        "TestUnknownPresetRejected"
+      ]
     },
     {
       "id": "F-056",
@@ -1122,8 +1131,15 @@
         "F-054"
       ],
       "description": "Trust per (group, member) grows with tenure and clean messages, drops with strikes (decaying), is full for vouched or allow-listed members, and established (≥7 days and ≥20 clean, pre-existing or vouched) never changes the score.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/policy TestTrust",
+        "TestTrustProperties",
+        "TestEstablished",
+        "TestStandingOf",
+        "TestStandingNeverChangesDetection",
+        "TestKnownSpamDeletedWhateverTheTrust"
+      ]
     },
     {
       "id": "F-058",
@@ -1140,8 +1156,13 @@
         "F-051"
       ],
       "description": "For each content type the matrix cell (auto_ban with require_source and else, ask, delete_only, allow) gives the action for spam from new/unknown senders; auto_ban never bans on sources outside require_source.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/policy TestCellEffective",
+        "TestRoutes",
+        "acceptance/policy TestCellEffective",
+        "TestMatrixCellSemanticsInDecide"
+      ]
     },
     {
       "id": "F-059",
@@ -1161,8 +1182,15 @@
         "F-053"
       ],
       "description": "The decision engine maps band, source, standing and settings to the §8.3 routes; known spam is deleted whatever the sender's trust, established members are never auto-banned, and admins, the bot and allow-listed members are never acted on.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/policy TestRoutes",
+        "TestDecisionInvariants",
+        "acceptance/policy TestDefaultRouting",
+        "TestExemptSendersNeverActedOn",
+        "TestEstablishedAndCompromisedNeverAutoBanned",
+        "TestStillUncertainGoesToAdminsNothingDeletedByDefault"
+      ]
     },
     {
       "id": "F-060",
@@ -1178,8 +1206,14 @@
         "F-059"
       ],
       "description": "ask_delete_first deletes certain or AI-verified spam and sends the ban to admins; ask_before_action does nothing until an admin decides; neither mode ever auto-bans, proven by a property test.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/policy TestAskModesNeverAutoBan",
+        "TestAskDeleteFirstDeletesSpamAndAsksForBan",
+        "TestAskBeforeActionLeavesMessageAndAsks",
+        "TestValidateRejectsAutoBanTimeoutInAskModes",
+        "internal/policy TestDecisionInvariants"
+      ]
     },
     {
       "id": "F-061",
@@ -1195,8 +1229,12 @@
         "F-059"
       ],
       "description": "A violation alone is deleted silently with no ban or strike by default; policy.action ask/ban and policy.repeat are opt-in, and if a message is both spam and a violation the spam route applies.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/policy TestPolicyViolationAloneNeverBansByDefault",
+        "TestSpamAndViolationFollowsSpamRoute",
+        "internal/policy TestRoutes (violation rows)"
+      ]
     },
     {
       "id": "F-062",
@@ -1212,8 +1250,15 @@
         "F-059"
       ],
       "description": "In shadow mode every would-be action is recorded as a detection with mode shadow and nothing is enqueued; paused does nothing; enforce acts.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/policy TestShadowModeEnqueuesNothingButRecords",
+        "TestPausedModeDoesNothing",
+        "TestEnforceModeEnqueuesDecision",
+        "TestShadowModeRecordsWouldBeBan",
+        "internal/policy TestPlanFor",
+        "TestShadowNeverEnqueues"
+      ]
     },
     {
       "id": "F-063",
@@ -1231,8 +1276,15 @@
         "F-062"
       ],
       "description": "rapid property tests cover: only CERTAIN evidence auto-bans by default, delete_only never bans, allow never deletes spam, require_source is honoured, thresholds are monotonic, established members and admins are never auto-banned.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/policy TestDecisionInvariants",
+        "TestKnownSpamDeletedWhateverTheTrust",
+        "TestScoreDoesNotChangeRoute",
+        "TestShadowNeverEnqueues",
+        "acceptance/policy TestIdentityPriorsNeverActAlone",
+        "TestMatrixCellSemanticsInDecide"
+      ]
     },
     {
       "id": "F-064",

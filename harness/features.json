@@ -230,8 +230,11 @@
         "F-000"
       ],
       "description": "internal/wa/adapter implements every WAClient method on whatsmeow (revoke via BuildRevoke, edits via BuildEdit, batched participant updates), converts JIDs both ways, and maps 429, temporary ban, not-admin, not-found and timeouts to the wa error values.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestErrorMapping, TestTemporaryBan, TestWrites, TestSend, TestParticipantResults, TestReads, TestJIDConversion",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-010",
@@ -517,8 +520,12 @@
         "F-000"
       ],
       "description": "internal/envelope defines Envelope, Kind and the text, URL, media, contact, channel, invite, quoted, status and ad references exactly as DESIGN.md §5.3 describes, with no whatsmeow import.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "hidden acceptance tests (envelope): TestKindNamesAreStable, TestTextSourceNamesAreStable, TestForwardedManyTimes, TestQuotedRefIsStatus, TestEnvelopeJSONRoundTrip, TestZeroEnvelopeHasNoSurfaces, TestEnvelopeHasNoWhatsmeowDependency",
+        "internal/envelope: TestForwardedManyTimes, TestQuotedIsStatus",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-025",
@@ -535,8 +542,11 @@
         "F-009"
       ],
       "description": "After UnwrapRaw, every remaining FutureProofMessage wrapper (found by reflection) and ProtocolMessage.EditedMessage is unwrapped up to depth 5, recording the removed wrappers; a fuzz test shows crafted nesting never panics or loops.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestUnwrap, TestUnwrapCycleAndWidth, FuzzUnwrap (30s, no failures)",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-026",
@@ -553,8 +563,11 @@
         "F-025"
       ],
       "description": "Conversation and ExtendedText messages produce body and link-preview text surfaces, preview URLs, mentions (including group mentions), the quoted message and ExternalAdReply fields.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestEnvelopeHeader, TestTextPreviewMentionsQuoteAd",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-027",
@@ -575,8 +588,11 @@
         "F-026"
       ],
       "description": "Media messages produce MediaRefs with SHA256, mimetype, size and inline thumbnail plus caption, file name, title, page count, sticker flags, accessibility label and sticker-pack text surfaces.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestMedia",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-028",
@@ -594,8 +610,11 @@
         "F-024"
       ],
       "description": "A tolerant, fuzz-tested vCard parser extracts FN, ORG, TEL waid, URL and X-WA-BIZ-* fields; contact, contacts-array and document-embedded vCards become ContactRefs with a text surface per field, waid numbers for matching and IsSelfContact recorded.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestContacts, TestParseVCardBusinessCard, TestParseVCardTolerant, TestVCardWAIDsDeduplicated, TestParseVCardBounded, FuzzParseVCard (20s, no failures)",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-029",
@@ -616,8 +635,11 @@
         "F-026"
       ],
       "description": "Forwarded-newsletter info, channel and group invites produce ChannelRefs and InviteRefs; every poll version, location, event, product, order, payment request and interactive message yields its text surfaces and URLs.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestChannelsInvitesPollsLocationsEventsCommerce",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-030",
@@ -635,8 +657,11 @@
         "F-026"
       ],
       "description": "ForwardOrigin STATUS, status source and attribution types, attribution URLs, reshared channel JIDs and Group Status authors fill StatusRef; quoted status content and status-mention/group-status wrappers reach the envelope like any other content.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestStatus",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-031",
@@ -654,8 +679,11 @@
         "F-026"
       ],
       "description": "A MESSAGE_EDIT becomes an envelope with IsEdit and the original message ID; a sender revoke becomes a revoke event; view-once and undecryptable messages become content-less envelopes with sender and ID.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestEditsRevokesViewOnceUndecryptable",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-032",
@@ -676,8 +704,11 @@
         "F-031"
       ],
       "description": "Unknown message fields have every string extracted by protoreflect into text surfaces and counted in an unknown-kind metric; a reflection test fails when a waE2E.Message field type is neither handled nor explicitly ignored.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter: TestUnknownFieldsByReflection, TestEveryMessageFieldClassified",
+        "judge review: .agent/logs/judge-F-024.md"
+      ]
     },
     {
       "id": "F-033",

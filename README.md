@@ -28,7 +28,9 @@ as its only dependency.
 - **Shadow mode** runs everything and records what it *would* have done, without acting. Use
   it first.
 
-The full design is in [docs/DESIGN.md](docs/DESIGN.md).
+The full design is in [docs/DESIGN.md](docs/DESIGN.md). How block and allow lists, the number
+blacklist and the confirmed-spam corpus match messages is in
+[docs/DETECTION-RULES.md](docs/DETECTION-RULES.md).
 
 **Status:** v0.1, the first release, is being built. This README describes v0.1 as it will
 ship; some parts below only work once they have landed (until then the binary only loads its
@@ -63,15 +65,19 @@ Before the first release image is published, build from the checkout instead:
 `docker compose ps` should show both services as healthy.
 Postgres isn't published to the network, and the bot's HTTP port is bound to `127.0.0.1` only.
 
-**Pair the number.** Run the pairing command and scan the QR code with the bot's phone
-(WhatsApp → Linked devices), or enter the 8-character code it prints:
+**Pair the number.** Run the pairing command and scan the QR code it prints with the bot's
+phone (WhatsApp → Settings → Linked devices → Link a device):
 
 ```bash
 docker compose exec bot /antispam pair
 ```
 
+On a headless server you can pair by code instead: add `-phone +<the bot's number>` and enter
+the 8-character code it prints under Linked devices → Link with phone number.
+
 Pairing sends no messages. It sets the bot's "about" text to the appeal line, so removed
-members know how to appeal. Give the number a neutral name and picture (e.g. "Group
+members know how to appeal, and lets anyone add the bot to groups. A running bot picks up a
+newly paired number within 10 seconds. Give the number a neutral name and picture (e.g. "Group
 Assistant").
 
 ## Try it in shadow mode first
@@ -171,7 +177,13 @@ admins.
   Losing it means pairing again and losing settings.
 - **Upgrades:** `docker compose pull && docker compose up -d`. Migrations run on start. Read
   the release notes first: they lead with breaking changes.
-- **Health:** `/healthz`, `/readyz` and `/metrics` (Prometheus) are served on port 8080.
+- **Health:** `/healthz`, `/readyz` and `/metrics` (Prometheus, including `wa_connected` per
+  bot) are served on port 8080.
+- **Alerts:** temporary bans, logouts, a replaced session and a bot offline for more than two
+  minutes are alerted to a webhook, Telegram or email (`ALERT_*` in [`env.example`](env.example));
+  without one they are only logged. Writes stop on a ban while the bot keeps reading.
+- **One process per number:** each bot number is connected by one process at a time (a lease
+  in Postgres), so running a second copy never kicks the first off WhatsApp.
 
 ## Privacy
 

@@ -63,18 +63,33 @@ misconfigured group. Nothing is slowed or stopped.
 
 ## Circuit breaker and kill switch
 
-The **circuit breaker** opens on a temporary ban, a logout, or 3 warning signs within 10 minutes.
-Opening it also cuts the rate, like a warning sign. While it's open:
+The **circuit breaker** opens on a temporary ban, a logout, the session being replaced by another
+login of the same number, or 3 warning signs within 10 minutes (one connection outage counts as one
+sign, however many disconnects and keepalive timeouts it produces). Opening it also cuts the rate,
+like a warning sign. While it's open:
 
 - only P0 lockdowns run;
 - the operator is alerted;
 - detections continue, and the queued work waits, so it can still be cleaned up within WhatsApp's delete window once the breaker is closed.
 
-Only an operator closes the breaker. Do it once the cause is gone.
+Only an operator closes the breaker, even when a temporary ban says when it expires. Do it once
+the cause is gone. Until the dashboard has the button, close it in the database (the executor picks
+it up within a second):
+
+```sql
+UPDATE app.action_controls
+SET state = state || jsonb_build_object('BreakerOpen', false, 'BreakerReason', '', 'BreakerClosedAt', now())
+WHERE scope = '<bot JID, e.g. 9665…@s.whatsapp.net>';
+```
+
+That SQL writes no audit-log entry, so note in your own records who closed it and why.
+
+Breaker and daily-writes alerts go to the operator alert sinks you configured (`ALERT_*`
+settings); without any they are only logged.
 
 The **kill switch** (pause all actions) stops every action on every bot, lockdowns included,
-within about a second, until it's turned off. Pausing, resuming and closing the breaker are
-audited.
+within about a second, until it's turned off. Pausing, resuming and closing the breaker through
+the operator controls are audited.
 
 ## Silent groups
 

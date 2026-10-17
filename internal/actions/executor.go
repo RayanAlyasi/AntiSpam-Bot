@@ -225,6 +225,13 @@ func (e *Executor) recoverRunning(ctx context.Context) error {
 	return nil
 }
 
+// holdsLock reports whether Run took the bot's lock and still has it.
+func (e *Executor) holdsLock() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.locked && !e.lockLost
+}
+
 func (e *Executor) ownsLock() bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()

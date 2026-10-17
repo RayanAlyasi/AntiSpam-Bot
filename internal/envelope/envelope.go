@@ -78,6 +78,17 @@ type Envelope struct {
 	Quoted   *QuotedRef   // the message this one replies to
 	Status   *StatusRef   // status context, for status shares and group status posts
 	Wrappers []string     // wrappers the unwrapper removed, outermost first; see WrapperTruncated
+
+	// Phones are the numbers the message advertises, in E.164: written in its text surfaces or
+	// carried by its contact cards. The normalizer (DESIGN.md §7.2 step 7) fills them in.
+	Phones []PhoneRef
+}
+
+// PhoneRef is a phone number found in a message. Source is the text surface source it was
+// written in ("body", "caption", …) or "vcard".
+type PhoneRef struct {
+	E164   string
+	Source string
 }
 
 // ForwardedManyTimes reports whether WhatsApp marks the message "forwarded many times"
@@ -98,6 +109,16 @@ type TextSurface struct {
 	Source string
 	Raw    string
 	Norm   string
+
+	// The other normalized variants (DESIGN.md §7.2), also filled by the normalizer: the
+	// confusables skeleton, the leetspeak fold and the Arabic match form.
+	Skeleton string
+	Leet     string
+	Loose    string
+	// Stripped counts the invisible and combining-flood characters removed from Raw.
+	Stripped int
+	// EmojiTokens are the spam-emoji tokens found in Raw, in order.
+	EmojiTokens []string
 }
 
 // URLRef is a URL found in a message. Source says where: "text", "preview", "vcard",

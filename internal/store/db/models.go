@@ -65,6 +65,66 @@ type AppAuditLog struct {
 	At       time.Time
 }
 
+type AppBlacklistBan struct {
+	GroupJid string
+	PersonID int64
+	BanID    int64
+	At       time.Time
+}
+
+type AppBot struct {
+	ID          int64
+	Jid         string
+	Lid         pgtype.Text
+	DisplayName string
+	Status      string
+	LeaseOwner  pgtype.Text
+	LeaseUntil  pgtype.Timestamptz
+	RateProfile json.RawMessage
+	CreatedAt   time.Time
+}
+
+type AppCorpusConfirmation struct {
+	PatternKey    string
+	GroupJid      string
+	AdminPersonID pgtype.Int8
+	CorpusEntryID int64
+	At            time.Time
+}
+
+type AppCorpusEntry struct {
+	ID              int64
+	Kind            string
+	Label           string
+	Scope           string
+	GroupJid        pgtype.Text
+	Status          string
+	Source          string
+	ImportBatchID   pgtype.Int8
+	SourceReviewID  pgtype.Int8
+	SourceActionID  pgtype.Int8
+	DecidedByPerson pgtype.Int8
+	TextRawRedacted string
+	TextNorm        string
+	Simhash         pgtype.Int8
+	Minhash         []byte
+	Keywords        []string
+	Urls            []string
+	Domains         []string
+	NumberHashes    [][]byte
+	ChannelJids     []string
+	InviteCodes     []string
+	MediaSha256     [][]byte
+	Phashes         []int64
+	Profile         []byte
+	Biz             []byte
+	Confidence      float64
+	Hits            int32
+	LastHitAt       pgtype.Timestamptz
+	CreatedAt       time.Time
+	ExpiresAt       time.Time
+}
+
 type AppDetection struct {
 	ID               int64
 	GroupJid         string
@@ -82,6 +142,7 @@ type AppDetection struct {
 	NetworkBanID     pgtype.Int8
 	EvidenceRef      pgtype.Text
 	CreatedAt        time.Time
+	EditSeq          int32
 }
 
 type AppDmThread struct {
@@ -101,6 +162,34 @@ type AppEvidenceSnapshot struct {
 	Reason        string
 	At            time.Time
 	ExpiresAt     pgtype.Timestamptz
+}
+
+type AppFingerprint struct {
+	Kind      string
+	Value     string
+	Label     string
+	Source    string
+	Scope     string
+	ScopeID   string
+	Hits      int64
+	FirstSeen time.Time
+	LastSeen  time.Time
+}
+
+type AppGroup struct {
+	Jid             string
+	BotID           pgtype.Int8
+	Name            string
+	Topic           string
+	Size            int32
+	AddressingMode  string
+	BotIsAdmin      bool
+	Announce        bool
+	Locked          bool
+	JoinApproval    bool
+	JoinedAt        pgtype.Timestamptz
+	Status          string
+	LastInfoRefresh pgtype.Timestamptz
 }
 
 type AppGroupBan struct {
@@ -134,6 +223,118 @@ type AppGroupSettingsHistory struct {
 	Doc       json.RawMessage
 	UpdatedBy string
 	UpdatedAt time.Time
+}
+
+type AppIdentity struct {
+	ID           int64
+	PersonID     int64
+	Kind         string
+	Value        string
+	CountryCode  pgtype.Text
+	NumberPrefix pgtype.Text
+	Source       string
+	FirstSeen    time.Time
+	LastSeen     time.Time
+	ValidTo      pgtype.Timestamptz
+}
+
+type AppInbox struct {
+	ID           int64
+	BotID        int64
+	Chat         string
+	MsgID        string
+	EditSeq      string
+	Kind         string
+	Sender       string
+	Raw          []byte
+	Info         json.RawMessage
+	ReceivedAt   time.Time
+	ProcessedAt  pgtype.Timestamptz
+	ClaimedUntil pgtype.Timestamptz
+	Attempts     int32
+	LastError    pgtype.Text
+}
+
+type AppLearnedRule struct {
+	RuleID        int64
+	CorpusEntryID int64
+	GroupJid      string
+	CreatedAt     time.Time
+}
+
+type AppMember struct {
+	GroupJid         string
+	PersonID         int64
+	Role             string
+	JoinedAt         pgtype.Timestamptz
+	FirstSeen        time.Time
+	MsgCount         int32
+	CleanCount       int32
+	Trust            float64
+	Strikes          int32
+	LastStrikeAt     pgtype.Timestamptz
+	MutedUntil       pgtype.Timestamptz
+	Allowlisted      bool
+	PreExisting      bool
+	Established      bool
+	Restricted       bool
+	RestrictedSince  pgtype.Timestamptz
+	RestrictedUntil  pgtype.Timestamptz
+	RestrictedReason pgtype.Text
+}
+
+type AppMessageIndex struct {
+	GroupJid     string
+	MsgID        string
+	SenderPerson pgtype.Int8
+	Ts           time.Time
+	Fingerprint  []byte
+	Simhash      pgtype.Int8
+	UrlDomains   []string
+	MediaSha256  [][]byte
+	Verdict      string
+	Actioned     bool
+	ExpiresAt    time.Time
+}
+
+type AppNumberBlacklist struct {
+	ID              int64
+	Scope           string
+	GroupJid        pgtype.Text
+	PnE164          string
+	PnHash          string
+	PersonID        pgtype.Int8
+	OnWhatsapp      pgtype.Bool
+	Reason          string
+	AddedByPerson   pgtype.Int8
+	AddedAt         time.Time
+	RemovedByPerson pgtype.Int8
+	RemovedAt       pgtype.Timestamptz
+}
+
+type AppPerson struct {
+	ID               int64
+	Lid              pgtype.Text
+	Pn               pgtype.Text
+	PnCountry        pgtype.Text
+	PushName         string
+	VerifiedName     string
+	ProfilePicID     pgtype.Text
+	ProfilePicPhash  pgtype.Int8
+	AboutTextHash    []byte
+	Business         []byte
+	GlobalReputation float64
+	FirstSeen        time.Time
+	LastProfileScan  pgtype.Timestamptz
+	MergedInto       pgtype.Int8
+}
+
+type AppPersonMerge struct {
+	ID         int64
+	FromPerson int64
+	IntoPerson int64
+	Reason     string
+	At         time.Time
 }
 
 type AppReview struct {
@@ -181,4 +382,21 @@ type AppReviewVote struct {
 	Valid         bool
 	InvalidReason string
 	At            time.Time
+}
+
+type AppRule struct {
+	ID          int64
+	Scope       string
+	ScopeID     string
+	Pack        string
+	Type        string
+	Pattern     string
+	NormPattern string
+	ActionClass string
+	Weight      float64
+	Enabled     bool
+	CreatedBy   pgtype.Int8
+	Hits        int64
+	Overturns   int64
+	CreatedAt   time.Time
 }

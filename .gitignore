@@ -17,3 +17,7 @@ CLAUDE.local.md
 
 # GoReleaser output
 dist/
+
+# Deployment secrets (copied from env.example)
+.env
+.env.local

@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"io"
 	"os"
 
@@ -12,6 +13,9 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(healthcheck(context.Background(), os.Getenv, os.Stderr))
+	}
 	os.Exit(run(os.Getenv, os.Stderr))
 }
 

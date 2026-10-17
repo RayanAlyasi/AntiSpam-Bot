@@ -17,6 +17,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.44.0
 	go.mau.fi/whatsmeow v0.0.0-20261016130820-0b0a1cdac3e2
 	go.yaml.in/yaml/v3 v3.0.5
+	pgregory.net/rapid v1.3.0
 )
 
 require (

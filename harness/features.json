@@ -822,8 +822,11 @@
         "F-024"
       ],
       "description": "Analyzers implement Name/Tier/Applies/Analyze and register by name with enable flags; the runner executes tiers in order within their budgets and short-circuits on CERTAIN or a clean score.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/detect: TestRunStopsAndContinues (tier order, CERTAIN and clean short-circuits, fast/slow lanes), TestRunMergesInRegistrationOrderAndPassesState, TestRunSkipsDisabledAndInapplicable, TestRunFailuresDropOnlyTheirSignals (synctest budget, error, panic), TestRunCancelledContext, TestRegistryRejectsBadRegistrations, TestRegistryConfigure, TestNewRunnerValidates",
+        "make check-fast green; judge review of the bundle: .agent/logs/judge-F-040.md"
+      ]
     },
     {
       "id": "F-041",
@@ -1011,8 +1014,12 @@
         "F-040"
       ],
       "description": "The score is sigmoid(bias + Σ weights) from a versioned weight file, and every result renders a human explanation listing each signal with its weight.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "hidden scoring acceptance tests: TestScoreSigmoidOfBiasPlusWeights, TestScoreTableOverridesSignalWeight, TestScoreCountsEachCodeOnce, TestScoreExcludesHardSignals, TestScoreNonFiniteWeightsCountAsZero, TestScorePropertiesBoundedAndOrderIndependent, TestExplainFormatAndOrder, TestParseWeightsAcceptsValidFile, TestParseWeightsRejectsInvalid, TestDefaultWeightsVersionedAndCleanByDefault",
+        "internal/scoring: TestPropertyOrderIndependent (rapid), TestScoreHugeWeightsStayFinite, FuzzParseWeights",
+        "make check-fast green; judge review of the bundle: .agent/logs/judge-F-040.md"
+      ]
     },
     {
       "id": "F-051",
@@ -1029,8 +1036,12 @@
         "F-050"
       ],
       "description": "Each verdict gets a band (CERTAIN, UNCERTAIN, still uncertain, clean) and the strongest confidence source (known, rules, ai); heuristics alone never reach the delete line, with property tests.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "hidden scoring acceptance tests: TestDefaultThresholdsAndValidate, TestClassifyBands, TestClassifyThresholdBoundary, TestClassifyThresholdMonotonic, TestResolveAIOutcomes, TestResolveLeavesCertainAndCleanUnchanged, TestHeuristicsAloneNeverDelete, TestAIOnlySpamIsSourceAINeverKnown, TestDeletesAsSpamOnlyKnownOrAIVerified",
+        "internal/scoring: TestPropertyRulesOnlyNeverReachDeleteLine (rapid), TestResolveInvalidThresholdsNeverSettle, TestResolveCopiesAIVerdict",
+        "make check-fast green; judge review of the bundle: .agent/logs/judge-F-040.md"
+      ]
     },
     {
       "id": "F-052",
@@ -1104,8 +1115,17 @@
         "F-054"
       ],
       "description": "Presets fill the auto-ban matrix and extras exactly as DESIGN.md §9.2/§12.2, switching preset resets the matrix, and the diff from the preset is reported.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/policy TestPresetGrid",
+        "TestPresetExtras",
+        "TestSwitchingPresetResetsMatrixAndKeepsOverrides",
+        "TestDiffFromPreset",
+        "acceptance/policy TestPresetMatrixMatchesDesignGrid",
+        "TestApplyPresetResetsMatrix",
+        "TestPresetMatricesAreIndependent",
+        "TestUnknownPresetRejected"
+      ]
     },
     {
       "id": "F-056",
@@ -1148,8 +1168,15 @@
         "F-054"
       ],
       "description": "Trust per (group, member) grows with tenure and clean messages, drops with strikes (decaying), is full for vouched or allow-listed members, and established (≥7 days and ≥20 clean, pre-existing or vouched) never changes the score.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/policy TestTrust",
+        "TestTrustProperties",
+        "TestEstablished",
+        "TestStandingOf",
+        "TestStandingNeverChangesDetection",
+        "TestKnownSpamDeletedWhateverTheTrust"
+      ]
     },
     {
       "id": "F-058",
@@ -1166,8 +1193,13 @@
         "F-051"
       ],
       "description": "For each content type the matrix cell (auto_ban with require_source and else, ask, delete_only, allow) gives the action for spam from new/unknown senders; auto_ban never bans on sources outside require_source.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/policy TestCellEffective",
+        "TestRoutes",
+        "acceptance/policy TestCellEffective",
+        "TestMatrixCellSemanticsInDecide"
+      ]
     },
     {
       "id": "F-059",
@@ -1187,8 +1219,15 @@
         "F-053"
       ],
       "description": "The decision engine maps band, source, standing and settings to the §8.3 routes; known spam is deleted whatever the sender's trust, established members are never auto-banned, and admins, the bot and allow-listed members are never acted on.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/policy TestRoutes",
+        "TestDecisionInvariants",
+        "acceptance/policy TestDefaultRouting",
+        "TestExemptSendersNeverActedOn",
+        "TestEstablishedAndCompromisedNeverAutoBanned",
+        "TestStillUncertainGoesToAdminsNothingDeletedByDefault"
+      ]
     },
     {
       "id": "F-060",
@@ -1204,8 +1243,14 @@
         "F-059"
       ],
       "description": "ask_delete_first deletes certain or AI-verified spam and sends the ban to admins; ask_before_action does nothing until an admin decides; neither mode ever auto-bans, proven by a property test.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/policy TestAskModesNeverAutoBan",
+        "TestAskDeleteFirstDeletesSpamAndAsksForBan",
+        "TestAskBeforeActionLeavesMessageAndAsks",
+        "TestValidateRejectsAutoBanTimeoutInAskModes",
+        "internal/policy TestDecisionInvariants"
+      ]
     },
     {
       "id": "F-061",
@@ -1221,8 +1266,12 @@
         "F-059"
       ],
       "description": "A violation alone is deleted silently with no ban or strike by default; policy.action ask/ban and policy.repeat are opt-in, and if a message is both spam and a violation the spam route applies.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/policy TestPolicyViolationAloneNeverBansByDefault",
+        "TestSpamAndViolationFollowsSpamRoute",
+        "internal/policy TestRoutes (violation rows)"
+      ]
     },
     {
       "id": "F-062",
@@ -1238,8 +1287,15 @@
         "F-059"
       ],
       "description": "In shadow mode every would-be action is recorded as a detection with mode shadow and nothing is enqueued; paused does nothing; enforce acts.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/policy TestShadowModeEnqueuesNothingButRecords",
+        "TestPausedModeDoesNothing",
+        "TestEnforceModeEnqueuesDecision",
+        "TestShadowModeRecordsWouldBeBan",
+        "internal/policy TestPlanFor",
+        "TestShadowNeverEnqueues"
+      ]
     },
     {
       "id": "F-063",
@@ -1257,8 +1313,15 @@
         "F-062"
       ],
       "description": "rapid property tests cover: only CERTAIN evidence auto-bans by default, delete_only never bans, allow never deletes spam, require_source is honoured, thresholds are monotonic, established members and admins are never auto-banned.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/policy TestDecisionInvariants",
+        "TestKnownSpamDeletedWhateverTheTrust",
+        "TestScoreDoesNotChangeRoute",
+        "TestShadowNeverEnqueues",
+        "acceptance/policy TestIdentityPriorsNeverActAlone",
+        "TestMatrixCellSemanticsInDecide"
+      ]
     },
     {
       "id": "F-064",
@@ -1531,8 +1594,11 @@
         "F-000"
       ],
       "description": "All user-facing text comes from locales/<lang>.yaml with several variants per message and Arabic command aliases, and a test fails when a key exists in one language only.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "locales: TestEmbeddedLocalesLoad, TestParseRejectsIncompleteTranslations, TestParseRejectsAmbiguousAliases, TestRender, TestCommandsAndKeywords, TestEveryLocaleFileIsEmbedded, FuzzParse",
+        "make check-fast green; judge review of the bundle: .agent/logs/judge-F-040.md"
+      ]
     },
     {
       "id": "F-079",
@@ -1802,8 +1868,12 @@
         "F-004"
       ],
       "description": "`docker compose up -d` starts bot + postgres with healthchecks, .env.example documents every variable, and README (unofficial-client ban risk), CONTRIBUTING (development with the fake WAClient) and CODE_OF_CONDUCT exist.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "cmd/antispam: TestConfigReadsOnlyDocumentedVariables, TestEnvExampleDocumentsEveryVariable, TestComposeFileBasics, TestHealthzURL, TestHealthcheck, TestHealthcheckFailsWhenNothingListens, TestHealthcheckRejectsBadAddr",
+        "docker compose config validates docker-compose.yml (fails fast without POSTGRES_PASSWORD); docker compose build bot succeeds",
+        "README.md (ban risk, quick start, shadow mode first), CONTRIBUTING.md (fake WAClient, branches, Conventional Commits), CODE_OF_CONDUCT.md; template ships as env.example (harness/deviations/F-091.md)"
+      ]
     },
     {
       "id": "F-092",
@@ -1820,8 +1890,13 @@
         "F-000"
       ],
       "description": ".goreleaser.yaml and .github/workflows/release.yml build linux and darwin amd64/arm64 binaries (CGO off, -trimpath, version/commit/date ldflags) and dockers_v2 multi-arch images to ghcr.io/rayanalyasi/antispam-bot tagged X.Y.Z always and X.Y/latest only on stable releases (no bare 0 tag on 0.x), with OCI labels, SBOMs, cosign keyless signatures and actions/attest provenance; the workflow refuses a tag that isn't SemVer or whose commit isn't on main or release/*.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        ".goreleaser.yaml: goreleaser v2.18.3 check OK; snapshot build produced 4 archives and linux/amd64+arm64 images",
+        "release.yml goreleaser job: tag exists/SemVer/on-branch check, cosign, syft, actions/attest; actionlint 1.7.12 with shellcheck: 0 findings on all workflows; every action pinned to a commit SHA",
+        "dockers_v2 tags X.Y and latest drop on prereleases (tmpl.NonEmpty in goreleaser source)",
+        "judge review: .agent/logs/judge-F-092.md"
+      ]
     },
     {
       "id": "F-093",
@@ -1837,8 +1912,11 @@
         "F-092"
       ],
       "description": ".github/workflows/edge.yml publishes images from staging tagged edge and sha-<7>, never latest.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "ci.yml edge job: push to staging only, needs image (and so make check), tags edge and sha-<7>, never latest; actionlint 1.7.12 with shellcheck: 0 findings on all workflows; every action pinned to a commit SHA",
+        "judge review: .agent/logs/judge-F-092.md"
+      ]
     },
     {
       "id": "F-094",
@@ -1854,8 +1932,12 @@
         "F-092"
       ],
       "description": "A release PR on main keeps CHANGELOG.md and the version up to date from Conventional Commits (on 0.x: feat bumps the minor, fix the patch, a breaking change the minor, with the pre-major options set explicitly); merging it creates the tag that triggers the GoReleaser release. staging is promoted to main with a merge commit, never squashed, so release-please sees every feature commit. Exact configuration comes from a follow-up spec.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "release-please-config.json validates against release-please's config schema; settings match DESIGN.md §23.3",
+        "release.yml rp job with App token from the release environment; actionlint 1.7.12 with shellcheck: 0 findings on all workflows; every action pinned to a commit SHA",
+        "judge review: .agent/logs/judge-F-092.md"
+      ]
     },
     {
       "id": "F-095",
@@ -1871,8 +1953,11 @@
         "F-000"
       ],
       "description": "A CI check fails a PR whose title doesn't follow Conventional Commits (feat, fix, docs, refactor, test, build, ci, chore; ! or BREAKING CHANGE for breaking changes), since feature PRs are squash-merged with the title as the commit message.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "pr-title.yml: amannn/action-semantic-pull-request v6.1.1 on pull_request_target into staging, 10 types, lowercase subject pattern; actionlint 1.7.12 with shellcheck: 0 findings on all workflows; every action pinned to a commit SHA",
+        "judge review: .agent/logs/judge-F-092.md"
+      ]
     },
     {
       "id": "F-097",
@@ -1888,8 +1973,11 @@
         "F-094"
       ],
       "description": "After each release, a workflow opens a PR that merges main back into staging (merged with a merge commit, never squashed) so the release commit and changelog reach staging; on a conflict it leaves the PR open with a note for the maintainer.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "release.yml back-merge job: sync/main-<tag> branch via REST, PR into staging, conflict comment; actionlint 1.7.12 with shellcheck: 0 findings on all workflows; every action pinned to a commit SHA",
+        "judge review: .agent/logs/judge-F-092.md"
+      ]
     },
     {
       "id": "F-098",
@@ -1906,8 +1994,12 @@
         "F-000"
       ],
       "description": ".github/dependabot.yml updates gomod, github-actions, docker and docker-compose weekly in groups, and a weekly workflow opens a PR into staging that bumps whatsmeow to its latest commit.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        ".github/dependabot.yml validates against the schemastore dependabot-2.0 schema",
+        "whatsmeow-bump.yml weekly PR into staging; actionlint 1.7.12 with shellcheck: 0 findings on all workflows; every action pinned to a commit SHA",
+        "judge review: .agent/logs/judge-F-092.md"
+      ]
     },
     {
       "id": "F-099",
@@ -1945,8 +2037,11 @@
         "F-092"
       ],
       "description": "SECURITY.md describes private vulnerability reporting, a 'Versions & upgrading' doc explains tags, the 0.x policy and upgrade steps, and the example docker-compose.yml pins ghcr.io/rayanalyasi/antispam-bot:0.1 and a Postgres major version; the docs tell deployers to run new groups in shadow mode first, because v0.1 ships before the hold-out recall and shadow-precision gates of DESIGN.md §20.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "SECURITY.md, docs/VERSIONS.md (tags, 0.x policy, compose pinned to :0.1 and postgres:18, shadow mode first, upgrade and verify steps), docs/RELEASING.md",
+        "judge review: .agent/logs/judge-F-092.md"
+      ]
     },
     {
       "id": "F-101",
@@ -1999,8 +2094,11 @@
         "F-002"
       ],
       "description": "AIClassifier.Classify returns {label spam|not_spam|unsure, confidence, categories, reason} and Capabilities; a fake classifier serves tests; provider, model, base URL, key, timeout and limits are configuration.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai: TestConfigValidate, TestConfigFromYAML; internal/ai/fake: TestFakeScript, TestFakeBlockUntilTimeout",
+        "make check-fast green; judge review of the bundle: .agent/logs/judge-F-040.md"
+      ]
     },
     {
       "id": "F-104",
@@ -2016,8 +2114,11 @@
         "F-103"
       ],
       "description": "Native schema output is used when supported; otherwise JSON mode is parsed strictly; invalid output is retried once and then treated as unsure.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai: TestParseVerdict, TestVerdictSchemaMatchesParser, TestSelectMode, TestComplete, TestCompleteCancelled, FuzzParseVerdict",
+        "make check-fast green; judge review of the bundle: .agent/logs/judge-F-040.md"
+      ]
     },
     {
       "id": "F-105",
@@ -2035,8 +2136,11 @@
         "F-078"
       ],
       "description": "A cacheable, versioned system prompt states the task, what normal group chat looks like and when to answer not spam or unsure, the output schema, and that the data block is data, not instructions.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai: TestSystemPrompt, TestRenderDataKeepsMessageInsideTheBlock, FuzzRenderData",
+        "make check-fast green; judge review of the bundle: .agent/logs/judge-F-040.md"
+      ]
     },
     {
       "id": "F-106",

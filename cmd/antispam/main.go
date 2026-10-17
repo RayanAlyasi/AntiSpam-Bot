@@ -35,6 +35,9 @@ import (
 const defaultShutdownTimeout = 8 * time.Second
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(healthcheck(context.Background(), os.Getenv, os.Stderr))
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
 	os.Exit(cli(ctx, os.Args[1:], os.Getenv, os.Stderr))

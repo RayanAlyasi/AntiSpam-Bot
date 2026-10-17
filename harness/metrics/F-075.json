@@ -1,0 +1,23 @@
+{
+ "feature": "F-075",
+ "branch": "feat/wp-h-wiring",
+ "category": "queue",
+ "core": true,
+ "harness_version": "2b4b2b9023da",
+ "commit": "a6cdae1",
+ "gate_runs": 4,
+ "gate_first_pass": true,
+ "gate_failed_steps": [],
+ "acceptance_first_pass": true,
+ "judge_rounds": 2,
+ "judge_first_verdict": "PASS",
+ "judge_final_verdict": "PASS",
+ "tamper_hits": 0,
+ "guard_blocks": 6,
+ "test_change_requests": 0,
+ "cost_usd": null,
+ "turns": null,
+ "mutation_score": null,
+ "human_verdict": null,
+ "ts": "2026-10-17T19:33:00Z"
+}

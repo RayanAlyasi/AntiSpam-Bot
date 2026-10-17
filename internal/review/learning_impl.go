@@ -38,7 +38,14 @@ func (l *Learning) overturn(ctx context.Context, o Overturn) error {
 	} else if !errors.Is(err, ErrNotFound) {
 		errs = append(errs, fmt.Errorf("evidence for %s: %w", o.Message.ID, err))
 	}
-	if err := l.d.Corpus.AllowFingerprint(ctx, FingerprintAllow{Group: o.Group, Message: o.Message, Text: text}); err != nil {
+	first, hasEntry, err := l.d.Corpus.EntryFor(ctx, o.Group, o.Message.ID)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("corpus entry for %s: %w", o.Message.ID, err))
+	}
+	if !hasEntry {
+		first = 0
+	}
+	if err := l.d.Corpus.AllowFingerprint(ctx, FingerprintAllow{Group: o.Group, Message: o.Message, Text: text, EntryID: first}); err != nil {
 		errs = append(errs, fmt.Errorf("allow-list fingerprint of %s: %w", o.Message.ID, err))
 	}
 	// A message can be confirmed more than once (.spam, then a review ✅): retract every entry.

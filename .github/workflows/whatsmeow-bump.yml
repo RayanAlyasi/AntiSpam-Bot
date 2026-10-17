@@ -1,0 +1,74 @@
+# Weekly whatsmeow bump (DESIGN.md §23.8). whatsmeow has no tags, so go.mod pins an exact
+# pseudo-version and Dependabot can't move it. This opens (or updates) a PR into staging that
+# bumps it to the latest commit, so CI and the staging checklist run before it ships.
+#
+# Uses the release App's token (docs/RELEASING.md) because PRs opened with GITHUB_TOKEN don't
+# start CI. Scheduled runs use main, which the `release` environment allows.
+name: whatsmeow bump
+
+on:
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: whatsmeow-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: bump whatsmeow
+    runs-on: ubuntu-24.04
+    environment: release
+    steps:
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: staging
+          token: ${{ steps.app-token.outputs.token }}
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Bump to the latest commit
+        id: bump
+        run: |
+          go get go.mau.fi/whatsmeow@main
+          go mod tidy
+          if git diff --quiet -- go.mod go.sum; then
+            echo "whatsmeow is already at the latest commit"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version="$(go list -m -f '{{.Version}}' go.mau.fi/whatsmeow)"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Open or update the PR
+        if: steps.bump.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          branch=deps/whatsmeow
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "build(deps): bump go.mau.fi/whatsmeow to $VERSION"
+          git push --force origin "HEAD:refs/heads/$branch"
+          title="build(deps): bump go.mau.fi/whatsmeow to $VERSION"
+          pr="$(gh pr list --head "$branch" --base staging --state open --json url --jq '.[0].url // empty')"
+          if [ -n "$pr" ]; then
+            gh pr edit "$pr" --title "$title"
+          else
+            gh pr create --base staging --head "$branch" --title "$title" \
+              --body "Weekly bump of whatsmeow to its latest commit (\`$VERSION\`), DESIGN.md §23.8.
+
+          Check the whatsmeow commit log for API changes and run the staging checklist before release. If this bump fixes a protocol break (\`405 client outdated\`), retitle it \`fix: …\` so release-please cuts a patch release."
+          fi

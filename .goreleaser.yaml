@@ -1,0 +1,97 @@
+# GoReleaser v2 configuration (DESIGN.md §23.2, §23.4, §23.10).
+#
+# Runs as the `goreleaser` job of .github/workflows/release.yml, after release-please has created
+# the vX.Y.Z tag and a draft release with the changelog. GoReleaser uploads everything to that
+# draft and publishes it last, because Immutable Releases lock a release once it's published.
+version: 2
+
+project_name: antispam-bot
+
+builds:
+  - id: antispam
+    main: ./cmd/antispam
+    binary: antispam
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .FullCommit }} -X main.date={{ .CommitDate }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: antispam
+    ids: [antispam]
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+# One SPDX SBOM per archive (needs syft on PATH). Images get theirs from BuildKit (dockers_v2.sbom).
+sboms:
+  - id: archives
+    artifacts: archive
+
+# Cosign keyless signature of the checksums file, which covers every archive and SBOM.
+signs:
+  - id: checksums
+    cmd: cosign
+    artifacts: checksum
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - --bundle=${signature}
+      - ${artifact}
+      - --yes
+
+dockers_v2:
+  - id: antispam
+    ids: [antispam]
+    dockerfile: goreleaser.Dockerfile
+    images:
+      - ghcr.io/rayanalyasi/antispam-bot
+    # X.Y.Z always; X.Y and latest only on stable releases; never a bare major while on 0.x.
+    # Edge images (edge, sha-<7>) come from staging in ci.yml, not from here.
+    tags:
+      - "{{ .Version }}"
+      - "{{ if not .Prerelease }}{{ .Major }}.{{ .Minor }}{{ end }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    sbom: true
+    labels:
+      org.opencontainers.image.title: antispam-bot
+      org.opencontainers.image.description: Self-hosted WhatsApp anti-spam bot
+      org.opencontainers.image.source: https://github.com/RayanAlyasi/AntiSpam-Bot
+      org.opencontainers.image.url: https://github.com/RayanAlyasi/AntiSpam-Bot
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.created: "{{ .CommitDate }}"
+      org.opencontainers.image.licenses: MIT
+
+# Cosign keyless signature of each pushed image, by digest. The default artifact selection signs
+# dockers_v2 images (their multi-platform manifest).
+docker_signs:
+  - id: images
+    cmd: cosign
+    args:
+      - sign
+      - ${artifact}@${digest}
+      - --yes
+
+release:
+  # release-please created the draft (named exactly vX.Y.Z) with the changelog as its body.
+  use_existing_draft: true
+  mode: keep-existing
+  replace_existing_artifacts: true
+  # Publish once every asset is uploaded; Immutable Releases lock it from then on.
+  draft: false
+  prerelease: auto
+
+# The release body is release-please's changelog.
+changelog:
+  disable: true

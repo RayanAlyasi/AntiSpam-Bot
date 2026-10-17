@@ -23,6 +23,6 @@ Then write black-box tests in `acceptance/<area>/` (`package <area>_test`). They
 - Every failure message states the expected outcome and the reason, e.g. `got ban, want review (ask-admins mode never auto-bans, DESIGN §9.2)`.
 - They must compile against the public surface and fail for the right reason before implementation exists. If the public types don't exist yet, also create a minimal stub file in the target package that declares only the exported names and signatures, with bodies that `panic("not implemented")`. Don't write any logic.
 
-Finally, stage and commit only `acceptance/` and `.agent/contracts/` (plus any stub files) with an engineer-style message such as `Add contract and acceptance tests for <short feature name>`, with `Feature: <ID>` in the body. No AI attribution.
+Finally, stage and commit only `acceptance/` and `.agent/contracts/` (plus any stub files) with a Conventional Commit message such as `test: add contract and acceptance tests for <short feature name>`, with `Feature: <ID>` in the body. No AI attribution.
 
 If DESIGN.md is ambiguous for this feature, choose the conservative reading and say so in the contract under **Assumptions**. Report back the contract path, the test names, and any assumptions, in under 15 lines.

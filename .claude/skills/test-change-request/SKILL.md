@@ -10,5 +10,5 @@ A test that looks wrong is either a real misunderstanding on your side or a real
    - **What you believe is correct,** and how confident you are.
    - **What you tried** before concluding this.
 2. Add `BLOCKED: test-change-request <file>` at the top of `.agent/plan.md`.
-3. Commit the request file alone (bookkeeping commits need no stamp), e.g. `Request change to <test name>`.
+3. Commit the request file alone (bookkeeping commits need no stamp), e.g. `chore: request change to <test name>`.
 4. Stop and report the file path.

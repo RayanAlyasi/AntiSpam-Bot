@@ -40,14 +40,20 @@ commit), and `harness/features.json` has `passes: true` with evidence.
 
 ## Commits and pull requests
 
-Write them the way an experienced engineer on this team would:
-- **Commit subject:** imperative mood, 72 characters or fewer, no trailing period, e.g.
-  `Add recursive unwrapper for FutureProof wrappers`.
-- **Commit body:** after a blank line, what changed and why, wrapped at 72 characters.
-- **PR body:** follow `.github/pull_request_template.md`: summary, why, how it was tested, and
-  what reviewers should look at.
+Commit messages and PR titles follow [Conventional Commits](https://www.conventionalcommits.org):
+`<type>: <description>`, where type is `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`,
+`ci` or `chore`. The description is lowercase, imperative and 72 characters or fewer, e.g.
+`feat: add recursive unwrapper for FutureProof wrappers`. Mark a breaking change with `!`
+(`feat!: rename review.timeout to review.wait`) and explain the upgrade in a `BREAKING CHANGE:` footer.
+release-please reads these to write the changelog and pick the next version, so the type matters.
+
+- **Body:** after a blank line, what changed and why, wrapped at 72 characters. Put the feature ID in a
+  footer: `Feature: F-012`.
+- **PRs:** the title uses the same format (feature PRs are squash-merged, so the title becomes the
+  commit). The body follows `.github/pull_request_template.md`.
+- **Docs:** if a change alters behaviour, configuration, commands or deployment, update the
+  user-facing docs (README, `docs/`) in the same PR.
 - No `Co-Authored-By` trailers, no "Generated with" lines, and no mention of AI or agents.
-  The history should read like any other open-source project's.
 
 ## Working style
 

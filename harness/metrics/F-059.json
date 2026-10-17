@@ -1,0 +1,25 @@
+{
+ "feature": "F-059",
+ "branch": "feat/wp-i-policy-core",
+ "category": "policy",
+ "core": true,
+ "harness_version": "8731488edd1b",
+ "commit": "5377a9a",
+ "gate_runs": 8,
+ "gate_first_pass": false,
+ "gate_failed_steps": [
+  "test"
+ ],
+ "acceptance_first_pass": false,
+ "judge_rounds": 2,
+ "judge_first_verdict": "NONE",
+ "judge_final_verdict": "PASS",
+ "tamper_hits": 0,
+ "guard_blocks": 9,
+ "test_change_requests": 0,
+ "cost_usd": null,
+ "turns": null,
+ "mutation_score": null,
+ "human_verdict": null,
+ "ts": "2026-10-17T13:59:28Z"
+}

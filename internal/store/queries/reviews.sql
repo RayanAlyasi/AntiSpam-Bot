@@ -44,6 +44,12 @@ UPDATE app.reviews
 SET evidence = evidence - 'text', evidence_raw = NULL, thumbnail = NULL, thumbnail_mime = NULL
 WHERE group_jid = @group_jid AND message_id = @msg_id;
 
+-- name: ClearStaleReviewRawText :execrows
+-- The unredacted text waits for the decision at most 72 h, like the raw inbox (§17); a longer
+-- timeout or a stalled expire job never keeps it longer.
+UPDATE app.reviews SET evidence_raw = NULL
+WHERE created_at <= @cutoff AND evidence_raw IS NOT NULL;
+
 -- name: ExpireReviewEvidence :execrows
 -- Review evidence follows the 30-day evidence retention (§14, §17.1).
 UPDATE app.reviews

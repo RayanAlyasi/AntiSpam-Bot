@@ -51,6 +51,21 @@ func (q *Queries) ClearReviewEvidenceText(ctx context.Context, arg ClearReviewEv
 	return result.RowsAffected(), nil
 }
 
+const clearStaleReviewRawText = `-- name: ClearStaleReviewRawText :execrows
+UPDATE app.reviews SET evidence_raw = NULL
+WHERE created_at <= $1 AND evidence_raw IS NOT NULL
+`
+
+// The unredacted text waits for the decision at most 72 h, like the raw inbox (§17); a longer
+// timeout or a stalled expire job never keeps it longer.
+func (q *Queries) ClearStaleReviewRawText(ctx context.Context, cutoff time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, clearStaleReviewRawText, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const decideReview = `-- name: DecideReview :one
 WITH prev AS (
     SELECT p.id, p.evidence_raw FROM app.reviews p WHERE p.id = $7 AND p.status = 'pending' FOR UPDATE

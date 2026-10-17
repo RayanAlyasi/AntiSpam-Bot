@@ -80,14 +80,38 @@ func (d DocSettings) Set(ctx context.Context, group wa.JID, key, value string, a
 	return Change{Key: key, Old: text(old), New: text(now)}, nil
 }
 
+// presetApplier is a settings store that switches presets in one step on the latest document
+// (policy.SettingsService), so two admins switching presets at once never mix the two grids.
+type presetApplier interface {
+	ApplyPreset(ctx context.Context, group wa.JID, actor string, p policy.Preset) (policy.Settings, []policy.Change, error)
+}
+
+var _ presetApplier = (*policy.SettingsService)(nil)
+
+func changesOf(diff []policy.Change) []Change {
+	out := make([]Change, len(diff))
+	for i, c := range diff {
+		out[i] = Change{Key: c.Key, Old: c.From, New: c.To}
+	}
+	return out
+}
+
 // ApplyPreset switches the preset and resets the auto-ban matrix to it.
 func (d DocSettings) ApplyPreset(ctx context.Context, group wa.JID, preset string, actor wa.JID) ([]Change, error) {
+	p := policy.Preset(strings.ToLower(preset))
+	if pa, ok := d.Docs.(presetApplier); ok {
+		_, diff, err := pa.ApplyPreset(ctx, group, string(actor), p)
+		if err != nil {
+			return nil, fmt.Errorf("preset %q: %w", preset, mapErr("preset", err))
+		}
+		return changesOf(diff), nil
+	}
 	s, err := d.Docs.Load(ctx, group)
 	if err != nil {
 		return nil, fmt.Errorf("load settings %s: %w", group, err)
 	}
 	next := s.Clone()
-	if err := next.ApplyPreset(policy.Preset(strings.ToLower(preset))); err != nil {
+	if err := next.ApplyPreset(p); err != nil {
 		return nil, fmt.Errorf("preset %q: %w: %w", preset, ErrInvalidValue, err)
 	}
 	diff, err := policy.Diff(s, next)
@@ -97,9 +121,5 @@ func (d DocSettings) ApplyPreset(ctx context.Context, group wa.JID, preset strin
 	if err := d.Docs.Save(ctx, group, next, actor, diff); err != nil {
 		return nil, mapErr("preset", err)
 	}
-	out := make([]Change, len(diff))
-	for i, c := range diff {
-		out[i] = Change{Key: c.Key, Old: c.From, New: c.To}
-	}
-	return out, nil
+	return changesOf(diff), nil
 }

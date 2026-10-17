@@ -86,7 +86,10 @@ func (h *Handler) cmdBlacklist(ctx context.Context, c *call) error {
 		}
 		lines := make([]string, 0, len(es))
 		for _, e := range es {
-			line := h.showNumber(c, e.E164) + " · " + review.MaskNumber("+"+e.AddedBy.User())
+			line := h.showNumber(c, e.E164)
+			if e.AddedBy.Server() == wa.ServerUser {
+				line += " · " + h.showNumber(c, "+"+e.AddedBy.User())
+			}
 			if e.Reason != "" {
 				line += " · " + e.Reason
 			}

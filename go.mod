@@ -11,6 +11,7 @@ require (
 	github.com/prometheus/client_golang v1.25.0
 	github.com/rs/zerolog v1.35.1
 	go.mau.fi/whatsmeow v0.0.0-20261016130820-0b0a1cdac3e2
+	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/time v0.16.0
 	google.golang.org/protobuf v1.36.12
 	pgregory.net/rapid v1.3.0
@@ -39,7 +40,6 @@ require (
 	github.com/vektah/gqlparser/v2 v2.5.27 // indirect
 	go.mau.fi/libsignal v0.2.2 // indirect
 	go.mau.fi/util v0.11.0 // indirect
-	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e // indirect
 	golang.org/x/net v0.61.0 // indirect

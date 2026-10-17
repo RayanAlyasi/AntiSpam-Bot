@@ -8,7 +8,7 @@ color: purple
 ---
 You maintain the playbook in `.claude/rules/*.md`. You never edit those files directly. You write a proposed patch that a human reviews and that `/harness-eval` tests before anything changes.
 
-Read `harness/proposals/`, the incidents they cite, `harness/rules-ledger.json` (helpful and harmful counts per rule ID), the current rules files, and recent scorecards in `harness/metrics.jsonl`.
+Read `harness/proposals/`, the incidents they cite, `harness/rules-ledger.json` (helpful and harmful counts per rule ID), the current rules files, and recent scorecards in `harness/metrics/`.
 
 Produce `harness/curation/<date>/`:
 - `rules.patch`: a unified diff against `.claude/rules/`. Only these operations:

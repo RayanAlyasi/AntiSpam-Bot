@@ -30,9 +30,12 @@ tcr = os.path.join(root, "harness", "test-change-requests")
 if os.path.isdir(tcr) and [f for f in os.listdir(tcr) if f.endswith(".md")]:
     out.append(f"- Open test-change requests: {len([f for f in os.listdir(tcr) if f.endswith('.md')])} (a human must resolve them)")
 
-dead = os.path.join(root, "harness", "dead-ends.md")
-if os.path.exists(dead):
-    entries = [l for l in open(dead).read().splitlines() if l.startswith("- ")]
+dead = os.path.join(root, "harness", "dead-ends")
+if os.path.isdir(dead):
+    entries = []
+    for fn in sorted(os.listdir(dead)):
+        if fn.endswith(".md") and fn != "README.md":
+            entries += [l for l in open(os.path.join(dead, fn)).read().splitlines() if l.startswith("- ")]
     if entries:
         out.append("- Recent dead ends: " + " | ".join(e[2:][:100] for e in entries[-3:]))
 print("\n".join(out))

@@ -8,7 +8,7 @@ Build one feature, then stop. Work through the checklist in order. Copy it into 
 
 ## Checklist
 
-- [ ] **1. Orient.** Read `git log --oneline -15`, the last 30 lines of `harness/progress.md`, all of `harness/dead-ends.md`, and any open `harness/test-change-requests/`. Run `make check-fast`. If it's red before you've changed anything, fix that first, or write BLOCKED.
+- [ ] **1. Orient.** Read `git log --oneline -15`, the five newest files in `harness/progress/`, everything in `harness/dead-ends/`, and any open `harness/test-change-requests/`. Run `make check-fast`. If it's red before you've changed anything, fix that first, or write BLOCKED.
 - [ ] **2. Pick.** Requested feature: $ARGUMENTS. If none was given, use the first feature in `harness/features.json` with `passes: false` whose `depends_on` features all pass. Create the branch from an up-to-date `staging`: `git switch staging && git pull --ff-only && git switch -c feat/<ID>-<short-slug>`.
 - [ ] **3. Contract.** Delegate to the **architect** agent with the feature ID. It writes `.agent/contracts/<ID>.md` and the acceptance tests, and commits them.
   - If the feature is `core: true`, or fewer than 10 features have `passes: true`, show the user the contract and wait for approval before building. During unattended runs (no user present) it proceeds without approval.
@@ -17,7 +17,7 @@ Build one feature, then stop. Work through the checklist in order. Copy it into 
   - **Effort:** core packages (queue, identity, scoring, bans) deserve careful reasoning.
   - **Caps:** if the same gate failure happens twice in a row, step back and reconsider the approach. On a third identical failure, write BLOCKED. Don't thrash.
   - **If an acceptance test seems wrong**, use `/test-change-request` and stop. Never work around a test.
-- [ ] **5. Record.** In `harness/features.json`, set this feature's `passes: true`, and set `evidence` to the test names that prove it. Append to `harness/progress.md`: date, ID, what was built, anything deferred. Then stage everything: `git add -A`.
+- [ ] **5. Record.** In `harness/features.json`, set this feature's `passes: true`, and set `evidence` to the test names that prove it. Write `harness/progress/<ID>.md`: date, what was built, anything deferred, and a "Follow-ups" section for pre-existing issues you noticed. Then stage everything: `git add -A`.
 - [ ] **6. Judge.** Delegate to the **judge** agent with the feature ID, the contract path, and "first review" or "re-review".
   - **PASS:** a hook writes the stamp; continue.
   - **FAIL:** fix only the blocker and major findings, run `make check-fast`, `git add -A`, then ask for a re-review. At most 3 judge rounds; after that, write BLOCKED with the open findings.

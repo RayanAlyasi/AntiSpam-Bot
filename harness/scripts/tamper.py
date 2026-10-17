@@ -48,7 +48,10 @@ for line in diff("*.go").splitlines():
     if line.startswith("+") and "//nolint" in line:
         problems.append(f"//nolint added: {line[1:].strip()[:80]}")
 
-# features.json: only `passes` and `evidence` may change.
+# features.json: only `passes` and `evidence` may change, unless the branch adds a plan-change
+# record (harness/plan-changes/*.md), which only humans can write.
+plan_change = any(p.startswith("harness/plan-changes/") and p.endswith(".md") and not p.endswith("README.md")
+                  for p in new_files)
 fj = os.path.join(root, "harness", "features.json")
 if os.path.exists(fj):
     old = h.run(["git", "show", f"{base}:harness/features.json"], root)
@@ -61,8 +64,9 @@ if os.path.exists(fj):
         try:
             before = strip(json.loads(old.stdout))
             after = strip(json.load(open(fj)))
-            if before != after and before.get("features"):
-                problems.append("harness/features.json changed beyond `passes` and `evidence`")
+            if before != after and before.get("features") and not plan_change:
+                problems.append("harness/features.json changed beyond `passes` and `evidence` "
+                                "(plan changes need a human-written record in harness/plan-changes/)")
         except ValueError:
             problems.append("harness/features.json is not valid JSON")
 

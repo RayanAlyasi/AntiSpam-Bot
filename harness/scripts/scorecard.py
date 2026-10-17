@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Write one scorecard line for a finished feature to harness/metrics.jsonl.
+"""Write the scorecard for a finished feature to harness/metrics/<ID>.json (one file per feature,
+so parallel feature branches never conflict).
 
 Usage: scorecard.py F-xxx
 Reads the per-branch logs in .agent/logs/ (gates, judge, guard, cost). Fields that can't be
@@ -71,6 +72,9 @@ card = {
     "human_verdict": None,   # filled by report.py from the PR state
 }
 card["ts"] = h.run(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"], root).stdout.strip()
-with open(os.path.join(root, "harness", "metrics.jsonl"), "a") as f:
-    f.write(json.dumps(card) + "\n")
+out_dir = os.path.join(root, "harness", "metrics")
+os.makedirs(out_dir, exist_ok=True)
+with open(os.path.join(out_dir, f"{fid or 'unknown'}.json"), "w") as f:
+    json.dump(card, f, indent=1)
+    f.write("\n")
 print(json.dumps(card, indent=1))

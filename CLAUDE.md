@@ -18,8 +18,9 @@ WhatsApp session and personal messages.
 ## How work happens
 
 One feature per session, through `/next-feature`. State lives on disk, not in memory:
-`harness/features.json` (the plan), `harness/progress.md` (log), `harness/dead-ends.md`
-(approaches that failed; read before retrying something), `.agent/plan.md` (current checklist).
+`harness/features.json` (the plan), `harness/progress/<ID>.md` (one log per feature),
+`harness/dead-ends/` (approaches that failed; read before retrying something), `.agent/plan.md`
+(current checklist). Logs are one file per feature, so parallel sessions never edit the same file.
 
 Done means: `make check` is green, the judge agent returned PASS (its stamp is what allows the
 commit), and `harness/features.json` has `passes: true` with evidence.
@@ -58,11 +59,11 @@ release-please reads these to write the changelog and pick the next version, so 
 ## Working style
 
 - Make surgical changes that serve the current feature. If you notice a pre-existing bug, add it
-  to `harness/progress.md` as a follow-up instead of fixing it now.
+  to the "Follow-ups" section of `harness/progress/<ID>.md` instead of fixing it now.
 - Write general solutions. Never special-case code to make a particular test pass.
 - Size new tests like the neighbouring tests, and prefer table tests.
 - Match the surrounding code's naming, error handling and comment density.
 - Don't delegate work you can finish in a few tool calls, and don't use subagents to verify your
   own work (the judge does that). For a single lookup, use grep or the Go language server directly.
 - When something is ambiguous in `docs/DESIGN.md`, pick the more conservative option, note it in
-  `harness/deviations.md`, and keep going.
+  `harness/deviations/<ID>.md`, and keep going.

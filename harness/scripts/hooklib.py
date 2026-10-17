@@ -20,7 +20,7 @@ SENSITIVE = ["auth_info_baileys/", "whatsapp_logs.db", ".env"]
 # Writable by nobody through agent tools (hooks and humans only).
 PROTECTED_WRITE = [
     "acceptance/", "testdata/fixtures/", "harness/evals/", "harness/rules-ledger.json",
-    "harness/metrics.jsonl", "harness/scoring.json", "harness/scripts/", ".agent/stamps/",
+    "harness/metrics/", "harness/plan-changes/", "harness/scoring.json", "harness/scripts/", ".agent/stamps/",
     ".agent/contracts/", ".claude/", ".githooks/", "Makefile", ".golangci.yml",
     ".go-arch-lint.yml", "CLAUDE.md",
 ]
@@ -29,15 +29,15 @@ PROTECTED_WRITE = [
 AGENT_WRITES = {
     "architect": ["acceptance/", ".agent/contracts/", "*_stub.go"],
     "judge": [".agent/scratch/", ".agent/logs/judge-*"],
-    "retro": ["harness/incidents/", "harness/proposals/", "harness/dead-ends.md"],
+    "retro": ["harness/incidents/", "harness/proposals/", "harness/dead-ends/"],
     "curator": ["harness/curation/"],
     "explorer": [],
 }
 
 # Commits touching only these paths are bookkeeping and need no judge stamp.
 STAMP_EXEMPT = [
-    "acceptance/", ".agent/contracts/", "*_stub.go", "harness/progress.md",
-    "harness/dead-ends.md", "harness/deviations.md", "harness/incidents/",
+    "acceptance/", ".agent/contracts/", "*_stub.go", "harness/progress/",
+    "harness/dead-ends/", "harness/deviations/", "harness/metrics/", "harness/incidents/",
     "harness/proposals/", "harness/test-change-requests/",
 ]
 

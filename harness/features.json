@@ -59,8 +59,12 @@
         "F-000"
       ],
       "description": "The binary logs JSON with zerolog, supports a log level per module, attaches a request/detection ID, and a masking helper renders phone numbers as +966 5•• ••• •12 wherever they are logged.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/logging: TestModuleLevels, TestModuleAtTraceLogsTrace, TestOutputIsJSONWithTimestampAndModule, TestIDsInContext, TestIDsMissingFromContext, TestNewIDIsRandomHex, TestMaskPhone, TestMaskJID, TestPhoneAndJIDMaskWhenLogged, FuzzMaskPhone, FuzzMaskJID",
+        "internal/config: TestParseLogLevel, TestLoadSetsLogModules",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-002",
@@ -76,8 +80,12 @@
         "F-000"
       ],
       "description": "The bot starts with no config file; an optional config.yaml sets pacing, presets, AI and scoring defaults, every key has a documented default, and environment variables override the file.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "hidden architect tests for config (17), incl. TestDefaultsMatchDesign, TestEnvOverridesFile, TestInvalidConfigIsRejected, TestSecretsNeverInFileOrErrors, TestExampleFileDocumentsEveryKey",
+        "internal/config: TestLoadFile, TestLoadRejects, TestLoadNeverEchoesSecrets, TestExampleFileLoadsDefaults, FuzzDecodeFile, TestHTTPAddr",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-003",
@@ -94,8 +102,11 @@
         "F-001"
       ],
       "description": "internal/store opens a pgx v5 pool from DATABASE_URL in UTC, exposes a transaction helper that rolls back on error, and integration tests get a fresh testcontainers Postgres through one helper.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/store (integration): TestOpenRunsInUTC, TestInTx; internal/store: TestOpenRejectsMissingOrBadURL; the storetest helper backs every integration test",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-004",
@@ -112,8 +123,11 @@
         "F-003"
       ],
       "description": "Migrations live in migrations/, are embedded in the binary and run on start; schemas app and whatsmeow exist; sqlc.yaml generates into internal/store/db and make check-gen is green.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/store (integration): TestMigrateFreshDatabase (schemas app and whatsmeow, idempotent re-run); make check sqlc step (sqlc diff) green",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-005",
@@ -129,8 +143,11 @@
         "F-004"
       ],
       "description": "River's tables are created by a goose migration, a River client starts with the workers role, jobs enqueue transactionally with InsertTx, and a periodic test job runs on schedule.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/store/jobs (integration): TestInsertTxRunsOnlyCommittedJobs, TestPeriodicHeartbeatRunsOnSchedule, TestInsertOnlyClientDoesNotWork; TestMigrateFreshDatabase checks the River schema version",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-006",
@@ -148,8 +165,11 @@
         "F-004"
       ],
       "description": "Every settings change, command, manual action and automated action can be written to audit_log with actor, group, action and a JSON diff, readable per group.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/store (integration): TestAuditLog; internal/store: TestWriteAuditValidatesBeforeTouchingTheDatabase",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-007",
@@ -166,8 +186,11 @@
         "F-003"
       ],
       "description": "The binary serves /metrics, /healthz (process alive) and /readyz (database reachable and at least one bot connected), suitable for Coolify health checks.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/api: TestOpsEndpoints, TestMetricsServesRegisteredCollectors, TestOpsRejectsOtherMethods; cmd/antispam (integration): TestServeRunsAllRolesAndStopsOnSignal",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-008",
@@ -185,8 +208,11 @@
         "F-002"
       ],
       "description": "The binary runs the connector, workers and api roles together by default or a subset via flag, and stops all of them cleanly on SIGTERM within a bounded time.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "cmd/antispam: TestParseRoles, TestRunRoles (synctest: bounded shutdown, failure propagation, stuck role), TestCLIRejectsBadFlags, TestServeWithoutDatabaseFails, TestCheckConfig, TestRun; integration: TestServeRunsAllRolesAndStopsOnSignal, TestServeSubsetOfRoles",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-009",
@@ -2032,8 +2058,11 @@
         "F-004"
       ],
       "description": "On start the binary compares the database's goose version with the newest migration it embeds and exits with a clear message (which version is needed) when the database is newer, instead of running against an unknown schema.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/store (integration): TestMigrateRefusesNewerSchema; cmd/antispam (integration): TestServeRefusesNewerSchema; internal/store: TestSchemaTooNewError",
+        "make check green, integration included; judge review: .agent/logs/judge-F-002.md"
+      ]
     },
     {
       "id": "F-100",

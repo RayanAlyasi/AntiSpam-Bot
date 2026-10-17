@@ -1,0 +1,18 @@
+# sqlc generates typed queries from internal/store/queries against the goose schema (`make gen`).
+version: "2"
+sql:
+  - engine: postgresql
+    schema: migrations
+    queries: internal/store/queries
+    gen:
+      go:
+        package: db
+        out: internal/store/db
+        sql_package: pgx/v5
+        emit_empty_slices: true
+        emit_json_tags: false
+        overrides:
+          - db_type: timestamptz
+            go_type: time.Time
+          - db_type: jsonb
+            go_type: encoding/json.RawMessage

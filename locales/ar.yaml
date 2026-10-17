@@ -1,0 +1,138 @@
+# النصوص العربية (DESIGN.md §22.2). Arabic texts: same keys and {placeholders} as en.yaml.
+lang: ar
+dir: rtl
+
+messages:
+  onboarding.welcome:
+    - "مرحباً! أحمي مجموعات واتساب من الرسائل المزعجة بصمت. ثلاث خطوات: ١) أضفني إلى مجموعتك، ٢) اجعلني مشرفاً، ٣) اختر أين تصل المراجعات. التفاصيل والإعدادات: {link}"
+    - "أهلاً! أحافظ على المجموعات خالية من السبام دون أن أنشر فيها أي شيء. للبدء: أضفني إلى المجموعة، واجعلني مشرفاً، ثم اختر أين أرسل المراجعات. الدليل: {link}"
+  onboarding.protection_on:
+    - "الحماية مفعّلة في \"{group}\" ({preset}، صامت). الحالات غير المؤكدة تذهب إلى الموقع حالياً. أرسل .review dm لتصلك هنا، أو .reviewgroup here في مجموعة خاصة بالمشرفين."
+    - "أصبحت \"{group}\" محمية ({preset}، صامت). الحالات غير المؤكدة تنتظر على الموقع حالياً. أرسل .review dm لتصلك في الخاص، أو .reviewgroup here في مجموعة للمشرفين فقط."
+  onboarding.not_admin:
+    - "أنا في \"{group}\" لكنني لست مشرفاً بعد، فلا أستطيع حمايتها. اجعلني مشرفاً وسأبدأ."
+    - "تذكير: أحتاج صلاحية الإشراف في \"{group}\" قبل أن أتمكن من حذف السبام فيها."
+  review.header:
+    - "🛡️ مراجعة #{id} · {group}"
+    - "🛡️ #{id} بانتظار المراجعة · {group}"
+  review.who:
+    - "من: {name} · {phone} · {tenure} · {count} رسالة سابقة"
+    - "المرسل: {name} · {phone} · {tenure} · {count} رسالة قبل هذه"
+  review.what:
+    - "ماذا: {text}"
+    - "الرسالة: {text}"
+  review.why:
+    - "لماذا: {reasons}"
+    - "الإشارات: {reasons}"
+  review.score:
+    - "النتيجة: {score} · المصدر: {source} · الرسالة: {state} · سبب السؤال: {why_asking}"
+    - "النتيجة {score} · المصدر {source} · الرسالة {state} · نسأل لأن: {why_asking}"
+  review.how_to_decide:
+    - "تفاعل بـ ✅ للحظر · ❌ ليس سبام، أو رُدّ: حظر · تمام · حذف فقط"
+    - "قرّر بتفاعل (✅ حظر، ❌ ليس سبام) أو بردّ: حظر أو تمام أو حذف فقط"
+  review.auto_decision:
+    - "قرار تلقائي بعد {timeout}: {fallback}"
+    - "إن لم يقرر أحد خلال {timeout}: {fallback}"
+  review.handled:
+    - "✔ تمت المعالجة بواسطة {admin} · {decision} · {time}"
+    - "✔ قرّر {admin}: {decision} ({time})"
+  review.already_handled:
+    - "تمت معالجتها مسبقاً بواسطة {admin}."
+    - "سبق أن قرّر {admin} في هذه المراجعة."
+  review.timed_out:
+    - "⏱ لا قرار خلال {timeout} ← {fallback}"
+    - "⏱ مضت {timeout} دون قرار ← {fallback}"
+  review.digest:
+    - "هناك {count} عناصر أخرى للمراجعة. قرّر على الموقع ({link}) أو رُدّ: الكل سليم / الكل سبام."
+    - "يوجد {count} عناصر أخرى بالانتظار. استخدم الموقع ({link})، أو رُدّ: الكل سليم أو الكل سبام."
+  detection.deleted_because:
+    - "حُذفت بسبب: {reasons}"
+    - "أُزيلت لأن: {reasons}"
+  command.unknown:
+    - "لا أعرف الأمر {command}. أرسل .مساعدة لعرض القائمة."
+    - "{command} ليس أمراً أعرفه. جرّب .مساعدة."
+  command.done:
+    - "تم."
+    - "تم ✔"
+  command.ban_reason:
+    - "السبب؟ رُدّ بـ سبام أو أخرى."
+    - "لماذا الحظر؟ رُدّ بـ سبام أو أخرى."
+  command.pick_group:
+    - "أي مجموعة؟ أرسل .المجموعات لعرضها، ثم .استخدم <اسم المجموعة>."
+    - "اختر مجموعة أولاً: .المجموعات تعرضها، و.استخدم <اسم المجموعة> تختار واحدة."
+  command.group_selected:
+    - "أعمل الآن على \"{group}\" لمدة ساعة."
+    - "حسناً، الأوامر هنا تخص \"{group}\" خلال الساعة القادمة."
+  login.link:
+    - "رابط الدخول (صالح لمدة {minutes} دقيقة): {link}"
+    - "ادخل إلى الموقع بهذا الرابط خلال {minutes} دقيقة: {link}"
+  login.code:
+    - "رمز الدخول هو {code}. ينتهي خلال {minutes} دقيقة. لا تشاركه أبداً."
+    - "رمز الدخول: {code} (صالح {minutes} دقيقة). لا تشاركه مع أحد."
+  shadow.summary:
+    - "ملخص وضع الظل: كنت سأحذف {deleted} رسالة وأحظر {banned} شخصاً. للمراجعة: {link}"
+    - "في وضع الظل كنت سأحذف {deleted} رسالة وأحظر {banned} شخصاً. راجعها هنا: {link}"
+  health.lost_admin:
+    - "لم أعد مشرفاً في \"{group}\"، لذا توقفت الحماية هناك."
+    - "الحماية في \"{group}\" متوقفة: فقدت صلاحية الإشراف."
+  status.summary:
+    - "\"{group}\": الإعداد {preset}، الوضع {mode}، المراجعات إلى {destination}. اليوم: {deleted} محذوفة، {banned} محظور."
+    - "\"{group}\" · {preset} · {mode} · المراجعات: {destination} · اليوم {deleted} محذوفة، {banned} محظور"
+  help.short:
+    - "رُدّ على رسالة بـ .سبام أو .تمام. الإعدادات: .حالة، .نمط، .الوضع، .مراجعة. والباقي: .مساعدة <موضوع> أو الموقع."
+    - "الأوامر الأساسية: رُدّ بـ .سبام / .تمام على رسالة، .حالة، .نمط، .الوضع، .مراجعة. المزيد عبر .مساعدة <موضوع> أو الموقع."
+
+# أسماء الأوامر (DESIGN.md §13.7): Arabic aliases. The English names work in every language.
+commands:
+  spam: [سبام]
+  notspam: [تمام, سليم]
+  ban: [حظر]
+  kick: [طرد]
+  mute: [كتم]
+  unmute: [الغاء_الكتم]
+  allow: [سماح]
+  unallow: [الغاء_السماح]
+  blacklist: [القائمة_السوداء]
+  clear: [تبرئة]
+  restrict: [تقييد]
+  restricted: [المقيدون]
+  unban: [فك_الحظر]
+  network: [الشبكة]
+  lockdown: [اغلاق]
+  unlock: [فتح]
+  undo: [تراجع]
+  review: [مراجعة]
+  reviewers: [المراجعون]
+  reviewer: [مراجع]
+  reviewgroup: [مجموعة_المراجعة]
+  askadmins: [اسأل_المشرفين]
+  autoban: [حظر_تلقائي]
+  pending: [المعلقة]
+  status: [حالة]
+  mode: [الوضع]
+  preset: [نمط]
+  block: [منع]
+  blocknew: [منع_الجدد]
+  policy: [السياسة]
+  silent: [صامت]
+  ladder: [التدرج]
+  newsignal: [اشارة_الجدد]
+  domain: [نطاق]
+  word: [كلمة]
+  set: [ضبط]
+  get: [عرض]
+  settings: [الاعدادات]
+  groups: [المجموعات]
+  use: [استخدم]
+  login: [دخول]
+  help: [مساعدة]
+
+# كلمات الرد على المراجعات (DESIGN.md §9.5).
+keywords:
+  ban: [حظر, طرد]
+  not_spam: [ليس سبام, تمام, سليم]
+  delete_only: [حذف فقط]
+  clear: [تبرئة]
+  mute: [كتم]
+  all_ok: [الكل سليم]
+  all_spam: [الكل سبام]

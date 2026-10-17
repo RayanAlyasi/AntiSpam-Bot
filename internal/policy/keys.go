@@ -134,6 +134,35 @@ func Parse(raw []byte) (Settings, error) {
 	return s, nil
 }
 
+// ParseStored decodes a document read back from the database. Keys added after it was written
+// take their default values; everything else is as strict as Parse (unknown keys and wrong
+// types are errors, and the result must pass Validate).
+//
+// Missing keys come from the stored document's own preset, so a matrix row added later gets
+// that preset's cell rather than Standard's.
+func ParseStored(raw []byte) (Settings, error) {
+	var head struct {
+		Preset Preset `json:"preset"`
+	}
+	if err := json.Unmarshal(raw, &head); err != nil {
+		return Settings{}, fmt.Errorf("%w: %w", ErrInvalidSettings, err)
+	}
+	s, err := PresetSettings(head.Preset)
+	if err != nil {
+		s = Defaults()
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&s); err != nil {
+		return Settings{}, fmt.Errorf("%w: %w", ErrInvalidSettings, err)
+	}
+	full, err := json.Marshal(s)
+	if err != nil {
+		return Settings{}, fmt.Errorf("encode settings: %w", err)
+	}
+	return Parse(full)
+}
+
 func splitKey(key string) []string {
 	key = strings.TrimSpace(key)
 	if key == "" {

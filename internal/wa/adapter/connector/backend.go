@@ -159,15 +159,8 @@ func (s *session) Disconnect() {
 	}
 }
 
-// Client implements Session. It is nil until the adapter implements every WAClient method
-// (F-009, a separate work package); the assertion makes that switch-over automatic.
-func (s *session) Client() wa.WAClient {
-	var c any = s.client
-	if wc, ok := c.(wa.WAClient); ok {
-		return wc
-	}
-	return nil
-}
+// Client implements Session.
+func (s *session) Client() wa.WAClient { return s.client }
 
 // resolver returns this bot's LID↔PN resolver.
 func (s *session) resolver() *LIDResolver { return s.lidRes }
@@ -177,6 +170,10 @@ func (s *session) resolver() *LIDResolver { return s.lidRes }
 // Everything else is queued for an ordered background delivery, because the sink may do slow
 // work (database writes, IQ lookups) that must never block, or deadlock, the receive loop.
 func (s *session) onEvent(raw any) bool {
+	// The adapter tracks temporary bans so its calls fail with wa.ErrTemporaryBan (§10.5).
+	if s.client != nil {
+		s.client.HandleEvent(raw)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), storeTimeout)
 	defer cancel()
 	evt, ok, err := convert(ctx, s.bot, raw, s.lids)

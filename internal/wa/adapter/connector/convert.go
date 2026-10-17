@@ -17,16 +17,7 @@ func jid(j types.JID) wa.JID {
 	if j.IsEmpty() {
 		return ""
 	}
-	j = j.ToNonAD()
-	// Hosted (Cloud API) devices use their own servers but the same user part; they are the same
-	// person as the plain phone number or LID.
-	switch j.Server {
-	case types.HostedServer:
-		j.Server = types.DefaultUserServer
-	case types.HostedLIDServer:
-		j.Server = types.HiddenUserServer
-	}
-	return wa.JID(j.String())
+	return wa.CanonicalJID(j.ToNonAD().String())
 }
 
 func jidPtr(j *types.JID) wa.JID {

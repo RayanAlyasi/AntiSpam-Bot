@@ -252,8 +252,12 @@
         "F-009"
       ],
       "description": "whatsmeow's device store lives in schema whatsmeow on the same Postgres, the bots table records each number's JID/LID/status, and devices are loaded at start.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/store: TestBotUpsertKeepsStatus (integration)",
+        "internal/wa/adapter/connector: TestOnlyOneProcessConnectsABot (device recorded with LID and name), TestPausedBotIsNeverConnected",
+        "cmd/antispam wiring: connector role opens the sqlstore in schema whatsmeow"
+      ]
     },
     {
       "id": "F-011",
@@ -270,8 +274,12 @@
         "F-004"
       ],
       "description": "A process connects a bot number only while it holds that bot's row lease (renewed every 10 s); a second process never connects the same session, preventing StreamReplaced.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/store: TestBotLease (integration)",
+        "internal/wa/adapter/connector: TestOnlyOneProcessConnectsABot, TestLostLeaseDisconnects",
+        "cmd/antispam: TestLeaseOwnerIsUniquePerCall"
+      ]
     },
     {
       "id": "F-012",
@@ -289,8 +297,11 @@
         "F-010"
       ],
       "description": "`antispam pair` pairs a number by QR or 8-character pairing code, then sets the about text to the appeal line and the add-to-groups privacy setting, without sending any message.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter/connector: TestSetupProfile",
+        "cmd/antispam: TestPairCmdRejectsBadUsage"
+      ]
     },
     {
       "id": "F-013",
@@ -331,8 +342,11 @@
         "F-013"
       ],
       "description": "Message and undecryptable events are inserted into inbox (raw proto + info JSON) with dedupe on chat, message ID and edit sequence, and acked only after the insert commits.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/inbox: TestWriterDedupes (integration)",
+        "internal/wa/adapter/connector: TestOnEventAckFollowsTheInboxInsert"
+      ]
     },
     {
       "id": "F-015",
@@ -352,8 +366,10 @@
         "F-005"
       ],
       "description": "Workers claim unprocessed inbox rows with FOR UPDATE SKIP LOCKED, wake on LISTEN/NOTIFY, mark rows processed and resume after a crash; a periodic job deletes inbox rows older than 72 h.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/inbox: TestWorkerProcessesRetriesAndGivesUp, TestCrashedClaimIsResumed, TestWorkersShareRowsAndWakeOnNotify, TestPurgeAndMessageIndex (integration), TestDispatcherRoutesToSinks, TestDecodeInfo"
+      ]
     },
     {
       "id": "F-016",
@@ -416,8 +432,10 @@
         "F-005"
       ],
       "description": "groups rows track name, topic, size, addressing mode and whether the bot is admin; JoinedGroup and GroupInfo events update them and a periodic job refreshes group info every 6 h.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/identity: TestGroupEvents, TestJoinedGroupSeedsPreExistingMembers, TestRefreshPrunesAndDoesNotMarkNewcomersPreExisting, TestRefreshStaleMarksVanishedGroupsLeft, TestSyncJoined, TestPostgresGroupStore (integration)"
+      ]
     },
     {
       "id": "F-019",
@@ -521,8 +539,10 @@
         "F-020"
       ],
       "description": "members rows per (group, person) track role, joined_at, first_seen, message and clean counts; members already present when the bot joins are marked pre-existing (established).",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/identity: TestJoinedGroupSeedsPreExistingMembers, TestMembersCountMessages, TestMergeCombinesMembershipsOfSharedGroups, TestSyncJoined, TestGroupInfoFromMembers, TestPostgresMergeRepointsReferencingTables (integration)"
+      ]
     },
     {
       "id": "F-024",
@@ -745,8 +765,10 @@
         "F-020"
       ],
       "description": "Each processed group message writes a text-free message_index row (fingerprint, SimHash, domains, media hashes, verdict); normal rows expire after 7 days, spam or actioned rows after 30.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/inbox: TestPurgeAndMessageIndex (integration: no text stored, verdict never lowered, 7 d / 30 d expiry, SimHash top bit kept)"
+      ]
     },
     {
       "id": "F-034",
@@ -1703,8 +1725,12 @@
         "F-018"
       ],
       "description": "With silent on, the queue refuses any send to a protected group; with silent off, in-group posts are limited to 1 per group per minute; a test checks no code path can post in a protected group while silent.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestSilentGroupRefusesEveryPost, TestNonSilentGroupOnePostPerMinute",
+        "internal/actions: TestSilentModeRefusesPosts, TestSilentWhenGroupStateFails, TestPGGroupsPostingRules (integration), TestExecutorRefusesPostsInSilentGroupOnPostgres (integration)",
+        "judge review: .agent/logs/judge-F-064.md"
+      ]
     },
     {
       "id": "F-076",

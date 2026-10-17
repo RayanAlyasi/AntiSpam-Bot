@@ -107,6 +107,7 @@ type Manager struct {
 	mu       sync.Mutex
 	sessions map[wa.JID]Session
 	cooldown map[wa.JID]time.Time
+	devices  map[wa.JID]Device // last listing, for Self
 }
 
 // NewManager builds a manager. sink receives every event of every bot.
@@ -129,7 +130,7 @@ func NewManager(backend Backend, lease Lease, registry Registry, sink wa.EventSi
 	opts.Log = opts.Log.With().Str("module", "connector").Logger()
 	return &Manager{
 		backend: backend, lease: lease, registry: registry, sink: sink, opts: opts,
-		sessions: map[wa.JID]Session{}, cooldown: map[wa.JID]time.Time{},
+		sessions: map[wa.JID]Session{}, cooldown: map[wa.JID]time.Time{}, devices: map[wa.JID]Device{},
 	}, nil
 }
 
@@ -156,6 +157,14 @@ func (m *Manager) Client(bot wa.JID) (wa.WAClient, bool) {
 	}
 	c := s.Client()
 	return c, c != nil
+}
+
+// Self returns a bot number's own phone-number JID and LID, so group tracking can tell the bot
+// apart from members.
+func (m *Manager) Self(bot wa.JID) (pn, lid wa.JID) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return bot, m.devices[bot].LID
 }
 
 // Connected lists the bots this process holds sessions for.
@@ -197,6 +206,11 @@ func (m *Manager) Tick(ctx context.Context) {
 		m.opts.Log.Error().Err(err).Msg("list paired devices")
 		return
 	}
+	m.mu.Lock()
+	for _, d := range devices {
+		m.devices[d.JID] = d
+	}
+	m.mu.Unlock()
 	for _, dev := range devices {
 		if ctx.Err() != nil {
 			return

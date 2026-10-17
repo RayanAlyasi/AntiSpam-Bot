@@ -100,6 +100,9 @@ func finishPair(ctx context.Context, cli *whatsmeow.Client, opts PairOptions) (w
 			return bot, nil
 		}
 		defer func() {
+			// Disconnect before giving the lease up, so the connector never connects while this
+			// client is still online (StreamReplaced).
+			cli.Disconnect()
 			if err := opts.Lease.Release(context.WithoutCancel(ctx), bot, opts.Owner); err != nil {
 				opts.Log.Error().Err(err).Msg("release pairing lease")
 			}

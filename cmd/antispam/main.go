@@ -40,6 +40,11 @@ func main() {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
+	if len(os.Args) > 1 && os.Args[1] == "pair" {
+		code := pairCmd(ctx, os.Args[2:], os.Getenv, os.Stderr)
+		stop()
+		os.Exit(code)
+	}
 	os.Exit(cli(ctx, os.Args[1:], os.Getenv, os.Stderr))
 }
 
@@ -130,18 +135,19 @@ func serve(ctx context.Context, opts options, getenv func(string) string, logOut
 	// The connector role reports here how many bot numbers are connected; /readyz reads it.
 	var connectedBots atomic.Int64
 	reg := api.NewRegistry()
+	wa, lids := newWAStack(pool, getenv, logs, &connectedBots)
 	var roles []role
 	for _, name := range opts.roles {
 		switch name {
 		case roleConnector:
-			roles = append(roles, connectorRole(logs.For("wa")))
+			roles = append(roles, wa.connectorRole(cfg.DatabaseURL, reg, lids))
 		case roleWorkers:
-			jc, err := jobs.New(pool, jobs.Options{Work: true, Logger: logs.For("jobs")})
+			jc, err := jobs.New(pool, jobs.Options{Work: true, Logger: logs.For("jobs"), Register: registerWAJobs(pool, logs.For("inbox"))})
 			if err != nil {
 				log.Error().Err(err).Msg("job client")
 				return 1
 			}
-			roles = append(roles, workersRole(jc, opts.shutdownTimeout))
+			roles = append(roles, workersRole(jc, opts.shutdownTimeout), wa.inboxRole())
 		case roleAPI:
 			h := api.OpsHandler(reg, api.Readiness{
 				PingDB:        pool.Ping,
@@ -177,16 +183,6 @@ func closePool(pool interface{ Close() }, grace time.Duration, log zerolog.Logge
 	case <-timer.C:
 		log.Warn().Dur("grace", grace).Msg("database connections still in use; exiting without waiting for them")
 	}
-}
-
-// connectorRole will own the whatsmeow client for each bot number. Until the connector lands it
-// connects nothing, so /readyz keeps reporting no bot connected.
-func connectorRole(log zerolog.Logger) role {
-	return role{name: roleConnector, run: func(ctx context.Context) error {
-		log.Warn().Msg("connector role: no WhatsApp connector is implemented yet; no bot will connect")
-		<-ctx.Done()
-		return nil
-	}}
 }
 
 // workersRole runs River's job workers and periodic jobs.

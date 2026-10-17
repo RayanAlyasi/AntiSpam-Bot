@@ -156,6 +156,44 @@ func (t *Tracker) RefreshStale(ctx context.Context, fetch func(ctx context.Conte
 	return n, errors.Join(errs...)
 }
 
+// SyncJoined applies one bot's full group list (GetJoinedGroups, one IQ for all its groups; run
+// every GroupRefreshEvery). Known groups are refreshed. A group the bot is in but has no row for
+// (it was added while offline) is treated like a join: its members are pre-existing (§8.1). The
+// bot's groups missing from the list are marked left.
+func (t *Tracker) SyncJoined(ctx context.Context, bot wa.JID, infos []wa.GroupInfo) error {
+	var errs []error
+	seen := map[wa.JID]bool{}
+	for _, info := range infos {
+		seen[info.JID] = true
+		g, existed, err := t.groups.Group(ctx, info.JID)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if existed && g.Status != GroupLeft {
+			errs = append(errs, t.Refresh(ctx, bot, info))
+			continue
+		}
+		errs = append(errs, t.joined(ctx, &wa.JoinedGroupEvent{Bot: bot, Info: info}))
+	}
+	all, err := t.groups.Groups(ctx, GroupActive, GroupPendingAdmin)
+	if err != nil {
+		return errors.Join(append(errs, err)...)
+	}
+	for _, g := range all {
+		if g.Bot == bot && !seen[g.JID] {
+			g.Status, g.BotIsAdmin = GroupLeft, false
+			if err := t.groups.UpsertGroup(ctx, g); err != nil {
+				errs = append(errs, err)
+			}
+			if t.parts != nil {
+				t.parts.Invalidate(g.JID)
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
 // apply writes a full snapshot: the group row, one person and membership per participant, and
 // the participant cache. Memberships the snapshot no longer contains are removed.
 func (t *Tracker) apply(ctx context.Context, bot wa.JID, info wa.GroupInfo, joinedAt time.Time, preExisting bool) error {

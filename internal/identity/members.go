@@ -208,3 +208,27 @@ func (s *Service) updateMember(ctx context.Context, group wa.JID, id PersonID, c
 	}
 	return nil
 }
+
+// GroupInfoFromMembers builds a group's participant list from the members table, which the
+// connector keeps current from group events and refreshes. A process that holds no WhatsApp
+// connection (the workers role on its own) uses it as the participant cache's fetcher.
+func (s *Service) GroupInfoFromMembers(ctx context.Context, group wa.JID) (wa.GroupInfo, error) {
+	ms, err := s.GroupMembers(ctx, group)
+	if err != nil {
+		return wa.GroupInfo{}, err
+	}
+	info := wa.GroupInfo{JID: group, Size: len(ms)}
+	for _, m := range ms {
+		p, err := s.Person(ctx, m.Person)
+		if err != nil {
+			return wa.GroupInfo{}, err
+		}
+		pt := wa.Participant{JID: p.LID, LID: p.LID, PhoneNumber: p.PN,
+			IsAdmin: m.Role.IsAdmin(), IsSuperAdmin: m.Role == RoleSuperAdmin}
+		if pt.JID == "" {
+			pt.JID = p.PN
+		}
+		info.Participants = append(info.Participants, pt)
+	}
+	return info, nil
+}

@@ -281,8 +281,10 @@
         "F-008"
       ],
       "description": "The connector owns one whatsmeow client per leased bot, converts message, group, picture, push-name, ban and connection events into internal event types, and hands them off without analysing on the receive loop.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/wa/adapter/connector: TestConvertEvents, TestConvertMessageKeepsRawProtoAndInfo, TestJIDNormalizes, TestOnlyOneProcessConnectsABot, TestLostLeaseDisconnects, TestAccountEvents, TestMessageStoreErrorReachesTheAck"
+      ]
     },
     {
       "id": "F-014",
@@ -338,8 +340,10 @@
         "F-015"
       ],
       "description": "Only configured group chats go to moderation; status@broadcast goes to person reputation only; DMs go to the command/auth/review handler; messages from the bot, admins and allow-listed members skip moderation but are still parsed for commands.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/inbox: TestRoute (14 cases), TestRouteErrorsAreNotGuessed"
+      ]
     },
     {
       "id": "F-017",
@@ -360,8 +364,10 @@
         "F-002"
       ],
       "description": "Operator alerts go to webhook/Telegram/email sinks (deduplicated, logged when none is set); connection events update wa_connected and reconnect metrics; TemporaryBan, LoggedOut and StreamReplaced raise an alert and a breaker signal.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/alert: TestNotifyDedupesPerKeyWithinWindow, TestNotifyWithoutSinksLogs, TestWebhookAndTelegramSinks, TestEmailSink, TestHealthConnectionMetrics, TestHealthAccountProblemsAlertAndTripBreaker, TestHealthAlertsLongDisconnectOnce"
+      ]
     },
     {
       "id": "F-018",
@@ -401,8 +407,11 @@
         "F-000"
       ],
       "description": "A thin otter wrapper gives typed caches with TTL, size bounds and invalidation; the participant cache built on it answers 'is X an admin of G', is updated by join/leave/promote/demote events and forces a refresh when older than 10 minutes.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/cache: TestTTL, TestGetWithAgeAndSetRestartsAge, TestUpdateKeepsAgeAndCanRemove, TestInvalidate, TestLoadIsSingleFlightAndDoesNotCacheErrors, TestSizeBound",
+        "internal/identity: TestParticipantsRefreshWhenOlderThanMaxAge, TestGroupEvents (cache updates on promote/leave)"
+      ]
     },
     {
       "id": "F-020",
@@ -419,8 +428,11 @@
         "F-004"
       ],
       "description": "Every person has an internal ID; identities store each JID normalized (LID primary, PN when known); MatchPerson(jid) finds the person from either identifier alone, and a PN-only person gets its LID looked up.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "hidden tests of contract .agent/contracts/F-020.md (identity package): TestMatchPersonFindsByEitherIdentifier, TestMatchPersonNormalizesDeviceSuffix, TestMatchPersonNeverCreatesOrLooksUp, TestNonPersonJIDsAreRejected, TestEnsureIsIdempotent, TestEnsureLIDOnlyUsesOnlyLocalLIDStore, TestEnsurePNOnlyLooksUpLIDOnce, TestEnsurePNOnlyUnresolvedDoesNotRepeatLookup, TestEnsurePNLookupFailureStillCreatesPerson, TestEnsurePNResolvesToExistingLIDPerson",
+        "internal/identity: TestIdentityInvariants (rapid), FuzzNormalize, TestNormalize"
+      ]
     },
     {
       "id": "F-021",
@@ -437,8 +449,11 @@
         "F-013"
       ],
       "description": "Phone numbers are recorded from SenderAlt, participant events, GroupInfo.SenderPN, GroupParticipant.PhoneNumber, the LID store and DMs, with the source on each identity row; no lookups beyond these are attempted.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "hidden tests of contract F-020: TestLearnRecordsSourceOnIdentityRow, TestLearnDerivesCountryCode, TestLearnRejectsSwappedPairOrUnknownSource, TestLearnNewPairEmitsResolvedOnce, TestLearnAddsPNToLIDPerson, TestLearnNeverCallsLIDForPN",
+        "internal/identity: TestCountryCodeAndNumberPrefix, TestJoinedGroupSeedsPreExistingMembers, TestGroupEvents (participant and SenderPN sources)"
+      ]
     },
     {
       "id": "F-022",
@@ -455,8 +470,11 @@
         "F-006"
       ],
       "description": "identity.resolved merges a PN-only person into the LID person (re-pointing memberships, strikes, detections, bans, corpus; person_merges and audit) and emits a back-fill event; a known number seen with a different LID closes the old link (valid_to), never carries bans, and is flagged for the operator.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "hidden tests of contract F-020: TestAddMemberIsIdempotent, TestLearnGivesPNOnlyPersonItsLID, TestLearnMergesPNOnlyPersonIntoLIDPerson, TestRecycledNumberClosesOldLinkAndNeverMerges, TestRecycledNumberIsIdempotent",
+        "internal/identity: TestMergeCombinesMembershipsOfSharedGroups, TestLearnPNMovesBetweenLIDsOfOnePersonClosesOldNumber, TestEventErrorIsReportedAfterTheWriteIsKept"
+      ]
     },
     {
       "id": "F-023",

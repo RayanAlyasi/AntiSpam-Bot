@@ -1,0 +1,140 @@
+# English texts (DESIGN.md §22.2). Every key here must exist in every other locale file with the
+# same {placeholders}; the locales tests fail otherwise. Bot messages have several variants, so
+# the bot never sends the same text over and over (§10.3). Placeholders are {lowercase_names}.
+lang: en
+dir: ltr
+
+messages:
+  onboarding.welcome:
+    - "Hi! I protect WhatsApp groups from spam, silently. Three steps: 1) add me to your group, 2) make me an admin, 3) choose where reviews go. Details and settings: {link}"
+    - "Hello! I keep groups free of spam without posting anything in them. To start: add me to the group, make me an admin, then pick where I send reviews. Guide: {link}"
+  onboarding.protection_on:
+    - "Protection is on in \"{group}\" ({preset}, silent). Uncertain cases go to the website for now. Reply .review dm to get them here, or send .reviewgroup here in a separate admins' group."
+    - "\"{group}\" is now protected ({preset}, silent). For now, uncertain cases wait on the website. Send .review dm to get them by DM, or .reviewgroup here in an admins-only group."
+  onboarding.not_admin:
+    - "I'm in \"{group}\" but not an admin yet, so I can't protect it. Make me an admin and I'll start."
+    - "Reminder: I need admin rights in \"{group}\" before I can remove spam there."
+  review.header:
+    - "🛡️ Review #{id} · {group}"
+    - "🛡️ #{id} to review · {group}"
+  review.who:
+    - "Who: {name} · {phone} · {tenure} · {count} earlier messages"
+    - "Sender: {name} · {phone} · {tenure} · {count} messages before this"
+  review.what:
+    - "What: {text}"
+    - "Message: {text}"
+  review.why:
+    - "Why: {reasons}"
+    - "Signals: {reasons}"
+  review.score:
+    - "Score: {score} · Source: {source} · Message: {state} · Why asking: {why_asking}"
+    - "Score {score} · source {source} · message {state} · asking because: {why_asking}"
+  review.how_to_decide:
+    - "React ✅ ban · ❌ not spam, or reply: ban · ok · delete only"
+    - "Decide with a reaction (✅ ban, ❌ not spam) or a reply: ban, ok or delete only"
+  review.auto_decision:
+    - "Auto-decision in {timeout}: {fallback}"
+    - "If nobody decides within {timeout}: {fallback}"
+  review.handled:
+    - "✔ Handled by {admin} · {decision} · {time}"
+    - "✔ Decided by {admin}: {decision} ({time})"
+  review.already_handled:
+    - "Already handled by {admin}."
+    - "{admin} has already decided this one."
+  review.timed_out:
+    - "⏱ No decision in {timeout} → {fallback}"
+    - "⏱ {timeout} passed without a decision → {fallback}"
+  review.digest:
+    - "{count} more items to review. Decide on the website ({link}) or reply all ok / all spam."
+    - "There are {count} more items waiting. Use the website ({link}), or reply all ok or all spam."
+  detection.deleted_because:
+    - "Deleted because: {reasons}"
+    - "Removed because: {reasons}"
+  command.unknown:
+    - "I don't know the command {command}. Send .help for the list."
+    - "{command} isn't a command I know. Try .help."
+  command.done:
+    - "Done."
+    - "Done ✔"
+  command.ban_reason:
+    - "Reason? Reply spam or other."
+    - "Why the ban? Reply spam or other."
+  command.pick_group:
+    - "Which group? Send .groups to see them, then .use <group name>."
+    - "Pick a group first: .groups lists them, .use <group name> selects one."
+  command.group_selected:
+    - "Now working on \"{group}\" for the next hour."
+    - "OK, commands here apply to \"{group}\" for the next hour."
+  login.link:
+    - "Your login link (valid for {minutes} minutes): {link}"
+    - "Log in to the website with this link within {minutes} minutes: {link}"
+  login.code:
+    - "Your login code is {code}. It expires in {minutes} minutes. Never share it."
+    - "Login code: {code} (valid {minutes} minutes). Don't share it with anyone."
+  shadow.summary:
+    - "Shadow mode summary: I would have deleted {deleted} messages and banned {banned} people. Review: {link}"
+    - "In shadow mode I'd have deleted {deleted} messages and banned {banned} people. Check them here: {link}"
+  health.lost_admin:
+    - "I'm no longer an admin in \"{group}\", so protection is paused there."
+    - "Protection in \"{group}\" is paused: I lost my admin rights."
+  status.summary:
+    - "\"{group}\": preset {preset}, mode {mode}, reviews to {destination}. Today: {deleted} deleted, {banned} banned."
+    - "\"{group}\" · {preset} · {mode} · reviews: {destination} · today {deleted} deleted, {banned} banned"
+  help.short:
+    - "Reply to a message with .spam or .ok. Settings: .status, .preset, .mode, .review. Everything else: .help <topic> or the website."
+    - "Main commands: reply .spam / .ok to a message, .status, .preset, .mode, .review. More with .help <topic>, or use the website."
+
+# Command names (DESIGN.md §13.7): canonical name → the words that invoke it in this language.
+commands:
+  spam: [spam]
+  notspam: [notspam, ok]
+  ban: [ban]
+  kick: [kick]
+  mute: [mute]
+  unmute: [unmute]
+  allow: [allow]
+  unallow: [unallow]
+  blacklist: [blacklist]
+  clear: [clear]
+  restrict: [restrict]
+  restricted: [restricted]
+  unban: [unban]
+  network: [network]
+  lockdown: [lockdown]
+  unlock: [unlock]
+  undo: [undo]
+  review: [review]
+  reviewers: [reviewers]
+  reviewer: [reviewer]
+  reviewgroup: [reviewgroup]
+  askadmins: [askadmins]
+  autoban: [autoban]
+  pending: [pending]
+  status: [status]
+  mode: [mode]
+  preset: [preset]
+  block: [block]
+  blocknew: [blocknew]
+  policy: [policy]
+  silent: [silent]
+  ladder: [ladder]
+  newsignal: [newsignal]
+  domain: [domain]
+  word: [word]
+  set: [set]
+  get: [get]
+  settings: [settings]
+  groups: [groups]
+  use: [use]
+  login: [login]
+  help: [help]
+
+# Review reply keywords (DESIGN.md §9.5): decision → the replies that mean it.
+keywords:
+  ban: [ban, kick]
+  not_spam: [ok, not spam]
+  delete_only: [delete only]
+  clear: [clear]
+  mute: [mute]
+  all_ok: [all ok]
+  all_spam: [all spam]

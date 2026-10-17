@@ -115,21 +115,35 @@ func Day(t time.Time) time.Time {
 // item to admins, delete nothing. Every provider request needs its own Allow, including the
 // invalid-output retry; cache and cluster-reuse hits need none.
 func (b *Budget) Allow(ctx context.Context, group string) (Decision, error) {
+	return b.AllowLimit(ctx, group, 0)
+}
+
+// AllowLimit is Allow with the group's own daily limit (the group setting ai.daily_budget_calls);
+// 0 or less uses the instance default.
+func (b *Budget) AllowLimit(ctx context.Context, group string, groupPerDay int) (Decision, error) {
+	lim := b.limits
+	if groupPerDay > 0 {
+		lim.GroupPerDay = groupPerDay
+	}
+	return b.allow(ctx, group, lim)
+}
+
+func (b *Budget) allow(ctx context.Context, group string, lim Limits) (Decision, error) {
 	day := Day(b.clock.Now())
-	counts, ok, err := b.store.Reserve(ctx, day, group, b.limits)
+	counts, ok, err := b.store.Reserve(ctx, day, group, lim)
 	if err != nil {
 		return Decision{}, fmt.Errorf("reserve ai call for %s: %w", group, err)
 	}
 	d := Decision{Allowed: ok, Counts: counts}
 	if !ok {
-		d.Exhausted = b.exhausted(counts)
+		d.Exhausted = exhausted(lim, counts)
 		if b.obs != nil {
 			b.obs.BudgetDenied(d.Exhausted)
 		}
 		return d, nil
 	}
-	b.observe(counts)
-	b.alertAt80(ctx, day, group, counts)
+	b.observe(lim, counts)
+	b.alertAt80(ctx, day, group, lim, counts)
 	return d, nil
 }
 
@@ -147,17 +161,17 @@ type window struct {
 	limit int
 }
 
-func (b *Budget) windows(c Counts) []window {
+func windows(lim Limits, c Counts) []window {
 	return []window{
-		{ScopeGroupDay, c.GroupDay, b.limits.GroupPerDay},
-		{ScopeInstanceDay, c.InstanceDay, b.limits.InstancePerDay},
-		{ScopeInstanceMonth, c.InstanceMonth, b.limits.InstancePerMonth},
+		{ScopeGroupDay, c.GroupDay, lim.GroupPerDay},
+		{ScopeInstanceDay, c.InstanceDay, lim.InstancePerDay},
+		{ScopeInstanceMonth, c.InstanceMonth, lim.InstancePerMonth},
 	}
 }
 
 // exhausted names the first budget with no call left (counts are the current, unreserved ones).
-func (b *Budget) exhausted(c Counts) Scope {
-	for _, w := range b.windows(c) {
+func exhausted(lim Limits, c Counts) Scope {
+	for _, w := range windows(lim, c) {
 		if w.limit > 0 && w.used >= w.limit {
 			return w.scope
 		}
@@ -165,11 +179,11 @@ func (b *Budget) exhausted(c Counts) Scope {
 	return ScopeGroupDay
 }
 
-func (b *Budget) observe(c Counts) {
+func (b *Budget) observe(lim Limits, c Counts) {
 	if b.obs == nil {
 		return
 	}
-	for _, w := range b.windows(c) {
+	for _, w := range windows(lim, c) {
 		if w.limit > 0 {
 			b.obs.BudgetRemaining(w.scope, w.limit-w.used)
 		}
@@ -179,11 +193,11 @@ func (b *Budget) observe(c Counts) {
 // alertAt80 alerts when this reservation is the one that reached 80% of a budget. Reservations
 // are atomic and count one call each, so exactly one caller per window crosses the line; no
 // extra state is needed, and a restart cannot raise a second alert.
-func (b *Budget) alertAt80(ctx context.Context, day time.Time, group string, c Counts) {
+func (b *Budget) alertAt80(ctx context.Context, day time.Time, group string, lim Limits, c Counts) {
 	if b.alerter == nil {
 		return
 	}
-	for _, w := range b.windows(c) {
+	for _, w := range windows(lim, c) {
 		if w.limit <= 0 || !crosses80(w.used, w.limit) {
 			continue
 		}

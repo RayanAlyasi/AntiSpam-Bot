@@ -80,12 +80,14 @@ type Executor struct {
 	killed       bool
 	breakerOpen  bool
 	breakerAt    time.Time
+	lockLost     bool        // the store no longer holds this executor's lock
 	warnings     []time.Time // warning signs within Config.BreakerWindow
 	lastWarning  time.Time
 	lastRecovery time.Time
 	lastWrite    time.Time
 
 	// Owned by the Run goroutine.
+	unlock    func() // releases the executor lock
 	cands     []Action
 	chatOut   map[wa.JID]*window // writes per chat
 	posts     map[wa.JID]*window // posts per protected, non-silent group
@@ -164,11 +166,14 @@ func (e *Executor) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer unlock()
-	if n, err := e.d.Store.Recover(ctx, e.d.Bot); err != nil {
-		return fmt.Errorf("recover actions: %w", err)
-	} else if n > 0 {
-		e.log.Warn().Int("actions", n).Msg("actions interrupted by a restart run again")
+	e.unlock = unlock
+	defer func() {
+		if e.unlock != nil {
+			e.unlock()
+		}
+	}()
+	if err := e.recoverRunning(ctx); err != nil {
+		return err
 	}
 	if err := e.start(ctx); err != nil {
 		return err
@@ -178,11 +183,82 @@ func (e *Executor) Run(ctx context.Context) error {
 			if ctx.Err() != nil {
 				break
 			}
-			// A store error is logged and retried after a poll interval; the table stays the truth.
+			// A store error is logged and retried after a poll interval; the table stays the
+			// truth. An action whose settle write failed may be left running: this executor is
+			// the only owner of the bot's running actions, so it puts them back.
 			e.log.Error().Err(err).Msg("action executor step failed")
 			e.sleep(ctx, e.cfg.PollInterval)
+			if e.ownsLock() {
+				if err := e.recoverRunning(ctx); err != nil {
+					e.log.Error().Err(err).Msg("recover running actions after a store error")
+				}
+			}
 		}
 	}
+	return nil
+}
+
+// recoverRunning returns the bot's running actions to pending (after a crash, a lost lock or a
+// failed store write).
+func (e *Executor) recoverRunning(ctx context.Context) error {
+	n, err := e.d.Store.Recover(ctx, e.d.Bot)
+	if err != nil {
+		return fmt.Errorf("recover actions: %w", err)
+	}
+	if n > 0 {
+		e.log.Warn().Int("actions", n).Msg("interrupted actions run again")
+	}
+	return nil
+}
+
+func (e *Executor) ownsLock() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return !e.lockLost
+}
+
+// checkLock verifies the executor still holds its bot's lock. A lost lock (on Postgres, its
+// connection died) stops every call at once, since another process may take over the bot.
+func (e *Executor) checkLock(ctx context.Context) bool {
+	if err := e.d.Store.HoldsLock(ctx, e.d.Bot); err != nil {
+		e.loseLock(err)
+		return false
+	}
+	return true
+}
+
+func (e *Executor) loseLock(err error) {
+	e.mu.Lock()
+	already := e.lockLost
+	e.lockLost = true
+	e.mu.Unlock()
+	if !already {
+		e.log.Error().Err(err).Msg("executor lock lost: no WhatsApp calls until it is taken again")
+	}
+}
+
+// relock tries to take the bot's lock again after losing it. While another executor holds it,
+// this one stands by and makes no calls.
+func (e *Executor) relock(ctx context.Context) error {
+	if e.unlock != nil {
+		e.unlock() // release the dead connection
+		e.unlock = nil
+	}
+	unlock, err := e.d.Store.Lock(ctx, e.d.Bot)
+	if errors.Is(err, ErrExecutorRunning) {
+		return nil // standing by
+	}
+	if err != nil {
+		return fmt.Errorf("take the executor lock again: %w", err)
+	}
+	e.unlock = unlock
+	if err := e.recoverRunning(ctx); err != nil {
+		return err
+	}
+	e.mu.Lock()
+	e.lockLost = false
+	e.mu.Unlock()
+	e.log.Warn().Msg("executor lock taken again")
 	return nil
 }
 
@@ -285,6 +361,13 @@ func (e *Executor) step(ctx context.Context) error {
 // poll re-reads the control state, expires overdue actions and refills the candidate window.
 func (e *Executor) poll(ctx context.Context) error {
 	now := e.clk.Now()
+	if !e.ownsLock() {
+		if err := e.relock(ctx); err != nil {
+			return err
+		}
+	} else {
+		e.checkLock(ctx)
+	}
 	if err := e.refreshControl(ctx); err != nil {
 		return err
 	}
@@ -364,7 +447,7 @@ func (e *Executor) applyControl(c Control, now time.Time) bool {
 func (e *Executor) blocked(now time.Time) time.Duration {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if e.killed {
+	if e.killed || e.lockLost {
 		return e.cfg.PollInterval
 	}
 	if now.Before(e.pausedUntil) {

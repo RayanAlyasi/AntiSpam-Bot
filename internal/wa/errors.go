@@ -15,7 +15,8 @@ var (
 	ErrTemporaryBan = errors.New("wa: account temporarily banned")
 	// ErrNotAdmin means the bot isn't an admin of the group, so it can't act there.
 	ErrNotAdmin = errors.New("wa: bot is not a group admin")
-	// ErrTimeout means the request got no answer in time. It's transient.
+	// ErrTimeout means the request got no answer in time, or failed transiently (a disconnect,
+	// a 500 or 503 from the server). The executor backs off and retries.
 	ErrTimeout = errors.New("wa: request timed out")
 	// ErrNotFound means the target doesn't exist: a message already gone, a participant not
 	// in the group, an unknown group, channel or invite code.

@@ -1,0 +1,23 @@
+{
+ "feature": "F-024",
+ "branch": "feat/F-024-envelope-types",
+ "category": "detection",
+ "core": false,
+ "harness_version": "8731488edd1b",
+ "commit": "94cd552",
+ "gate_runs": 10,
+ "gate_first_pass": true,
+ "gate_failed_steps": [],
+ "acceptance_first_pass": true,
+ "judge_rounds": 3,
+ "judge_first_verdict": "NONE",
+ "judge_final_verdict": "PASS",
+ "tamper_hits": 0,
+ "guard_blocks": 13,
+ "test_change_requests": 0,
+ "cost_usd": null,
+ "turns": null,
+ "mutation_score": null,
+ "human_verdict": null,
+ "ts": "2026-10-17T13:59:07Z"
+}

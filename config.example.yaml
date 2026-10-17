@@ -1,0 +1,73 @@
+# AntiSpam Bot configuration (optional).
+#
+# Copy this file to config.yaml in the bot's working directory, or point CONFIG_FILE at it.
+# The bot starts without any config file: every value below is the built-in default, so you
+# only need to keep the keys you change. Unknown keys are rejected, so a typo stops the bot
+# at start-up instead of being ignored. Durations use Go syntax: 500ms, 5s, 1m30s, 15m.
+# Full reference: docs/CONFIGURATION.md.
+
+# Outbound write pacing: how fast the bot sends deletes, kicks and messages to WhatsApp.
+# Sending too fast is what gets numbers banned, so these defaults are deliberately low.
+pacing:
+  # Sustained writes per minute. The rate never rises above this on its own.
+  # RISKY: raising it increases the chance of a ban; the bot logs a warning if you do.
+  ceiling_per_min: 20
+  # Writes allowed at the start of a wave before the ceiling applies.
+  # RISKY: raising it increases the chance of a ban; the bot logs a warning if you do.
+  burst: 10
+  # Pause after each write.
+  spacing_base: 1s
+  # Random extra pause after each write, from 0 up to this value (0 turns jitter off).
+  spacing_jitter: 1.5s
+  # Writes per minute for any single group, so one raided group can't starve the others.
+  group_ceiling_per_min: 10
+  # On a warning sign (429, unusual errors, slow acks) the rate is multiplied by this.
+  # Must be between 0 and 1.
+  slowdown_factor: 0.25
+  # The rate never drops below this many writes per minute. At most ceiling_per_min.
+  min_rate_per_min: 2
+  # After slowing down, the rate recovers by this many writes per minute ...
+  recovery_step_per_min: 1
+  # ... for every interval this long without a warning sign, up to the ceiling at most.
+  recovery_interval: 15m
+  # Most participants removed in one call; larger sets are split into several calls.
+  max_kick_batch: 8
+  # Alert the operator when the bot passes this many writes in a day. Not a limit.
+  daily_alert_writes: 7500
+
+presets:
+  # Preset for new groups: relaxed, standard, strict or ask_admins.
+  default: standard
+
+scoring:
+  # Score lines from 0 to 1, with review < delete <= ban.
+  thresholds:
+    # At or above this a message is suspicious and goes to the AI (or to admins).
+    review: 0.60
+    # Delete line: reached only by certain evidence or a confident AI verdict.
+    delete: 0.85
+    # Ban line: auto-bans also need certain evidence and a group that allows them.
+    ban: 0.95
+  # Extra or changed signal weights, as signal name: log-odds weight (e.g. new_member: 0.8).
+  weights: {}
+
+# AI classifier for uncertain messages. Off by default: uncertain cases go to admins.
+# The AI_PROVIDER, AI_BASE_URL, AI_MODEL and AI_TIMEOUT environment variables override these.
+ai:
+  # anthropic, openai_compatible (also Ollama, llama.cpp, vLLM, LM Studio) or google.
+  # Empty turns the AI tier off.
+  provider: ""
+  # API endpoint. Required for openai_compatible, e.g. http://ollama:11434/v1.
+  base_url: ""
+  # Model name. Required when a provider is set.
+  model: ""
+  # Name (upper case) of the environment variable that holds the API key. The key is never read
+  # from this file. Required for anthropic and google; optional for openai_compatible.
+  api_key_env: AI_API_KEY
+  # How long to wait for a verdict. Local models may need longer, e.g. 30s.
+  timeout: 5s
+  # How to get structured verdicts: auto, native (JSON schema / tool output) or json
+  # (JSON mode with strict parsing, for models without native support).
+  structured_output: auto
+  # AI spam confidence needed to delete a message (0 to 1). Below it, admins decide.
+  spam_confidence: 0.90

@@ -114,6 +114,17 @@ def is_tracked(relpath, root):
     return run(["git", "ls-files", "--error-unmatch", relpath], root).returncode == 0
 
 
+def in_base(relpath, root):
+    """True if the file already exists at the merge-base with the base branch (staging, else main).
+
+    That is what makes a test "committed" for protection purposes: tests that came from earlier,
+    reviewed work. Tests the builder wrote on its own feature branch, staged or committed, are its
+    own and can still be fixed before review. Hidden acceptance tests are protected separately.
+    """
+    base = run(["git", "merge-base", "HEAD", base_branch(root)], root).stdout.strip() or base_branch(root)
+    return run(["git", "cat-file", "-e", f"{base}:{relpath}"], root).returncode == 0
+
+
 def log_event(root, name, record):
     d = os.path.join(root, ".agent", "logs")
     os.makedirs(d, exist_ok=True)

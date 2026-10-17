@@ -11,6 +11,23 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AppAiCache struct {
+	Key           string
+	Model         string
+	PromptVersion string
+	Result        json.RawMessage
+	CreatedAt     time.Time
+}
+
+type AppAiUsage struct {
+	Day          pgtype.Date
+	GroupJid     string
+	Calls        int32
+	InputTokens  int64
+	OutputTokens int64
+	CostMicros   int64
+}
+
 type AppAuditLog struct {
 	ID       int64
 	Actor    string

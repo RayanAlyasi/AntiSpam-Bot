@@ -35,8 +35,9 @@ messages from the last 10 minutes, the group's name, topic and allowed-content s
 sender's tenure, role and recent activity, and replies the message already got. Phone numbers,
 emails, mentions and people's names are masked, each message is cut to 200 characters, and the
 whole context is capped at 2,000 characters, dropping the oldest first. It is sent as data the
-model is told not to follow. The bot keeps these recent messages in memory only, for at most an
-hour, and never stores them for the AI.
+model is told not to follow. To build it, the bot keeps the last 100 messages of each group in
+memory for at most an hour (nothing is written to disk for this, and a restart clears it); a
+message deleted for everyone is dropped from it.
 
 ## Providers
 
@@ -97,6 +98,7 @@ cache or reused from a cluster (below) are free.
   groups, reuse the first verdict, so a campaign hitting 40 groups costs one call. Concurrent
   copies wait for the one call in flight instead of making their own.
 - "Unsure" answers, invalid output and errors are never cached, so the next copy asks again.
+- Expired cache rows are deleted every 6 hours by a background job.
 
 ## Metrics
 

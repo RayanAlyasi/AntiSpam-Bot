@@ -2357,8 +2357,13 @@
         "F-007"
       ],
       "description": "ai_usage tracks calls and tokens per group and day; budgets send uncertain items straight to admins when exhausted (never deleting) with an 80% alert; metrics expose calls per 1,000 messages, cost, latency, cache hit rate, retries and unsure share.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai/aistore (integration): TestBudgetReservationsAreAtomic, TestBudgetWindowsAreUTCDaysAndMonths",
+        "internal/ai/budget: TestAllowEnforcesEachLimit, TestAlertOnceAt80Percent, TestPropertyReservationsNeverExceedLimits, TestPropertyReservationsGrantExactlyTheCapacity, TestAllowLimitUsesTheGroupsOwnLimit",
+        "internal/ai/gateway: TestBudgetExhaustedGoesToAdmins, TestEveryProviderRequestCountsAgainstTheBudget",
+        "internal/ai/aimetrics: TestMetricsRegisterAndRecord"
+      ]
     },
     {
       "id": "F-110",
@@ -2377,8 +2382,12 @@
         "F-004"
       ],
       "description": "Results are cached on hash(normalized text + context hash + model + prompt version) for 30 days, and copies in the same SimHash cluster or campaign reuse the first verdict.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai/aistore (integration): TestCacheStoreRoundTripExpiryAndPurge",
+        "internal/ai/cache: TestResultCacheHitAndMiss, TestKeyChangesWithEachPart, FuzzKeyInjective, TestOnlyDefinitiveVerdictsAreKept, TestClusterReusesFirstVerdictAcrossGroups, TestSynctestWaitingCopyGetsSanitizedVerdict",
+        "internal/ai/gateway: TestCacheAndClusterSaveCalls, TestSanitizeRedactsTheStoredReason"
+      ]
     },
     {
       "id": "F-111",

@@ -11,6 +11,50 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AppAction struct {
+	ID                int64
+	Bot               string
+	Chat              string
+	Kind              string
+	Priority          int16
+	Payload           json.RawMessage
+	Status            string
+	Attempts          int32
+	NotBefore         time.Time
+	Deadline          time.Time
+	MessageTime       pgtype.Timestamptz
+	DedupeKey         string
+	ReasonDetectionID pgtype.Int8
+	LastError         string
+	Result            json.RawMessage
+	Called            bool
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+type AppActionControl struct {
+	Scope     string
+	State     json.RawMessage
+	UpdatedAt time.Time
+}
+
+type AppAiCache struct {
+	Key           string
+	Model         string
+	PromptVersion string
+	Result        json.RawMessage
+	CreatedAt     time.Time
+}
+
+type AppAiUsage struct {
+	Day          pgtype.Date
+	GroupJid     string
+	Calls        int32
+	InputTokens  int64
+	OutputTokens int64
+	CostMicros   int64
+}
+
 type AppAuditLog struct {
 	ID       int64
 	Actor    string
@@ -18,4 +62,122 @@ type AppAuditLog struct {
 	Action   string
 	Diff     json.RawMessage
 	At       time.Time
+}
+
+type AppDetection struct {
+	ID               int64
+	GroupJid         string
+	MsgID            string
+	PersonID         pgtype.Int8
+	Score            float64
+	TierReached      string
+	Signals          json.RawMessage
+	Verdict          string
+	ConfidenceSource pgtype.Text
+	Route            string
+	RuleVersion      string
+	ActionPlan       json.RawMessage
+	Mode             string
+	NetworkBanID     pgtype.Int8
+	EvidenceRef      pgtype.Text
+	CreatedAt        time.Time
+}
+
+type AppDmThread struct {
+	Person          string
+	LastInboundAt   pgtype.Timestamptz
+	LastExceptionAt pgtype.Timestamptz
+}
+
+type AppEvidenceSnapshot struct {
+	GroupJid      string
+	MsgID         string
+	Sender        string
+	Text          string
+	Thumbnail     []byte
+	ThumbnailMime pgtype.Text
+	DetectionID   pgtype.Int8
+	Reason        string
+	At            time.Time
+	ExpiresAt     pgtype.Timestamptz
+}
+
+type AppGroupBan struct {
+	ID            int64
+	GroupJid      string
+	PersonID      int64
+	Reason        string
+	DecidedBy     string
+	DeciderPerson pgtype.Int8
+	DetectionID   pgtype.Int8
+	ReviewID      pgtype.Int8
+	NetworkBanID  pgtype.Int8
+	RejoinBlock   bool
+	Active        bool
+	CreatedAt     time.Time
+	LiftedBy      pgtype.Text
+	LiftedAt      pgtype.Timestamptz
+}
+
+type AppGroupSetting struct {
+	GroupJid  string
+	Version   int32
+	Doc       json.RawMessage
+	UpdatedBy string
+	UpdatedAt time.Time
+}
+
+type AppGroupSettingsHistory struct {
+	GroupJid  string
+	Version   int32
+	Doc       json.RawMessage
+	UpdatedBy string
+	UpdatedAt time.Time
+}
+
+type AppReview struct {
+	ID            int64
+	ShortCode     string
+	GroupJid      string
+	GroupName     string
+	Kind          string
+	DetectionID   pgtype.Int8
+	Subject       json.RawMessage
+	MessageSender pgtype.Text
+	MessageID     pgtype.Text
+	Evidence      json.RawMessage
+	EvidenceRaw   pgtype.Text
+	Thumbnail     []byte
+	ThumbnailMime pgtype.Text
+	Proposed      string
+	Mode          string
+	Status        string
+	Deadline      time.Time
+	OnTimeout     string
+	Decision      pgtype.Text
+	DecidedBy     pgtype.Text
+	DecidedByName pgtype.Text
+	Method        pgtype.Text
+	DecidedAt     pgtype.Timestamptz
+	CreatedAt     time.Time
+}
+
+type AppReviewMessage struct {
+	ChatJid       string
+	MsgID         string
+	ReviewID      int64
+	SentAt        time.Time
+	OutcomeEdited bool
+}
+
+type AppReviewVote struct {
+	ID            int64
+	ReviewID      int64
+	Voter         string
+	Method        string
+	Raw           string
+	Decision      string
+	Valid         bool
+	InvalidReason string
+	At            time.Time
 }

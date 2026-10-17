@@ -81,7 +81,9 @@ Per type: `allow` (default), `block`, `block_for_new` (senders who joined within
 `status_mentions`, `group_status_posts`. `content.link_domains.allow` exempts domains from a links
 rule; `content.link_domains.block` blocks links to a domain even when links are allowed.
 `content.document_extensions_block` (default `apk exe scr bat js`) blocks documents with those
-extensions, and documents that hide an executable behind an innocent extension (`invoice.pdf.exe`).
+extensions, documents that hide an executable behind an innocent extension (`invoice.pdf.exe`),
+and documents whose declared type is one of those executables (an APK renamed `invoice.pdf`). Link
+domains are matched without ports and in their ASCII form, so `BIT．ly:443` matches `bit.ly`.
 
 A violation is not spam. By default (`policy.action: delete_only`) it's deleted silently: no ban, no
 strike, no message. Opt in to `policy.action: ask` or `ban`, or to escalation with
@@ -109,3 +111,22 @@ A ban is a kick plus a rejoin block for that group only (`enforcement.ban.rejoin
 banned person joins again they're removed at once. If a current admin deliberately re-adds them, the
 bot treats it as the admins' decision and lifts the block. Unbanning lifts the block; the bot never
 re-adds anyone.
+
+## How settings are stored
+
+Each change, whether from the website or a `.set` command, stores a new version of the group's
+document. Every earlier version is kept in `group_settings_history`, and the audit log gets one
+`settings.update` entry with each changed dotted key and its old and new value. A command that
+changes some keys is re-applied on top of a change another admin made meanwhile, so neither is
+lost; a whole-document edit from the website made on an older version is refused instead of
+overwriting the newer one. Each save is announced with Postgres `NOTIFY group_settings`, so
+processes that listen refresh their copy straight away.
+A document saved by an older release still loads after an upgrade: keys added since then take the
+defaults of the group's preset.
+
+## Detections
+
+Every message that wasn't clean is recorded in `detections`. The record holds the score, the tier
+reached, the signals and content-rule violations, the confidence source, the route, the rule
+version, the planned actions, and the mode (`enforce`, or `shadow` when nothing was done). Message
+text is never stored there.

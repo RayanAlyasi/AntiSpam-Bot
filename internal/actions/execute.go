@@ -24,11 +24,15 @@ const (
 	classNotAdmin               // permanent: the bot isn't an admin of the group
 	classNotFound               // permanent: the message or participant is gone
 	classShutdown               // the executor is stopping, or the call was held back: run again later
+	classExpired                // the deadline passed while the call waited: drop it
 )
 
 // errInterrupted means a call was held back at the last moment (kill switch, a pause or the
 // breaker), so WhatsApp was never called.
 var errInterrupted = errors.New("actions: held back before the call")
+
+// errExpired means the action's deadline passed while its call waited for the call lock.
+var errExpired = errors.New("actions: deadline passed before the call")
 
 // batchChunks caps how many calls one coalesced batch makes in a row, so a big wave of kicks
 // in one group can't hold the executor while other groups wait.
@@ -43,6 +47,8 @@ func classify(ctx context.Context, err error) errorClass {
 		return classTempBan
 	case errors.Is(err, wa.ErrRateLimited):
 		return classRateLimited
+	case errors.Is(err, errExpired):
+		return classExpired
 	case errors.Is(err, errInterrupted), ctx.Err() != nil:
 		return classShutdown
 	case errors.Is(err, wa.ErrNotAdmin):
@@ -57,7 +63,7 @@ func classify(ctx context.Context, err error) errorClass {
 }
 
 // reachedWhatsApp reports whether a call with this outcome may have been delivered.
-func (c errorClass) reachedWhatsApp() bool { return c != classShutdown }
+func (c errorClass) reachedWhatsApp() bool { return c != classShutdown && c != classExpired }
 
 // execute runs one picked action, or the coalesced batch it starts.
 func (e *Executor) execute(ctx context.Context, picked Action) error {
@@ -184,7 +190,7 @@ func (e *Executor) executeBatch(ctx context.Context, picked Action) error {
 		if len(nextChunk(members, outcomes, e.cfg.MaxKickBatch)) == 0 {
 			break
 		}
-		if calls == batchChunks || (calls > 0 && e.chatWindow(picked.Chat).wait(e.clk.Now()) > 0) {
+		if calls == batchChunks || (calls > 0 && e.mustWait(picked.Chat)) {
 			// Yield: the rest of the wave runs later, after other groups' work.
 			errs = append(errs, e.settleRest(sctx, members, classShutdown, nil, outcomes, nil))
 			return errors.Join(errs...)
@@ -193,7 +199,12 @@ func (e *Executor) executeBatch(ctx context.Context, picked Action) error {
 			errs = append(errs, e.settleRest(sctx, members, classShutdown, nil, outcomes, nil))
 			return errors.Join(errs...)
 		}
-		// Members whose deadline passed meanwhile don't get the rest of their JIDs sent.
+		if !e.lockCall(ctx, picked) {
+			errs = append(errs, e.settleRest(sctx, members, classShutdown, nil, outcomes, nil))
+			return errors.Join(errs...)
+		}
+		// Members whose deadline passed meanwhile (the call lock can wait behind a slow read)
+		// don't get the rest of their JIDs sent.
 		now := e.clk.Now()
 		for _, m := range members {
 			if !m.settled && !m.a.Deadline.After(now) && !resolved(m.a, outcomes) {
@@ -203,6 +214,7 @@ func (e *Executor) executeBatch(ctx context.Context, picked Action) error {
 		}
 		chunk := nextChunk(members, outcomes, e.cfg.MaxKickBatch)
 		if len(chunk) == 0 {
+			e.callMu.Unlock()
 			break
 		}
 		for _, m := range members {
@@ -210,7 +222,9 @@ func (e *Executor) executeBatch(ctx context.Context, picked Action) error {
 				m.called = true
 			}
 		}
-		results, callErr := e.callParticipants(ctx, picked, chunk)
+		results, callErr := e.doParticipants(ctx, picked, chunk)
+		e.reactUrgent(ctx, classify(ctx, callErr), callErr)
+		e.callMu.Unlock()
 		class := classify(ctx, callErr)
 		if class.reachedWhatsApp() {
 			e.wrote(ctx, picked.Chat, false)
@@ -238,6 +252,16 @@ func (e *Executor) executeBatch(ctx context.Context, picked Action) error {
 	}
 	errs = append(errs, e.finishResolved(sctx, members, outcomes))
 	return errors.Join(errs...)
+}
+
+// mustWait reports whether another write to chat would have to wait for the bot's bucket or
+// the chat's window: a batch then yields instead of holding the executor.
+func (e *Executor) mustWait(chat wa.JID) bool {
+	now := e.clk.Now()
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.recover(now)
+	return e.writes.wait(now) > 0 || e.chatWindow(chat).wait(now) > 0
 }
 
 // err turns a stored outcome back into the error it recorded.
@@ -375,7 +399,7 @@ func unique(base, add []wa.JID) []wa.JID {
 // stoppedFor reports whether a may not run now: the kill switch, a 429 pause, or the open
 // breaker for a kind it doesn't allow. It must be called with e.mu held.
 func (e *Executor) stoppedFor(a Action, now time.Time) bool {
-	return e.killed || now.Before(e.pausedUntil) || (e.breakerOpen && !e.allowedWhenOpen(a))
+	return e.killed || e.lockLost || now.Before(e.pausedUntil) || (e.breakerOpen && !e.allowedWhenOpen(a))
 }
 
 // takeWrite waits until the bot's write bucket and the chat's window allow one more write, and
@@ -389,7 +413,9 @@ func (e *Executor) takeWrite(ctx context.Context, chat wa.JID, a Action, refresh
 		}
 		if refresh {
 			if err := e.refreshControl(ctx); err != nil {
-				e.log.Error().Err(err).Msg("re-read control state in a batch")
+				if ctx.Err() == nil {
+					e.log.Error().Err(err).Msg("re-read control state in a batch")
+				}
 				return errInterrupted
 			}
 		}
@@ -419,8 +445,14 @@ func (e *Executor) takeWrite(ctx context.Context, chat wa.JID, a Action, refresh
 // consequences before releasing the lock. On success the caller must unlock e.callMu.
 func (e *Executor) lockCall(ctx context.Context, a Action) bool {
 	e.callMu.Lock()
+	if !e.checkLock(ctx) {
+		e.callMu.Unlock()
+		return false
+	}
 	if err := e.refreshControl(ctx); err != nil {
-		e.log.Error().Err(err).Msg("re-read control state before a call")
+		if ctx.Err() == nil {
+			e.log.Error().Err(err).Msg("re-read control state before a call")
+		}
 		e.callMu.Unlock()
 		return false
 	}
@@ -440,6 +472,9 @@ func (e *Executor) call(ctx context.Context, a Action, text string) (Result, err
 		return Result{}, errInterrupted
 	}
 	defer e.callMu.Unlock()
+	if !a.Deadline.After(e.clk.Now()) {
+		return Result{}, errExpired // it waited behind a slow read
+	}
 	res, err := e.doCall(ctx, a, text)
 	e.reactUrgent(ctx, classify(ctx, err), err)
 	return res, err
@@ -476,17 +511,8 @@ func (e *Executor) doCall(ctx context.Context, a Action, text string) (Result, e
 	}
 }
 
-// callParticipants performs one batched kick or join-request rejection for picked's group.
-func (e *Executor) callParticipants(ctx context.Context, picked Action, jids []wa.JID) ([]wa.ParticipantResult, error) {
-	if !e.lockCall(ctx, picked) {
-		return nil, errInterrupted
-	}
-	defer e.callMu.Unlock()
-	results, err := e.doParticipants(ctx, picked, jids)
-	e.reactUrgent(ctx, classify(ctx, err), err)
-	return results, err
-}
-
+// doParticipants performs one batched kick or join-request rejection for picked's group. The
+// caller holds the call lock.
 func (e *Executor) doParticipants(ctx context.Context, picked Action, jids []wa.JID) ([]wa.ParticipantResult, error) {
 	cctx, cancel := context.WithTimeout(ctx, e.cfg.CallTimeout)
 	defer cancel()
@@ -545,7 +571,7 @@ func (e *Executor) reactUrgent(ctx context.Context, class errorClass, err error)
 		if berr := e.openBreaker(ctx, fmt.Sprintf("temporary ban: %v", err)); berr != nil {
 			e.log.Error().Err(berr).Msg("persist breaker state")
 		}
-	case classOK, classTransient, classUnusual, classNotAdmin, classNotFound, classShutdown:
+	case classOK, classTransient, classUnusual, classNotAdmin, classNotFound, classShutdown, classExpired:
 	}
 }
 
@@ -565,7 +591,7 @@ func (e *Executor) react(ctx context.Context, chat wa.JID, class errorClass, err
 		if nerr := e.d.Groups.NotAdmin(sctx, e.d.Bot, chat); nerr != nil {
 			e.log.Error().Err(nerr).Msg("record lost admin")
 		}
-	case classOK, classTransient, classNotFound, classShutdown, classRateLimited, classTempBan:
+	case classOK, classTransient, classNotFound, classShutdown, classRateLimited, classTempBan, classExpired:
 	}
 }
 
@@ -586,9 +612,12 @@ func (e *Executor) dispose(ctx context.Context, a Action, class errorClass, err 
 		e.mu.Lock()
 		until := e.pausedUntil
 		e.mu.Unlock()
-		return e.d.Store.Retry(ctx, a.ID, RetryInfo{NotBefore: until, Error: errText, Called: called, Result: res})
+		return e.d.Store.Retry(ctx, a.ID, RetryInfo{NotBefore: until, Error: errText, Called: called, Attempted: true, Result: res})
 	case classShutdown:
 		return e.d.Store.Retry(ctx, a.ID, RetryInfo{NotBefore: now, Error: errText, Result: res})
+	case classExpired:
+		e.log.Info().Int64("action", a.ID).Str("kind", string(a.Kind)).Msg("action expired while waiting for its call")
+		return e.d.Store.Finish(ctx, a.ID, StatusExpired, "deadline passed", res)
 	case classTransient, classUnusual, classTempBan:
 		// A temporary ban retries like a transient error: an action the open breaker still
 		// allows (a lockdown) must not hammer a banned account.
@@ -598,7 +627,7 @@ func (e *Executor) dispose(ctx context.Context, a Action, class errorClass, err 
 		e.mu.Lock()
 		d := backoff(a.Attempts, e.cfg.BackoffBase, e.cfg.BackoffMax, e.rnd.Float64)
 		e.mu.Unlock()
-		return e.d.Store.Retry(ctx, a.ID, RetryInfo{NotBefore: now.Add(d), Error: errText, Called: called, Result: res})
+		return e.d.Store.Retry(ctx, a.ID, RetryInfo{NotBefore: now.Add(d), Error: errText, Called: called, Attempted: true, Result: res})
 	default:
 		return fmt.Errorf("unhandled error class %d", class)
 	}
@@ -644,11 +673,11 @@ func (e *Executor) warn(ctx context.Context, w Warning) {
 	}
 }
 
-// slowDown cuts the rate to a quarter (at least MinRatePerMin) and restarts calm time. It must be
+// slowDown cuts the rate by SlowdownFactor (at least to MinRatePerMin) and restarts calm time. It must be
 // called with e.mu held.
 func (e *Executor) slowDown(now time.Time) {
 	e.recover(now)
-	e.rate = math.Max(e.cfg.MinRatePerMin, e.rate/4)
+	e.rate = math.Max(e.cfg.MinRatePerMin, e.rate*e.cfg.SlowdownFactor)
 	e.rate = math.Min(e.rate, float64(e.ceiling))
 	e.lastWarning, e.lastRecovery = now, now
 	e.resize(now)
@@ -667,8 +696,8 @@ func (e *Executor) persistRate(ctx context.Context) {
 	}
 }
 
-// recover raises a slowed-down rate by 1 write/min per RecoverEvery of calm, never above the
-// ceiling. It must be called with e.mu held.
+// recover raises a slowed-down rate by RecoveryStep writes/min per RecoverEvery of calm, never
+// above the ceiling. It must be called with e.mu held.
 func (e *Executor) recover(now time.Time) {
 	if e.rate >= float64(e.ceiling) {
 		return
@@ -681,7 +710,7 @@ func (e *Executor) recover(now time.Time) {
 	if steps < 1 {
 		return
 	}
-	e.rate = math.Min(float64(e.ceiling), e.rate+steps)
+	e.rate = math.Min(float64(e.ceiling), e.rate+steps*e.cfg.RecoveryStep)
 	e.lastRecovery = base.Add(time.Duration(steps) * e.cfg.RecoverEvery)
 	e.resize(now)
 }

@@ -25,6 +25,10 @@ type Store interface {
 	// Lock makes the caller the only executor of bot until unlock is called; it returns
 	// ErrExecutorRunning if another executor holds the bot.
 	Lock(ctx context.Context, bot wa.JID) (unlock func(), err error)
+	// HoldsLock returns nil while this store still holds bot's executor lock, and an error
+	// wrapping ErrLockLost once it doesn't (on Postgres: the lock's connection died). The
+	// executor checks it before every WhatsApp call.
+	HoldsLock(ctx context.Context, bot wa.JID) error
 	// Recover returns the bot's running actions to pending, after a crash, and counts them.
 	Recover(ctx context.Context, bot wa.JID) (int, error)
 	// Candidates returns the bot's pending actions the executor chooses from: for each priority
@@ -42,8 +46,8 @@ type Store interface {
 	// Finish moves a running action to a final status with its error text and result.
 	Finish(ctx context.Context, id int64, status Status, errText string, res Result) error
 	// Retry moves a running action back to pending, to run again at r.NotBefore, keeping
-	// r.Result (a batch's partial outcomes). When r.Called is false no WhatsApp call was made
-	// for it, so the claim's attempt is given back.
+	// r.Result (a batch's partial outcomes). Unless r.Attempted, the claim's attempt is given
+	// back (the action was held back, or yielded its turn).
 	Retry(ctx context.Context, id int64, r RetryInfo) error
 	// ExpireDue moves the bot's pending actions whose deadline is at or before now to expired,
 	// and returns them.
@@ -64,7 +68,8 @@ type Store interface {
 type RetryInfo struct {
 	NotBefore time.Time
 	Error     string
-	Called    bool   // a WhatsApp call was made for it this time
+	Called    bool   // a WhatsApp call was made for it this time (counts as a write)
+	Attempted bool   // the call it got counts toward Config.MaxAttempts
 	Result    Result // outcomes so far (e.g. JIDs of a kick already removed)
 }
 

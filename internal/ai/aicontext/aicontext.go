@@ -166,16 +166,17 @@ func Size(c *ai.Context) int {
 }
 
 // capTotal drops the oldest context until the text fits: previous messages oldest first, then the
-// oldest replies, then the replied-to message, and finally it shortens the group fields.
+// replied-to message (it precedes the judged one), then the replies oldest first. The group fields
+// are shortened last; with the default caps (200 runes per field) they never need to be.
 func capTotal(c *ai.Context, limit int) {
 	for Size(c) > limit && len(c.Previous) > 0 {
 		c.Previous = c.Previous[1:]
 	}
-	for Size(c) > limit && len(c.Replies) > 0 {
-		c.Replies = c.Replies[1:]
-	}
 	if Size(c) > limit {
 		c.ReplyTo = nil
+	}
+	for Size(c) > limit && len(c.Replies) > 0 {
+		c.Replies = c.Replies[1:]
 	}
 	for _, f := range []*string{&c.Group.Allowed, &c.Group.Topic, &c.Group.Name} {
 		if over := Size(c) - limit; over > 0 {

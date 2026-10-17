@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/config"
 )
 
 // Config is the pacing and error handling of one bot's executor (DESIGN.md §10.3, §10.5).
@@ -38,11 +40,14 @@ type Config struct {
 	// UrgentWithin: within a priority, actions whose deadline is this close run first.
 	UrgentWithin time.Duration
 
-	// MinRatePerMin is the floor of a slow-down: a warning sign cuts the rate to a quarter, but
-	// never below this.
+	// SlowdownFactor multiplies the rate on a warning sign (a quarter by default).
+	SlowdownFactor float64
+	// MinRatePerMin is the floor of a slow-down: a warning sign cuts the rate, but never below this.
 	MinRatePerMin float64
-	// RecoverEvery: after this much calm time the rate rises by 1 write/min, up to the ceiling.
+	// RecoverEvery and RecoveryStep: after RecoverEvery of calm time the rate rises by
+	// RecoveryStep writes/min, up to the ceiling.
 	RecoverEvery time.Duration
+	RecoveryStep float64
 	// RateLimitPause is how long a 429 pauses the executor before it resumes, slowed down.
 	RateLimitPause time.Duration
 	// SlowAck: a call slower than this is a warning sign.
@@ -92,8 +97,10 @@ func DefaultConfig() Config {
 		MaxKickBatch:        8,
 		KickWindow:          2500 * time.Millisecond,
 		UrgentWithin:        time.Hour,
+		SlowdownFactor:      0.25,
 		MinRatePerMin:       2,
 		RecoverEvery:        15 * time.Minute,
+		RecoveryStep:        1,
 		RateLimitPause:      time.Minute,
 		SlowAck:             10 * time.Second,
 		DisconnectWindow:    time.Minute,
@@ -145,6 +152,12 @@ func (c Config) Validate() error {
 	if c.OTPPerMin < 0 || c.ReviewPerMin < 0 || c.DailyAlert < 0 {
 		errs = append(errs, errors.New("OTP and review budgets and the daily alert can't be negative"))
 	}
+	if c.SlowdownFactor <= 0 || c.SlowdownFactor >= 1 {
+		errs = append(errs, fmt.Errorf("SlowdownFactor must be in (0, 1): the queue only slows down, got %g", c.SlowdownFactor))
+	}
+	if c.RecoveryStep <= 0 {
+		errs = append(errs, fmt.Errorf("RecoveryStep must be positive, got %g", c.RecoveryStep))
+	}
 	if c.MinRatePerMin <= 0 || c.MinRatePerMin > float64(c.CeilingPerMin) {
 		errs = append(errs, fmt.Errorf("MinRatePerMin must be in (0, CeilingPerMin], got %g", c.MinRatePerMin))
 	}
@@ -154,4 +167,22 @@ func (c Config) Validate() error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// ConfigFromPacing builds the executor configuration from the instance's pacing settings
+// (config.yaml "pacing", DESIGN.md §10.3); the settings it doesn't cover keep their defaults.
+func ConfigFromPacing(p config.Pacing) Config {
+	c := DefaultConfig()
+	c.CeilingPerMin = p.CeilingPerMin
+	c.Burst = p.Burst
+	c.Spacing = p.SpacingBase
+	c.Jitter = p.SpacingJitter
+	c.GroupPerMin = p.GroupCeilingPerMin
+	c.SlowdownFactor = p.SlowdownFactor
+	c.MinRatePerMin = float64(p.MinRatePerMin)
+	c.RecoveryStep = float64(p.RecoveryStepPerMin)
+	c.RecoverEvery = p.RecoveryInterval
+	c.MaxKickBatch = p.MaxKickBatch
+	c.DailyAlert = p.DailyAlertWrites
+	return c
 }

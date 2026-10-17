@@ -111,3 +111,22 @@ A ban is a kick plus a rejoin block for that group only (`enforcement.ban.rejoin
 banned person joins again they're removed at once. If a current admin deliberately re-adds them, the
 bot treats it as the admins' decision and lifts the block. Unbanning lifts the block; the bot never
 re-adds anyone.
+
+## How settings are stored
+
+Each change, whether from the website or a `.set` command, stores a new version of the group's
+document. Every earlier version is kept in `group_settings_history`, and the audit log gets one
+`settings.update` entry with each changed dotted key and its old and new value. A command that
+changes some keys is re-applied on top of a change another admin made meanwhile, so neither is
+lost; a whole-document edit from the website made on an older version is refused instead of
+overwriting the newer one. Each save is announced with Postgres `NOTIFY group_settings`, so
+processes that listen refresh their copy straight away.
+A document saved by an older release still loads after an upgrade: keys added since then take the
+defaults of the group's preset.
+
+## Detections
+
+Every message that wasn't clean is recorded in `detections`. The record holds the score, the tier
+reached, the signals and content-rule violations, the confidence source, the route, the rule
+version, the planned actions, and the mode (`enforce`, or `shadow` when nothing was done). Message
+text is never stored there.

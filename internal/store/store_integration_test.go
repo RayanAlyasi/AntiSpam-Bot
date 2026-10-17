@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"testing"
 	"time"
 
@@ -103,8 +104,14 @@ func TestMigrateFreshDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.From != 0 || res.To != newest || res.Applied != int(newest) {
-		t.Errorf("first Migrate = %+v, want 0 → %d with %d applied", res, newest, newest)
+	// Versions have gaps (packages own number ranges), so count the embedded migrations.
+	sqlFiles, err := fs.Glob(migrations.SQL, "*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	embedded := len(sqlFiles) + len(migrations.Go())
+	if res.From != 0 || res.To != newest || res.Applied != embedded {
+		t.Errorf("first Migrate = %+v, want 0 → %d with %d applied (every embedded migration)", res, newest, embedded)
 	}
 	for _, rel := range []string{"app.audit_log", "app.river_job", "app.river_migration", "app.river_leader"} {
 		var ok bool

@@ -182,6 +182,8 @@ var (
 	ErrNotFound = errors.New("actions: action not found")
 	// ErrExecutorRunning is returned by Executor.Run when another executor already serves the bot.
 	ErrExecutorRunning = errors.New("actions: an executor is already running for this bot")
+	// ErrLockLost means an executor no longer holds its bot's lock (Store.HoldsLock).
+	ErrLockLost = errors.New("actions: executor lock lost")
 )
 
 // WhatsApp's delete-for-everyone window, and the default deadlines per kind (DESIGN.md §10.4).

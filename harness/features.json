@@ -1429,8 +1429,12 @@
         "F-004"
       ],
       "description": "Actions are stored with kind, payload, priority P0–P4, not_before, deadline and a unique dedupe key, and can be enqueued in the same transaction as the detection that caused them.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions (integration): TestPGEnqueueTxCommitsWithDetection, TestPGDedupeKeyUniqueForever, TestPGSetCeilingPersistsAndIsAudited",
+        "internal/actions: TestPGStoreContract, TestMemStoreContract, TestEnqueueTxCommitsWithTheDetection, TestOperatorAuditsInTheSameTransaction, TestConfigFromPacingDefaultsMatch, TestNULIsStrippedOrRefused",
+        "judge review: .agent/logs/judge-F-064.md"
+      ]
     },
     {
       "id": "F-065",
@@ -1447,8 +1451,12 @@
         "F-008"
       ],
       "description": "Exactly one executor goroutine per bot pulls actions with SKIP LOCKED ordered by priority, not_before and id, keeps an in-memory heap refilled from the table, and resumes correctly after a crash.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions (integration): TestPGOneExecutorPerBotAcrossProcesses, TestPGCrashRecoveryRerunsRunningActions, TestPGExecutorPriorityOrderAndPacing, TestPGKicksCoalesce, TestPGKillSwitchAcrossStores",
+        "internal/actions: TestPGLockAcrossStores, TestPGClaimSkipsLockedRows, TestExecutorOnPostgres, TestOneExecutorPerBotAndRecovery, TestLockLossStopsCalls",
+        "judge review: .agent/logs/judge-F-064.md"
+      ]
     },
     {
       "id": "F-066",
@@ -1695,8 +1703,18 @@
         "F-006"
       ],
       "description": "A ban records group_bans with reason spam/other, kicks through the queue and blocks rejoin to that group: a banned identity that joins again is kicked at P0; unban lifts the block without re-adding.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/policy TestLocalBanThroughTheQueue",
+        "TestReBanAfterADeadKickKicksAgain",
+        "TestQueueKickerStopsWithoutProgress",
+        "TestQueueKickerErrors",
+        "TestLocalBan",
+        "TestBanWithoutRejoinBlock",
+        "TestAdminReAddLiftsBan",
+        "TestBanRejects",
+        "internal/store TestGroupBansStore (integration)"
+      ]
     },
     {
       "id": "F-078",
@@ -2375,8 +2393,13 @@
         "F-007"
       ],
       "description": "ai_usage tracks calls and tokens per group and day; budgets send uncertain items straight to admins when exhausted (never deleting) with an 80% alert; metrics expose calls per 1,000 messages, cost, latency, cache hit rate, retries and unsure share.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai/aistore (integration): TestBudgetReservationsAreAtomic, TestBudgetWindowsAreUTCDaysAndMonths",
+        "internal/ai/budget: TestAllowEnforcesEachLimit, TestAlertOnceAt80Percent, TestPropertyReservationsNeverExceedLimits, TestPropertyReservationsGrantExactlyTheCapacity, TestAllowLimitUsesTheGroupsOwnLimit",
+        "internal/ai/gateway: TestBudgetExhaustedGoesToAdmins, TestEveryProviderRequestCountsAgainstTheBudget",
+        "internal/ai/aimetrics: TestMetricsRegisterAndRecord"
+      ]
     },
     {
       "id": "F-110",
@@ -2395,8 +2418,12 @@
         "F-004"
       ],
       "description": "Results are cached on hash(normalized text + context hash + model + prompt version) for 30 days, and copies in the same SimHash cluster or campaign reuse the first verdict.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai/aistore (integration): TestCacheStoreRoundTripExpiryAndPurge",
+        "internal/ai/cache: TestResultCacheHitAndMiss, TestKeyChangesWithEachPart, FuzzKeyInjective, TestOnlyDefinitiveVerdictsAreKept, TestClusterReusesFirstVerdictAcrossGroups, TestSynctestWaitingCopyGetsSanitizedVerdict",
+        "internal/ai/gateway: TestCacheAndClusterSaveCalls, TestSanitizeRedactsTheStoredReason"
+      ]
     },
     {
       "id": "F-111",

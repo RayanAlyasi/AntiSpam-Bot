@@ -5,7 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
+
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/normalize/normtest"
 )
 
 func TestExtractFinds(t *testing.T) {
@@ -141,19 +142,17 @@ func TestExtractBounded(t *testing.T) {
 	if len(got) != 1 || len(got[0]) > MaxURLBytes {
 		t.Errorf("Extract(long) = %d URLs, first %d bytes; want one of at most %d", len(got), len(got[0]), MaxURLBytes)
 	}
-	for name, in := range map[string]string{
-		"dots":      strings.Repeat("a.", 128<<10),
-		"spaced":    strings.Repeat("www . a ", 32<<10),
-		"brackets":  "https://x.com/" + strings.Repeat(")", 256<<10),
-		"defang":    strings.Repeat("[[.]", 64<<10),
-		"labels":    strings.Repeat("ab ", 85<<10),
-		"many urls": strings.Repeat("x.com/a ", 32<<10),
+	for name, in := range map[string]struct{ prefix, unit string }{
+		"dots":      {"", "a."},
+		"spaced":    {"", "www . a "},
+		"brackets":  {"https://x.com/", ")"},
+		"defang":    {"", "[[.]"},
+		"labels":    {"", "ab "},
+		"many urls": {"", "x.com/a "},
 	} {
-		start := time.Now()
-		Extract(in)
-		if d := time.Since(start); d > 3*time.Second {
-			t.Errorf("Extract(%s) took %v, want under 3s", name, d)
-		}
+		n := (64 << 10) / len(in.unit)
+		normtest.Linear(t, "Extract("+name+")", func(k int) string { return in.prefix + strings.Repeat(in.unit, k*n) },
+			func(s string) { Extract(s) })
 	}
 }
 

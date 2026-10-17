@@ -1,6 +1,9 @@
 package adapter
 
 import (
+	"cmp"
+	"fmt"
+	"slices"
 	"strings"
 
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -30,11 +33,24 @@ func (b *builder) reflect(v protoreflect.Value, source string, depth int) {
 			b.reflect(x.Get(i), source, depth+1)
 		}
 	case protoreflect.Map:
-		x.Range(func(_ protoreflect.MapKey, mv protoreflect.Value) bool {
-			b.reflect(mv, source, depth+1)
-			return true
-		})
+		for _, k := range sortedKeys(x) {
+			b.reflect(x.Get(k), source, depth+1)
+		}
 	}
+}
+
+// sortedKeys returns a map field's keys in a fixed order. Map.Range has none, and the text
+// order feeds normalization, fingerprints and hashes, which must not change between runs.
+func sortedKeys(m protoreflect.Map) []protoreflect.MapKey {
+	keys := make([]protoreflect.MapKey, 0, m.Len())
+	m.Range(func(k protoreflect.MapKey, _ protoreflect.Value) bool {
+		keys = append(keys, k)
+		return true
+	})
+	slices.SortFunc(keys, func(a, b protoreflect.MapKey) int {
+		return cmp.Compare(fmt.Sprint(a.Interface()), fmt.Sprint(b.Interface()))
+	})
+	return keys
 }
 
 func (b *builder) reflectMessage(m protoreflect.Message, source string, depth int) {
@@ -48,14 +64,17 @@ func (b *builder) reflectMessage(m protoreflect.Message, source string, depth in
 	case *waE2E.ContextInfo:
 		return
 	}
-	isMedia := m.Descriptor().Fields().ByName("fileSHA256") != nil
-	m.Range(func(fd protoreflect.FieldDescriptor, fv protoreflect.Value) bool {
-		if skipField(fd, isMedia) {
-			return true
+	fields := m.Descriptor().Fields()
+	isMedia := fields.ByName("fileSHA256") != nil
+	// Fields go in declaration order. Message.Range is deliberately randomized per binary by
+	// protobuf-go, and the text order feeds normalization, fingerprints and hashes.
+	for i := range fields.Len() {
+		fd := fields.Get(i)
+		if !m.Has(fd) || skipField(fd, isMedia) {
+			continue
 		}
-		b.reflect(fv, source, depth+1)
-		return true
-	})
+		b.reflect(m.Get(fd), source, depth+1)
+	}
 }
 
 func (b *builder) reflectString(source, s string) {

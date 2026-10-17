@@ -1776,8 +1776,12 @@
         "F-004"
       ],
       "description": "`docker compose up -d` starts bot + postgres with healthchecks, .env.example documents every variable, and README (unofficial-client ban risk), CONTRIBUTING (development with the fake WAClient) and CODE_OF_CONDUCT exist.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "cmd/antispam: TestConfigReadsOnlyDocumentedVariables, TestEnvExampleDocumentsEveryVariable, TestComposeFileBasics, TestHealthzURL, TestHealthcheck, TestHealthcheckFailsWhenNothingListens, TestHealthcheckRejectsBadAddr",
+        "docker compose config validates docker-compose.yml (fails fast without POSTGRES_PASSWORD); docker compose build bot succeeds",
+        "README.md (ban risk, quick start, shadow mode first), CONTRIBUTING.md (fake WAClient, branches, Conventional Commits), CODE_OF_CONDUCT.md; template ships as env.example (harness/deviations/F-091.md)"
+      ]
     },
     {
       "id": "F-092",

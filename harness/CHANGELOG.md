@@ -16,3 +16,4 @@ Every change to CLAUDE.md, rules, skills, agents, hooks or checks: date, what ch
   - no AI attribution in commits or PRs;
   - engineer-style commit and PR rules, plus a PR template.
 - 2026-10-17 — The judge stamp hook now reads the verdict from the SubagentHandback call in the judge transcript when last_assistant_message is empty, which it is when a subagent reports through a hand-back. Found when F-000 got two PASS reviews but no stamp. Self-test: 91 cases.
+- 2026-10-17 — Commits and PR titles switch to Conventional Commits, so release-please can generate the changelog and pick versions. Feature PRs are squash-merged with the PR title. User-facing docs are updated in the same PR, and the judge treats a missing docs update as a major finding.

@@ -15,3 +15,4 @@ Every change to CLAUDE.md, rules, skills, agents, hooks or checks: date, what ch
   - tamper and lint baselines use the base branch;
   - no AI attribution in commits or PRs;
   - engineer-style commit and PR rules, plus a PR template.
+- 2026-10-17 — The judge stamp hook now reads the verdict from the SubagentHandback call in the judge transcript when last_assistant_message is empty, which it is when a subagent reports through a hand-back. Found when F-000 got two PASS reviews but no stamp. Self-test: 91 cases.

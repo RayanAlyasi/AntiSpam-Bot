@@ -84,6 +84,47 @@ type AppBot struct {
 	CreatedAt   time.Time
 }
 
+type AppCorpusConfirmation struct {
+	PatternKey    string
+	GroupJid      string
+	AdminPersonID pgtype.Int8
+	CorpusEntryID int64
+	At            time.Time
+}
+
+type AppCorpusEntry struct {
+	ID              int64
+	Kind            string
+	Label           string
+	Scope           string
+	GroupJid        pgtype.Text
+	Status          string
+	Source          string
+	ImportBatchID   pgtype.Int8
+	SourceReviewID  pgtype.Int8
+	SourceActionID  pgtype.Int8
+	DecidedByPerson pgtype.Int8
+	TextRawRedacted string
+	TextNorm        string
+	Simhash         pgtype.Int8
+	Minhash         []byte
+	Keywords        []string
+	Urls            []string
+	Domains         []string
+	NumberHashes    [][]byte
+	ChannelJids     []string
+	InviteCodes     []string
+	MediaSha256     [][]byte
+	Phashes         []int64
+	Profile         []byte
+	Biz             []byte
+	Confidence      float64
+	Hits            int32
+	LastHitAt       pgtype.Timestamptz
+	CreatedAt       time.Time
+	ExpiresAt       time.Time
+}
+
 type AppDetection struct {
 	ID               int64
 	GroupJid         string
@@ -121,6 +162,18 @@ type AppEvidenceSnapshot struct {
 	Reason        string
 	At            time.Time
 	ExpiresAt     pgtype.Timestamptz
+}
+
+type AppFingerprint struct {
+	Kind      string
+	Value     string
+	Label     string
+	Source    string
+	Scope     string
+	ScopeID   string
+	Hits      int64
+	FirstSeen time.Time
+	LastSeen  time.Time
 }
 
 type AppGroup struct {
@@ -202,6 +255,13 @@ type AppInbox struct {
 	LastError    pgtype.Text
 }
 
+type AppLearnedRule struct {
+	RuleID        int64
+	CorpusEntryID int64
+	GroupJid      string
+	CreatedAt     time.Time
+}
+
 type AppMember struct {
 	GroupJid         string
 	PersonID         int64
@@ -235,6 +295,21 @@ type AppMessageIndex struct {
 	Verdict      string
 	Actioned     bool
 	ExpiresAt    time.Time
+}
+
+type AppNumberBlacklist struct {
+	ID              int64
+	Scope           string
+	GroupJid        pgtype.Text
+	PnE164          string
+	PnHash          string
+	PersonID        pgtype.Int8
+	OnWhatsapp      pgtype.Bool
+	Reason          string
+	AddedByPerson   pgtype.Int8
+	AddedAt         time.Time
+	RemovedByPerson pgtype.Int8
+	RemovedAt       pgtype.Timestamptz
 }
 
 type AppPerson struct {

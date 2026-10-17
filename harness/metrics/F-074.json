@@ -1,0 +1,25 @@
+{
+ "feature": "F-074",
+ "branch": "feat/wp-h-on-finished",
+ "category": "queue",
+ "core": true,
+ "harness_version": "2b4b2b9023da",
+ "commit": "b820894",
+ "gate_runs": 15,
+ "gate_first_pass": true,
+ "gate_failed_steps": [
+  "test"
+ ],
+ "acceptance_first_pass": true,
+ "judge_rounds": 6,
+ "judge_first_verdict": "FAIL",
+ "judge_final_verdict": "PASS",
+ "tamper_hits": 0,
+ "guard_blocks": 8,
+ "test_change_requests": 0,
+ "cost_usd": null,
+ "turns": null,
+ "mutation_score": null,
+ "human_verdict": null,
+ "ts": "2026-10-17T20:35:58Z"
+}

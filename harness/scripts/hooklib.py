@@ -20,7 +20,7 @@ SENSITIVE = ["auth_info_baileys/", "whatsapp_logs.db", ".env"]
 # Writable by nobody through agent tools (hooks and humans only).
 PROTECTED_WRITE = [
     "acceptance/", "testdata/fixtures/", "harness/evals/", "harness/rules-ledger.json",
-    "harness/metrics/", "harness/plan-changes/", "harness/scoring.json", "harness/scripts/", ".agent/stamps/",
+    "harness/metrics/", "harness/plan-changes/", "harness/test-approvals/", "harness/scoring.json", "harness/scripts/", ".agent/stamps/",
     ".agent/contracts/", ".claude/", ".githooks/", "Makefile", ".golangci.yml",
     ".go-arch-lint.yml", "CLAUDE.md",
 ]

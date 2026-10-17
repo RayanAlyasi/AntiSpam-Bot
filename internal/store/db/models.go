@@ -11,6 +11,33 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AppAction struct {
+	ID                int64
+	Bot               string
+	Chat              string
+	Kind              string
+	Priority          int16
+	Payload           json.RawMessage
+	Status            string
+	Attempts          int32
+	NotBefore         time.Time
+	Deadline          time.Time
+	MessageTime       pgtype.Timestamptz
+	DedupeKey         string
+	ReasonDetectionID pgtype.Int8
+	LastError         string
+	Result            json.RawMessage
+	Called            bool
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+type AppActionControl struct {
+	Scope     string
+	State     json.RawMessage
+	UpdatedAt time.Time
+}
+
 type AppAiCache struct {
 	Key           string
 	Model         string

@@ -125,6 +125,16 @@ func (s *MemStore) Lock(_ context.Context, bot wa.JID) (func(), error) {
 	}, nil
 }
 
+// HoldsLock implements Store.
+func (s *MemStore) HoldsLock(_ context.Context, bot wa.JID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.locked[bot] {
+		return fmt.Errorf("bot %s: %w", maskJID(bot), ErrLockLost)
+	}
+	return nil
+}
+
 // Recover implements Store.
 func (s *MemStore) Recover(_ context.Context, bot wa.JID) (int, error) {
 	s.mu.Lock()
@@ -247,7 +257,8 @@ func (s *MemStore) Retry(_ context.Context, id int64, r RetryInfo) error {
 	}
 	if r.Called {
 		s.called[id] = true
-	} else if a.Attempts > 0 {
+	}
+	if !r.Attempted && a.Attempts > 0 {
 		a.Attempts--
 	}
 	a.Status = StatusPending

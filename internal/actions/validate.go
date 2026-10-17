@@ -3,12 +3,22 @@ package actions
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 )
 
 // prepare applies Enqueue's defaults to a at now and validates it. dropped is non-empty when
 // the action can no longer matter and must not be stored.
 func prepare(a Action, now time.Time) (out Action, dropped string, err error) {
+	// NUL can't be stored in Postgres text or jsonb; dropping it keeps both stores alike and
+	// keeps attacker-supplied text from aborting the caller's transaction.
+	a.Payload.Text = noNUL(a.Payload.Text)
+	a.Payload.Emoji = noNUL(a.Payload.Emoji)
+	variants := a.Payload.Variants
+	a.Payload.Variants = nil
+	for _, v := range variants {
+		a.Payload.Variants = append(a.Payload.Variants, noNUL(v))
+	}
 	if err := validate(a); err != nil {
 		return Action{}, "", err
 	}
@@ -20,7 +30,6 @@ func prepare(a Action, now time.Time) (out Action, dropped string, err error) {
 	a.LastError = ""
 	a.Result = Result{}
 	a.Payload.JIDs = slices.Clone(a.Payload.JIDs)
-	a.Payload.Variants = slices.Clone(a.Payload.Variants)
 	if a.NotBefore.IsZero() || a.NotBefore.Before(now) {
 		a.NotBefore = now
 	}
@@ -48,6 +57,13 @@ func validate(a Action) error {
 		return invalid("priority %d is not P0–P4", a.Priority)
 	case a.DedupeKey == "":
 		return invalid("%s action without a dedupe key", a.Kind)
+	case strings.ContainsRune(a.DedupeKey+string(a.Bot)+string(a.Chat)+string(a.Payload.Target.ID)+string(a.Payload.Target.Sender), 0):
+		return invalid("NUL in a key, JID or message ID")
+	}
+	for _, j := range a.Payload.JIDs {
+		if strings.ContainsRune(string(j), 0) {
+			return invalid("NUL in a JID")
+		}
 	}
 	p := a.Payload
 	switch a.Kind {
@@ -84,3 +100,5 @@ func validate(a Action) error {
 	}
 	return nil
 }
+
+func noNUL(s string) string { return strings.ReplaceAll(s, "\x00", "") }

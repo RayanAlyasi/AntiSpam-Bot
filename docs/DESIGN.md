@@ -1,6 +1,6 @@
 # WhatsApp Anti-Spam Bot: Design Document
 
-**Status:** Draft for review (revision 11: v0.1 milestone first, and the release and versioning plan in §23; revision 10: tech stack decided (Go modular monolith, Postgres only, River), no embeddings in the core, frontend decided later; revision 9: context bundle for the AI, explicit AI cost controls, provider-neutral AI classifier; revision 8: spam-only bootstrap, no collection of normal messages, certainty routing as the core flow; revision 7: generic labeled-dataset import replaces the old-database import, and a manual phone-number blacklist; revision 6: AI and learning in the first version; revision 5: new enforcement model with instant delete + ban by default, no trust grace on detection, silent bot, auto-ban matrix and ask-admins mode; revision 4: adds hacked-account handling, one-number capacity model, unbounded queue with slow-down-only pacing and capped kick batches, and the open-source/self-hosting framing to revision 3's network bans and spammer intelligence). Nothing is built yet.
+**Status:** Draft for review (revision 12: release automation specified (release-please, GoReleaser with Immutable Releases, release App, back-merge, PR title lint; no docs agent); revision 11: v0.1 milestone first, and the release and versioning plan in §23; revision 10: tech stack decided (Go modular monolith, Postgres only, River), no embeddings in the core, frontend decided later; revision 9: context bundle for the AI, explicit AI cost controls, provider-neutral AI classifier; revision 8: spam-only bootstrap, no collection of normal messages, certainty routing as the core flow; revision 7: generic labeled-dataset import replaces the old-database import, and a manual phone-number blacklist; revision 6: AI and learning in the first version; revision 5: new enforcement model with instant delete + ban by default, no trust grace on detection, silent bot, auto-ban matrix and ask-admins mode; revision 4: adds hacked-account handling, one-number capacity model, unbounded queue with slow-down-only pacing and capped kick batches, and the open-source/self-hosting framing to revision 3's network bans and spammer intelligence). Nothing is built yet.
 **Stack:** Go + [whatsmeow](https://github.com/tulir/whatsmeow) (`go.mau.fi/whatsmeow`), PostgreSQL, Docker Compose (ARM64 + AMD64); runs anywhere Docker does (the user's own instance runs on Coolify).
 **Scope:** A from-scratch rewrite. The existing Baileys/Node code in this repo is ignored.
 **Project type:** **open source and self-hosted**, aimed at big groups and communities. Anyone can run their own instance with one `docker compose up`. Throughout this document, **"operator" means whoever deploys an instance**, and "global" means "across all groups of that one deployment".
@@ -1853,7 +1853,7 @@ Self-hosting is the main way to run the project, not an afterthought. The user's
   5. add the bot to a group and make it admin.
 
   It also covers a reverse proxy (Caddy/Traefik/nginx examples, plus a Coolify example), backups, upgrades, the privacy note (§17.1) and the ban-risk advice (§3).
-- **Images:** multi-arch (`linux/arm64`, `linux/amd64`) at `ghcr.io/rayanalyasi/antispam-bot`, built by GoReleaser on `v*` tags, signed (cosign keyless) and attested, with SBOMs. The tag scheme is in §23.4: pin `:0.1` or an exact version, never `latest`.
+- **Images:** multi-arch (`linux/arm64`, `linux/amd64`) at `ghcr.io/rayanalyasi/antispam-bot`, built by GoReleaser in the release workflow (§23.10), signed (cosign keyless) and attested, with SBOMs. The tag scheme is in §23.4: pin `:0.1` or an exact version, never `latest`.
 
 ### 19.2 Build
 
@@ -1945,11 +1945,16 @@ Poisoning guards, promotion and re-weighting come with learning in v0.2.
 - **v0.1 first:** a quick, stable first release for a friend (known-spam matching, `.blacklist`, content rules and the auto-ban matrix, silent delete + ban, ask-admins and the review group, commands, the paced queue, shadow mode, the provider-neutral AI check with OpenAI-compatible and Anthropic adapters, Postgres, Docker and the release pipeline). Learning, import, enrichment, hacked accounts, the website, vision, network bans and multi-number come in v0.2 and later (§20).
 - **Releases and versioning** (§23):
   - **Versions:** SemVer, staying on 0.x until the operator surface is frozen (patches are safe; minors may break, with upgrade steps); no CalVer; tags are never moved.
-  - **Release pipeline:** GoReleaser v2 on `v*` tags, multi-arch images on GHCR, SBOMs, cosign keyless signing, attestations, immutable releases.
-  - **Release notes:** generated notes by PR label plus a curated Keep a Changelog `CHANGELOG.md`.
+  - **Release pipeline:** GoReleaser v2 runs in the release workflow after release-please has created the tag and a draft (`use_existing_draft`, publish last), with multi-arch images on GHCR, SBOMs, cosign keyless signing, attestations and Immutable Releases.
+  - **Changelog and versions:** automated by release-please from Conventional Commits (`release-type: go`, `initial-version: 0.1.0`, `bump-minor-pre-major`). Its release PR into main holds only `CHANGELOG.md` and the manifest, and merging it replaces manual tagging. Visible `docs` commits trigger patch releases.
+  - **Workflow and tokens:** one workflow on push to main with three jobs (`rp`, `goreleaser`, `back-merge`). A dedicated GitHub App, held in a `release` Environment, is the only bypass actor on the `v*` tag ruleset. An explicit tag-exists check guards against release-please's silent 422.
+  - **Back-merge:** a throwaway `sync/main-<tag>` branch PR into staging, merged with a merge commit.
+  - **PR titles:** `action-semantic-pull-request` on PRs into staging (Conventional types, lowercase subject).
+  - **No docs agent:** docs are updated in the same PR as the change, and the judge enforces it (§23.11).
+  - **Actions:** all pinned by SHA (table in §23.9).
   - **Docker tags:** `X.Y.Z` is immutable; `X.Y`/`latest` move on stable releases only; `edge` builds from staging.
   - **No LTS.**
-  - **Where releases are cut:** release PRs from staging into main with merge commits; `release/X.Y` branches only when needed.
+  - **Where releases are cut:** release PRs from staging into main, then release-please's release PR, both merged with merge commits (release PRs are the one exception to "PRs into main come from staging"); `release/X.Y` branches only when needed.
   - **Upgrade safety:** forward-only migrations, and the binary refuses a newer schema.
   - **whatsmeow:** pinned pseudo-version with a weekly bump PR.
 - **Open-source, self-hosted project** for big groups and communities. "Operator" = whoever deploys an instance, and network bans, the spammer database and learning are scoped to one deployment. Cross-instance sharing is opt-in feeds only (§15, §19, §22).
@@ -2007,7 +2012,7 @@ Poisoning guards, promotion and re-weighting come with learning in v0.2.
 14. **AI context default:** send the context bundle (replies, the previous 5 messages, group info, sender context) by default (current), or default it off and let groups opt in? It improves accuracy but sends other members' recent messages to the AI provider.
 15. **Track-record bar:** is "≥ 200 admin decisions with ≥ 98% confirmed as spam over 30 days, plus hold-out precision" the right bar before `ai` may be allowed to auto-ban?
 16. **v0.1 AI provider for the friend's instance:** which OpenAI-compatible or Anthropic model will the friend's instance use for the v0.1 AI check, and what budget? It's the same question as Q13, but it needs an answer before the first rc.
-17. **Release-candidate checks (§23.11):** confirm `latest=auto` behaviour on pre-releases, generated notes after a merge-commit release PR, whether notes stay editable on immutable releases, and whether `docker_signs` covers `dockers_v2`. These are verification items, not open decisions.
+17. **Release setup checks (§23.13):** pre-release tag behaviour, editable notes on immutable releases, `docker_signs` with `dockers_v2`, the App bypass and 422 on `createRef`, `require_extra_approval_for_unattributed_changes`, and release-please on `release/*` and for `-rc.N`. These are verification items, not open decisions. **Maintainer prerequisites** (the release App, the `release` environment, `ANTHROPIC_API_KEY`, and the "Actions may create PRs" setting vs. a docs App) are listed in §23.12.
 18. **Website frontend framework:** React, Svelte or Next.js for the separate frontend app (§13.1)? To be decided when the full version is built; the API (`/api/v1`, OpenAPI) comes first either way.
 
 **Project:**
@@ -2098,7 +2103,7 @@ Either way:
 
 ## 23. Releases and versioning
 
-How the project is versioned, built, released and upgraded. These are decisions from research. Brief sources are given inline, and the items to check on the first release candidate are at the end.
+How the project is versioned, built, released and upgraded. These are decisions from research and a verified automation setup. Brief sources are given inline, and the items still to check on the first release are at the end (§23.13).
 
 ### 23.1 Version numbers
 
@@ -2111,13 +2116,13 @@ How the project is versioned, built, released and upgraded. These are decisions 
 - **0.x policy:**
   - a **patch** release (`0.1.N`) is **fixes only and always safe** to apply;
   - a **minor** release (`0.Y.0`) **may break things**, and its notes list the upgrade steps.
-- **Pre-releases** look like `v0.1.0-rc.1`.
+- **Pre-releases** look like `v0.1.0-rc.1` (how they're cut with release-please is in §23.12 and §23.13).
 - **Tags are permanent.** A pushed tag is never moved or deleted: the Go module proxy and checksum database treat versions as immutable ([Go modules reference](https://go.dev/ref/mod)). A bad release is fixed with a **new version**, plus a `retract` directive in `go.mod` if needed.
 - If the project ever reaches **v2**, the module path needs a **`/v2`** suffix (Go's major-version rule).
 
 ### 23.2 Release mechanics
 
-- **GoReleaser v2** ([goreleaser.com](https://goreleaser.com)) runs on every `v*` tag push in GitHub Actions.
+- **GoReleaser v2** ([goreleaser.com](https://goreleaser.com)) builds and publishes each release. It runs as the `goreleaser` job of the release workflow, right after release-please has created the tag and a draft release (§23.10), not on a separate tag-push trigger.
 - **Binaries:**
   - linux and darwin × amd64 and arm64, `CGO_ENABLED=0`, `-trimpath`;
   - `ldflags` embed the **version, commit and build date** (shown by `antispam version` and in logs and metrics).
@@ -2126,13 +2131,32 @@ How the project is versioned, built, released and upgraded. These are decisions 
   - **SBOMs** for archives and images;
   - **cosign keyless signing** (Sigstore) of the checksums file and the images;
   - **build provenance** via `actions/attest`;
-  - **GitHub Immutable Releases** turned on, so published release assets and tags can't be altered ([GitHub docs: immutable releases](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/immutable-releases)).
+  - **GitHub Immutable Releases** turned on, so published release assets and tags can't be altered ([GitHub docs: immutable releases](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/immutable-releases)). Because a published release can't change, all assets are uploaded to a **draft** first and the release is published last (§23.10).
 
-### 23.3 Release notes
+### 23.3 Changelog and version bumps: release-please
 
-- **release-please is ruled out:** it needs Conventional Commits, and our commits are engineer-style messages instead.
-- **GitHub-generated release notes** are grouped by PR labels through `.github/release.yml` ([GitHub docs: automatically generated release notes](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes)). The categories are `breaking`, `security`, `feature`, `bug`, `dependencies`, and a catch-all.
-- **A hand-curated `CHANGELOG.md`** in [Keep a Changelog](https://keepachangelog.com) format, with an **"Upgrade notes"** section for each release. The changelog is what operators read; generated notes are the complete list.
+The repository uses **Conventional Commits** (switched in PR #4), so **[release-please](https://github.com/googleapis/release-please)** automates the version and the changelog. It replaces the hand-curated `CHANGELOG.md` and the label-based generated notes.
+
+- **How it works:** `release-please-action` v5.0.0 runs on every **push to `main`**. It keeps a **release PR into `main`** open that contains **only** `CHANGELOG.md` and `.release-please-manifest.json`. Merging that PR creates the release (§23.10).
+- **Configuration** (`release-please-config.json`):
+
+  | Setting | Value | Why |
+  |---|---|---|
+  | `release-type` | `go` | Go project, no version file to bump |
+  | `initial-version` | `0.1.0` | without it, a `0.0.0` manifest would ship `1.0.0` |
+  | `bump-minor-pre-major` | `true` | on 0.x, a breaking change bumps the **minor** (matches the 0.x policy in §23.1) |
+  | `bump-patch-for-minor-pre-major` | `false` | on 0.x, a `feat` bumps the minor (new behaviour isn't "fixes only") |
+  | `include-component-in-tag` | `false` | tags are plain `vX.Y.Z` (GoReleaser matches the draft by that exact name) |
+  | `bootstrap-sha` | the last pre-rewrite commit | keeps the legacy Node commits out of the first changelog |
+  | `draft` / `force-tag-creation` | `true` / `true` | needed for Immutable Releases (§23.10) |
+
+- **Changelog sections:**
+  - **visible:** Features (`feat`), Bug Fixes (`fix`), Performance (`perf`), Documentation (`docs`), Reverts (`revert`);
+  - **hidden:** `refactor`, `chore`, `test`, `ci`, `build`.
+
+  **Visible `docs` commits trigger patch releases,** so let docs changes batch up on staging rather than releasing for each one.
+- **Breaking changes and upgrade steps** are written in the commit's **`BREAKING CHANGE:` footer** (or as `feat!:`). release-please puts them at the top of the release notes under "⚠ BREAKING CHANGES", which gives the "Breaking changes / Upgrade steps first" rule in §23.7. The GitHub release body is release-please's notes; GoReleaser's own changelog is disabled.
+- **Merging:** release-please's release PR, like the staging → main release PR, is merged with a **merge commit, never squashed**. Release PRs are the **one allowed exception** to "PRs into `main` come from `staging`".
 
 ### 23.4 Docker tags
 
@@ -2159,14 +2183,17 @@ The moving **`0.1` tag is the stable channel.** The docs tell deployers to pin *
 
 - **The normal path:**
   1. A **release PR** from `staging` into `main` is merged **with a merge commit** (not a squash), so `main` contains the exact commits that were tested on staging.
-  2. The release tag goes on that **merge commit**.
+  2. The push to `main` makes release-please open or update **its release PR** (`CHANGELOG.md` + manifest) into `main`.
+  3. Merging that PR (merge commit) lets the release workflow create the tag `vX.Y.Z` on it and publish the release (§23.10).
+  4. `main` is merged back into `staging` (§23.10).
 - **`release/X.Y` branches** are created **only when needed:** when a patch must ship while `staging` holds unshippable work.
   - Fixes go **upstream first** (to `staging`).
   - They're then **cherry-picked by PR** into `release/X.Y`.
+  - The release workflow also runs for `release/*`, with release-please targeting that branch. This is to verify (§23.13).
 - **Repository settings:**
-  - a **tag ruleset on `v*`** that restricts creating, updating and deleting tags;
+  - a **tag ruleset on `v*`** that restricts creating, updating and deleting tags, with the **release App as the only bypass actor** (§23.10);
   - `release/*` added to the **branch ruleset** (PR-only, like `main` and `staging`);
-  - the release workflow **builds only tags whose commit is on `main` or `release/*`**, and fails otherwise.
+  - the release workflow runs only for pushes to `main` or `release/*`, so it never tags anything else.
 
 ### 23.7 Upgrade safety
 
@@ -2194,44 +2221,129 @@ The moving **`0.1` tag is the stable channel.** The docs tell deployers to pin *
 - **The same-day patch path for protocol breaks:**
   1. WhatsApp starts rejecting the client ("405 client outdated", `events.ClientOutdated`);
   2. bump whatsmeow;
-  3. release **`v0.1.N`** through the hotfix path below.
+  3. release **`v0.1.N`** through the hotfix path (§23.12).
 
 ### 23.9 Supply chain
 
-- **Actions are pinned by commit SHA**, not by tag.
+- **Actions are pinned by commit SHA**, not by tag (the repository requires it).
 - **Dependabot** covers `gomod`, `github-actions`, `docker` and the compose file, with updates **grouped** to limit PR noise. It doesn't bump whatsmeow's pseudo-version, so that's left to the weekly workflow.
 - **`SECURITY.md`:** private vulnerability reporting through GitHub, the supported versions (the latest minor), and the response expectations.
 
-### 23.10 The maintainer's release procedure
+**Pinned actions** (as of 2026-10-17; Dependabot keeps them current):
+
+| Action | Version | SHA |
+|---|---|---|
+| `googleapis/release-please-action` | v5.0.0 | `45996ed1f6d02564a971a2fa1b5860e934307cf7` |
+| `amannn/action-semantic-pull-request` | v6.1.1 | `48f256284bd46cdaab1048c3721360e808335d50` |
+| `goreleaser/goreleaser-action` | v7.3.0 | `a4f02ab5355a589de60d917a659ce617ed19b3de` |
+| `actions/create-github-app-token` | v3.3.0 (use `client-id`) | `64ab729a6294000f5aa4a4bc0b73d1f32bc45510` |
+| `actions/checkout` | v7.0.1 | `3d3c42e5aac5ba805825da76410c181273ba90b1` |
+| `actions/setup-go` | v7.0.0 | `b7ad1dad31e06c5925ef5d2fc7ad053ef454303e` |
+| `docker/setup-qemu-action` | v4.4.0 | `99012661954931238ded8c8b007157a8430204e1` |
+| `docker/setup-buildx-action` | v4.4.1 | `f87e5991a6d7451dcb8d9637bfbc97413f497069` |
+| `docker/login-action` | v4.6.0 | `dbcb813823bdd20940b903addbd779551569679f` |
+| `sigstore/cosign-installer` | v4.1.2 | `6f9f17788090df1f26f669e9d70d6ae9567deba6` |
+| `actions/attest` | v4.2.2 | `1e69f48acb82d1966a394da916b4c1698aa569d6` |
+
+### 23.10 The release workflow
+
+#### Immutable Releases: draft first, publish last
+
+With Immutable Releases on, a published release can't gain or change assets. So the release is created as a **draft**, filled, and published at the end:
+
+1. **release-please** (`draft: true`, `force-tag-creation: true`, which needs release-please core 17.2+):
+   - creates the **`vX.Y.Z` tag** itself through `POST /git/refs`;
+   - then creates a **draft release** named `vX.Y.Z` with the changelog as its body.
+2. **GoReleaser v2:**
+   - `release.use_existing_draft: true` finds that draft by its name `vX.Y.Z` (so no component in the tag);
+   - `mode: keep-existing` keeps release-please's notes;
+   - `changelog.disable: true`;
+   - `replace_existing_artifacts: true` lets a re-run replace partial uploads;
+   - `release.draft: false` means that, after uploading everything, it **publishes** the release, which locks it.
+3. **Silent-failure guard:** release-please **swallows a 422** on tag creation, so a tag blocked by the ruleset would fail silently and GoReleaser would find no tag. The workflow therefore has an explicit **"tag exists" check** step after release-please, and it fails loudly if the tag is missing.
+
+#### One workflow, three jobs
+
+Events caused by `GITHUB_TOKEN` don't start other workflows, so a tag created inside one workflow can't trigger a separate "on tag" workflow. Everything runs in **one workflow on `push` to `main`** (and `release/*`):
+
+| Job | Runs when | Does |
+|---|---|---|
+| `rp` | every push | release-please: keeps its release PR up to date; when that PR was just merged, creates the tag and the draft release, and outputs `release_created` |
+| `goreleaser` | `needs: rp`, only if `release_created` | the tag-exists check, then builds, signs, attests, uploads and publishes (above) |
+| `back-merge` | after a release | merges `main` back into `staging` (below) |
+
+#### Tokens: a dedicated GitHub App
+
+- The release jobs use tokens from a **dedicated GitHub App** (via `actions/create-github-app-token`, with `client-id`):
+  - permissions: **Contents, Pull requests and Issues: read and write**;
+  - installed on **this repository only**.
+- The App is the **only bypass actor on the `v*` tag ruleset**. `GITHUB_TOKEN` gets **no** bypass, because that would let any workflow on any branch create release tags.
+- The App's credentials live in a GitHub **Environment `release`** restricted to `main` (and `release/*`), so only the release workflow on those branches can use them.
+- Bonus: PRs and tags created with the App's token **do trigger workflows** (unlike `GITHUB_TOKEN`), so release-please's PR and the back-merge PR get normal CI.
+
+#### Back-merge: main → staging
+
+- After a release, `main` holds commits `staging` lacks (the release PR's `CHANGELOG.md` and manifest, and the merge commits).
+- The `back-merge` job cuts a throwaway branch **`sync/main-<tag>`** from `main` and opens a PR into `staging`, merged with a **merge commit, never squashed**.
+- It doesn't open a PR from `main` directly. A PR from `main` can't be updated or conflict-resolved without commits to `main` itself; the throwaway branch can be fixed by hand if a conflict appears.
+
+### 23.11 PR title lint and docs upkeep
+
+#### PR title lint
+
+- **`amannn/action-semantic-pull-request`** v6.1.1 runs on **`pull_request_target`** for PRs into `staging`.
+- Allowed types: `feat`, `fix`, `perf`, `docs`, `refactor`, `test`, `ci`, `build`, `chore`, `revert`.
+- The subject **must not start with an uppercase letter**.
+- PRs into staging are squash-merged, so the PR title becomes the Conventional Commit that release-please reads.
+
+#### Docs upkeep (no docs agent)
+
+There is **no automated docs agent** (decided 2026-10-17). User-facing docs stay current through the normal feature flow:
+- the builder updates README and `docs/` in the **same PR** as any change to behaviour, configuration, commands or deployment;
+- the judge treats a missing docs update as a **major** finding (CLAUDE.md, "Commits and pull requests").
+
+This avoids an extra paid agent run on every merge, and the repository secrets and PR-creation setting it would need.
+
+### 23.12 The maintainer's release procedure
+
+**One-time prerequisites** (before the release features F-094 and F-097):
+1. Create the **release GitHub App** (Contents, Pull requests and Issues: read and write) and install it on this repository only.
+2. Add the App as the **only bypass actor** on the `v*` tag ruleset.
+3. Create the **`release` Environment**, restricted to `main` (and `release/*`), holding the App's client ID and private key.
 
 **Normal release:**
-1. **Prepare-CHANGELOG PR** into `staging`: move "Unreleased" into the new version's section, write the "Upgrade notes", and check PR labels for the generated notes.
-2. **Release PR** `staging` → `main`, merged with a **merge commit**.
-3. **Tag the release candidate** on the merge commit: `v0.Y.Z-rc.1`.
-4. **Verify** the published artefacts:
+1. **Release PR** `staging` → `main`, merged with a **merge commit**.
+2. release-please opens or updates **its release PR** into `main`. Review the generated `CHANGELOG.md`, especially the "⚠ BREAKING CHANGES" section, whose upgrade steps come from `BREAKING CHANGE:` footers.
+3. **Merge release-please's PR** (merge commit). This replaces manual tagging. The workflow creates the tag and the draft, and GoReleaser uploads, signs, attests and publishes.
+4. **Verify** the published release:
    - the image runs on amd64 and arm64;
    - `cosign verify` passes on the image and the checksums;
    - `gh attestation verify` passes;
-   - the SBOM is present.
-5. **The friend tests the rc** on their groups (shadow mode first if it's a minor release).
-6. **Tag the final release** `v0.Y.Z` on the same commit. The `X.Y` and `latest` tags move.
-7. **Reopen "Unreleased"** in `CHANGELOG.md` on `staging`.
+   - the SBOM is present;
+   - the `X.Y` and `latest` tags moved.
+5. **Merge the back-merge PR** (`sync/main-<tag>` → `staging`, merge commit).
+
+**Release candidates for the friend:** the friend tests the **`sha-<7>`/`edge` image** of the staging commit that's about to be released (shadow mode first for a minor release), *before* step 1. A tagged `vX.Y.Z-rc.N` would use release-please's prerelease versioning; that's to verify (§23.13).
 
 **Hotfix path:**
 1. Fix on `staging` first (upstream first).
-2. If `staging` is shippable, do a normal release PR, as above.
+2. If `staging` is shippable, do a normal release, as above.
 3. If not:
    - create `release/X.Y` from the last release tag;
    - cherry-pick the fix by PR;
-   - tag `vX.Y.(Z+1)` on `release/X.Y` (an rc is optional for urgent protocol fixes);
-   - verify, then release.
+   - release-please's PR on `release/X.Y` produces `vX.Y.(Z+1)`;
+   - verify, then back-merge.
+4. For a WhatsApp protocol break (§23.8), the same path is the same-day route.
 
-### 23.11 To verify on the first release candidate
+### 23.13 To verify on the first release
 
-- How `docker/metadata-action`'s **`latest=auto`** behaves on pre-releases, so an rc never moves `latest` or `X.Y`.
-- What **generated release notes** look like after a **merge-commit** release PR (no duplicated or missing PRs).
+- How `docker/metadata-action`'s **`latest=auto`** (or GoReleaser's tag templates) behaves on pre-releases, so a pre-release never moves `latest` or `X.Y`.
 - Whether release notes **stay editable** on **immutable releases**.
 - Whether GoReleaser's **`docker_signs`** covers images built with **`dockers_v2`**.
+- Whether the tag ruleset honours the **App bypass for `createRef`** (`POST /git/refs`).
+- Whether a ruleset-blocked `createRef` really returns **422** (the case the "tag exists" check guards against).
+- What **`require_extra_approval_for_unattributed_changes`** on the branch ruleset means for App-authored and back-merge PRs.
+- release-please on **`release/*`** (target branch) for hotfixes, and its **prerelease versioning** (`-rc.N`) for tagged release candidates.
 
 ---
 

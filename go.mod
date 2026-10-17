@@ -7,6 +7,7 @@ toolchain go1.27.2
 require (
 	github.com/rs/zerolog v1.35.1
 	go.mau.fi/whatsmeow v0.0.0-20261016130820-0b0a1cdac3e2
+	golang.org/x/text v0.43.0
 	pgregory.net/rapid v1.3.0
 )
 
@@ -25,6 +26,5 @@ require (
 	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )

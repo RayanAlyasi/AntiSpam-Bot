@@ -2173,8 +2173,12 @@
         "F-105"
       ],
       "description": "An Anthropic adapter classifies with schema-constrained output and prompt caching, mapping timeouts and errors to unsure; tested against a recorded HTTP fake.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai/anthropic: TestCompleteSendsCachedSystemPromptAndSchema, TestCompleteErrorsMapToSentinels, TestCompleteDoesNotRetry, TestCompleteTimeout",
+        "internal/ai/gateway: TestClassifierModesAndRetry (provider error -> unsure), TestNewFromConfig",
+        "internal/ai/llm: TestPortableSchema, TestStatusError, TestTransportError"
+      ]
     },
     {
       "id": "F-107",
@@ -2191,8 +2195,11 @@
         "F-105"
       ],
       "description": "An OpenAI-compatible adapter works with hosted APIs and Ollama/llama.cpp/vLLM/LM Studio via base_url, using native schema when available and JSON mode otherwise.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai/openaicompat: TestCompleteNativeRequestShape, TestCompleteLocalServerWithoutKeyOrUsage, TestAutoFallsBackToJSONModeOnce, TestFallbackOnlyOnSchemaRejection, TestAutoFallbackIsSafeUnderConcurrency, TestCompleteResponseOutcomes, TestCompleteTimeoutAndCancel",
+        "internal/ai/gateway: TestNewFromConfig (local server config)"
+      ]
     },
     {
       "id": "F-108",
@@ -2211,8 +2218,10 @@
         "F-101"
       ],
       "description": "With ai.context on, the request includes the replied-to message, up to N=5 previous messages in 10 minutes, group info and allowed-content summary, sender context and existing replies, redacted, capped at ~2,000 characters and fenced as untrusted data; nothing new is stored.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/ai/aicontext: TestBuildContents, TestBuildOffOrNoSource, TestBuildLimitsPreviousToN, TestBuildRedactsAndTruncates, TestBuildCapsTotalDroppingOldestFirst, TestBuildIsDeterministic, FuzzBuildStaysFencedAndCapped, TestBufferKeepsRecentMessagesOnly"
+      ]
     },
     {
       "id": "F-109",
@@ -2275,8 +2284,11 @@
         "F-088"
       ],
       "description": "Only UNCERTAIN messages go to the AI; spam ≥ ai.spam_confidence is deleted with the ban sent to admins, not spam ≥ 0.9 is logged, and unsure, low confidence, timeout, error or no AI configured go to admins with nothing deleted.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/ai: TestAISpamDeletesMessageAndAsksAdminsForBan, TestAISpamConfidenceBoundary, TestCertainAndCleanMessagesNeverCallAI, TestStillUncertainAsksAdminsNothingDeleted, TestAINotSpamHighConfidenceLoggedOnly, TestAskBeforeActionModeKeepsAISpamVisible, TestRedeliveredMessageClassifiedOnce",
+        "internal/ai/gateway: TestVerifyOutcomes, TestOnlyUncertainReachesTheAI, TestAIOffGoesToAdmins, TestBudgetExhaustedGoesToAdmins, TestPropertyOnlyConfidentAISpamDeletes"
+      ]
     },
     {
       "id": "F-112",
@@ -2294,8 +2306,11 @@
         "F-058"
       ],
       "description": "A ban resting on source ai routes to ask admins in every preset until the instance meets the track-record bar; property tests show AI-only evidence and looser near-duplicates never auto-ban.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/ai: TestPropertyAISourceNeverAutoBansWithoutTrackRecord, TestPropertyLooserNearDuplicateNeverActsAlone, TestAIAutoBanOnlyWithTrackRecordAndExplicitCell, TestKnownEvidenceStillAutoBans",
+        "internal/ai/safety: TestPropertyAISourceNeverAutoBansWithoutTrackRecord, TestAISpamDeletesAndAsksAdmins, TestSettingsDoesNotModifyInput"
+      ]
     },
     {
       "id": "F-113",

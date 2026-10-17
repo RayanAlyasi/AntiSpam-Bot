@@ -8,9 +8,11 @@ on:
 permissions:
   contents: read
 
+# A newer push to a PR supersedes the older run, so that one is cancelled. Pushes to main and
+# staging get one group per commit, so every merge runs to the end on the combined code.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:

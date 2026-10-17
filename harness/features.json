@@ -1105,8 +1105,12 @@
         "F-023"
       ],
       "description": "A sender who joined within the window (default 24 h) gets the just-joined weight (default +0.8) decaying to 0, configurable and never visible to members.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/policy TestJustJoinedWeight",
+        "TestJustJoinedDecays",
+        "TestJustJoinedScoringSignal"
+      ]
     },
     {
       "id": "F-053",
@@ -1124,8 +1128,11 @@
         "F-004"
       ],
       "description": "Every non-clean verdict is stored with score, tier reached, signals, confidence source, route, rule version, action plan and mode.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/store TestDetectionsStore (integration)",
+        "internal/policy TestDetectionRecord"
+      ]
     },
     {
       "id": "F-054",
@@ -1143,8 +1150,20 @@
         "F-006"
       ],
       "description": "Group settings are a versioned JSON document validated against a Go struct and JSON Schema, every leaf is reachable by dotted key for get/set, changes write history and the audit log, and caches refresh via NOTIFY.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/store TestSettingsSaveVersionsHistoryAuditNotify (integration)",
+        "TestSettingsConflict (integration)",
+        "internal/policy TestSettingsServiceDefaultsThenVersions",
+        "TestSettingsServiceConflictRetries",
+        "TestSettingsServiceCacheAndInvalidate",
+        "TestSettingsServiceSaveReappliesChanges",
+        "TestGetSet",
+        "TestKeysCoverEveryLeaf",
+        "TestParseRejects",
+        "TestSchemaMatchesDocument",
+        "TestParseStoredFillsNewKeys"
+      ]
     },
     {
       "id": "F-055",
@@ -1195,8 +1214,15 @@
         "F-040"
       ],
       "description": "Each content type (including links, status shares/mentions, Group Status posts, view-once, forwarded-many-times and blocked document extensions or double extensions) is allow/block/block_for_new/block_for_untrusted, producing hard policy signals separate from the spam score.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/policy TestEvaluateContent",
+        "FuzzBlockedDocument",
+        "TestTypeOf",
+        "TestFactsOf",
+        "TestFindingFrom",
+        "TestEngineRoute"
+      ]
     },
     {
       "id": "F-057",
@@ -1622,8 +1648,16 @@
         "F-072"
       ],
       "description": "Per-group max bans per hour (default 10) defers extra bans into one review item instead of dropping them, a max-deletions-per-minute circuit pauses and alerts, and per-rule kill switches disable a rule at once.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/policy TestBanCapDefersToOneReview",
+        "TestBanCapSeededFromStore",
+        "TestDeletionCircuit",
+        "TestKillSwitches",
+        "TestKilledContentRuleIsSilent",
+        "TestFilterFindingReDerivesOnlyFromKilledEvidence",
+        "TestAdmitLeavesShadowAlone"
+      ]
     },
     {
       "id": "F-077",

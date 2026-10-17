@@ -2,10 +2,13 @@ package policy
 
 import (
 	"fmt"
+	"net"
 	"path"
 	"slices"
 	"strings"
 	"unicode"
+
+	"golang.org/x/net/idna"
 )
 
 // ContentFacts are the content types present in one message, as the content policy sees
@@ -19,6 +22,7 @@ type ContentFacts struct {
 	Videos             bool
 	Stickers           bool
 	Documents          []string // file names; an empty name still counts as a document
+	DocumentMimetypes  []string // declared mimetypes of the documents
 	HasDocument        bool
 	Audio              bool
 	Polls              bool
@@ -83,6 +87,11 @@ func EvaluateContent(c Content, f ContentFacts, st Standing) []Violation {
 				add("content.document_extensions_block", why)
 			}
 		}
+		for _, mt := range f.DocumentMimetypes {
+			if why := blockedMimetype(mt, c.DocumentExtensionsBlock); why != "" {
+				add("content.document_extensions_block", why)
+			}
+		}
 	}
 	check(f.Audio, c.Audio, "audio", "audio")
 	check(f.Polls, c.Polls, "polls", "poll")
@@ -98,8 +107,20 @@ func EvaluateContent(c Content, f ContentFacts, st Standing) []Violation {
 	return out
 }
 
+// normHost canonicalises a link host for list matching: lower case, no port, no trailing dot,
+// no "www.", the ideographic and fullwidth dots that browsers treat as "." mapped to ".", and
+// internationalised names in their ASCII (punycode) form, so "BIT．ly:443" matches "bit.ly".
 func normHost(h string) string {
-	h = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(h)), ".")
+	h = strings.TrimSpace(h)
+	h = strings.NewReplacer("\u3002", ".", "\uff0e", ".", "\uff61", ".").Replace(h)
+	if host, _, err := net.SplitHostPort(h); err == nil {
+		h = host
+	}
+	h = strings.Trim(h, "[]")
+	if a, err := idna.Lookup.ToASCII(h); err == nil {
+		h = a
+	}
+	h = strings.TrimSuffix(strings.ToLower(h), ".")
 	return strings.TrimPrefix(h, "www.")
 }
 
@@ -150,6 +171,38 @@ func blockedDocument(name string, block []string) string {
 	}
 	if len(exts) >= 2 && slices.Contains(executableExt, last) && slices.Contains(innocentExt, exts[len(exts)-2]) {
 		return fmt.Sprintf("document %q hides .%s behind .%s", name, last, exts[len(exts)-2])
+	}
+	return ""
+}
+
+// executableMime maps executable mimetypes to the extension they stand for, so a renamed
+// executable ("invoice.pdf" sent as an APK) is still caught.
+var executableMime = map[string]string{
+	"application/vnd.android.package-archive":       "apk",
+	"application/x-msdownload":                      "exe",
+	"application/x-msdos-program":                   "exe",
+	"application/x-dosexec":                         "exe",
+	"application/vnd.microsoft.portable-executable": "exe",
+	"application/x-ms-installer":                    "msi",
+	"application/x-msi":                             "msi",
+	"application/java-archive":                      "jar",
+	"application/x-bat":                             "bat",
+	"application/javascript":                        "js",
+	"text/javascript":                               "js",
+}
+
+// blockedMimetype returns why a document's declared mimetype is blocked, or "" if it isn't:
+// it names an executable type whose extension is on the group's block list.
+func blockedMimetype(mt string, block []string) string {
+	mt, _, _ = strings.Cut(strings.ToLower(strings.TrimSpace(mt)), ";")
+	ext, ok := executableMime[strings.TrimSpace(mt)]
+	if !ok {
+		return ""
+	}
+	for _, b := range block {
+		if strings.TrimPrefix(strings.ToLower(strings.TrimSpace(b)), ".") == ext {
+			return fmt.Sprintf("document of type %s (.%s) is blocked", mt, ext)
+		}
 	}
 	return ""
 }

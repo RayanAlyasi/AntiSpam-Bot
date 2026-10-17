@@ -1286,8 +1286,11 @@
         "F-065"
       ],
       "description": "Revoke and remove-participant actions execute only through WAClient, record their result, and dedupe on revoke:<group>:<msgid> and kick keys.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestPermanentErrorsFailFast, TestKicksCoalesce, TestDedupeAcrossAllStatuses, TestCancelPendingRevoke",
+        "internal/actions: TestErrorHandling, TestKickCoalescing"
+      ]
     },
     {
       "id": "F-067",
@@ -1304,8 +1307,11 @@
         "F-065"
       ],
       "description": "DM, review, edit and reaction actions execute at P3 through WAClient, with template variants so the same text is never sent twice in a row to different chats.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestSendVariants, TestSilentGroupRefusesEveryPost",
+        "internal/actions: TestSendVariantsNeverRepeatAcrossChats, TestReservedSubBudgetsDuringRaid"
+      ]
     },
     {
       "id": "F-068",
@@ -1321,8 +1327,11 @@
         "F-065"
       ],
       "description": "Writes are spaced with base ~1 s plus 0–1.5 s jitter under a ceiling of 20/min with a burst of 10; a property test under synctest shows the effective rate never exceeds the ceiling.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestCeilingNeverExceeded, TestBurstSpacingAndJitter, TestExecutorIsStrictlySerial",
+        "internal/actions: TestCeilingPropertyRandomWorkloads, TestSpacingBetweenWrites, TestBucketNeverExceedsCapacityPlusRate"
+      ]
     },
     {
       "id": "F-069",
@@ -1358,8 +1367,11 @@
         "F-068"
       ],
       "description": "Each group is limited to 10 writes/min with round robin within a priority, OTPs and reviews have reserved P3 sub-budgets, and reads (IQs) use separate buckets that never consume write budget.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestPerGroupCap, TestRoundRobinFairness, TestReadsUseSeparateBudget",
+        "internal/actions: TestRoundRobinAcrossGroups, TestReservedSubBudgetsDuringRaid, TestReadsHaveTheirOwnBudget"
+      ]
     },
     {
       "id": "F-071",
@@ -1375,8 +1387,11 @@
         "F-066"
       ],
       "description": "Deletes in a group run newest first, anything near WhatsApp's ~48 h delete window moves ahead, expired actions are dropped and logged, and a sender's own revoke cancels the pending delete.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestPriorityOrder, TestUrgentDeadlinesFirst, TestDeletesNewestFirstInGroup, TestExpiredActionsNeverRun, TestCancelPendingRevoke",
+        "internal/actions: TestPriorityAndNewestFirst, TestDedupeExpiryAndCancel"
+      ]
     },
     {
       "id": "F-072",
@@ -1392,8 +1407,11 @@
         "F-066"
       ],
       "description": "Kicks and join-request rejections for one group within a 2–3 s window merge into calls of at most max_kick_batch (default 8), each JID individually eligible, and larger sets split into paced calls.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestKicksCoalesce, TestKicksWithinWindowMerge",
+        "internal/actions: TestKickCoalescing, TestKickWaitsForWindow"
+      ]
     },
     {
       "id": "F-073",
@@ -1409,8 +1427,11 @@
         "F-069"
       ],
       "description": "Transient errors retry with min(2^n·2 s, 5 min) full-jitter backoff up to 6 attempts; a 429 pauses the bot's executor 60 s then slows down; not-admin and not-found fail fast and update group state.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestTransientErrorBackoff, TestTransientErrorGivesUp, TestRateLimitPausesThenSlowsDown, TestPermanentErrorsFailFast",
+        "internal/actions: TestErrorHandling, TestBackoff"
+      ]
     },
     {
       "id": "F-074",

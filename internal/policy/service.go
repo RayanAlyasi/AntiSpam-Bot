@@ -252,16 +252,6 @@ func (s *SettingsService) Save(ctx context.Context, group wa.JID, next Settings,
 		return err
 	}
 	_, _, err = s.update(ctx, group, string(actor), -1, func(cur Settings) (Settings, error) {
-		// A preset switch resets the matrix and the extras on the latest document first, so a
-		// concurrent switch can't leave cells of two presets under one preset name.
-		for _, c := range changes {
-			if c.Key == "preset" {
-				if err := cur.ApplyPreset(next.Preset); err != nil {
-					return Settings{}, err
-				}
-				break
-			}
-		}
 		tree, err := toTree(cur)
 		if err != nil {
 			return Settings{}, err

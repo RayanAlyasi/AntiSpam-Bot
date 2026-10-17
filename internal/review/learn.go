@@ -52,6 +52,7 @@ type FingerprintAllow struct {
 	Group   wa.JID
 	Message wa.MessageRef
 	Text    string // used to compute the fingerprint, then dropped
+	EntryID int64  // the corpus entry being retracted, whose stored fingerprints can be used; 0 if none
 }
 
 // Corpus is the confirmed-spam corpus (F-113) as learning needs it.
@@ -62,6 +63,9 @@ type Corpus interface {
 	// Retract removes an entry and the rules it created from the matching indexes at once
 	// (NOTIFY) and deletes its text.
 	Retract(ctx context.Context, entryID int64) error
+	// AllowFingerprint stores the fingerprint of an overturned message (the entry's stored
+	// fingerprints when EntryID is set, otherwise one computed from Text). With neither, it must
+	// store nothing: a fingerprint of empty text would allow-list every text-less message.
 	AllowFingerprint(ctx context.Context, f FingerprintAllow) error
 }
 

@@ -76,7 +76,10 @@ When the bot isn't allowed or isn't sure enough to ban, it opens a review with a
 - **Timeouts.** With no decision within `review.timeout` (6 h; 15 min in ask-before-action mode)
   the fallback applies: `keep_deleted_no_ban`, `delete_no_ban`, `auto_ban` or `dismiss`. Set it
   with `.review timeout 6h keep|delete|ban|dismiss`. A timeout never bans in ask-admins modes,
-  nor an established member, a possibly hacked account or an admin.
+  nor an established member, a possibly hacked account or an admin. The workers role checks
+  timeouts every minute.
+- **Evidence.** Every deletion keeps a redacted snapshot (text and thumbnail) for 30 days; the
+  workers role purges older ones hourly. A "not spam" decision deletes the snapshot's text at once.
 
 ## Phone-number blacklist
 

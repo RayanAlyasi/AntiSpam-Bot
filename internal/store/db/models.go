@@ -64,6 +64,13 @@ type AppAuditLog struct {
 	At       time.Time
 }
 
+type AppBlacklistBan struct {
+	GroupJid string
+	PersonID int64
+	BanID    int64
+	At       time.Time
+}
+
 type AppCorpusConfirmation struct {
 	PatternKey    string
 	GroupJid      string
@@ -122,6 +129,7 @@ type AppDetection struct {
 	NetworkBanID     pgtype.Int8
 	EvidenceRef      pgtype.Text
 	CreatedAt        time.Time
+	EditSeq          int32
 }
 
 type AppDmThread struct {

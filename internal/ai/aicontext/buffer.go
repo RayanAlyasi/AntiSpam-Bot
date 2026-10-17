@@ -61,6 +61,16 @@ func (b *Buffer) Add(chat string, m Msg) {
 	b.chats[chat] = msgs
 }
 
+// Remove drops one message, e.g. one its sender deleted for everyone, so it never reaches the AI.
+func (b *Buffer) Remove(chat, id string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	msgs := b.chats[chat]
+	if i := slices.IndexFunc(msgs, func(x Msg) bool { return x.ID == id }); i >= 0 {
+		b.chats[chat] = slices.Delete(msgs, i, i+1)
+	}
+}
+
 // Forget drops every buffered message of a chat (e.g. when the bot leaves the group).
 func (b *Buffer) Forget(chat string) {
 	b.mu.Lock()

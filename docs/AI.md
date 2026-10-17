@@ -4,6 +4,40 @@ The bot asks an AI model only about **uncertain** messages: ones that look suspi
 match known spam exactly (DESIGN.md §7.0, §7.4). Certain spam is handled without it, and clean
 messages never reach it. With no AI configured, uncertain messages simply go to the admins.
 
+## What happens with the AI's answer
+
+| The AI says | What the bot does |
+|---|---|
+| spam, confidence ≥ `ai.spam_confidence` (default 0.9) | deletes the message and asks the admins about a ban |
+| not spam, confidence ≥ 0.9 | nothing; the verdict is logged |
+| unsure, or either label below 0.9 | asks the admins; the message stays (unless `uncertain.delete_while_pending` is on) |
+| no answer: timeout, error, refusal, invalid output twice, budget used up, AI off for the group or not configured | asks the admins; nothing is deleted |
+
+In `ask_before_action` mode nothing is deleted until an admin decides, whatever the AI says.
+
+### Early-AI safety: the AI never bans on its own
+
+A ban that rests on the AI's verdict always goes to the admins, in every preset. This holds
+even if a matrix cell lists `ai` as an auto-ban source (for example `.autoban links auto known,ai`):
+until the AI has a **track record** on your instance (DESIGN.md §9.2: at least 200 admin decisions
+on reviews it decided, with ≥ 98% confirmed as spam over 30 days, plus shadow-mode precision), the
+bot ignores `ai` in such a cell: `auto known,ai` acts as `auto known`, and a cell with only `ai`
+acts as its fallback (`ask` unless you set another), so known spam keeps exactly the outcome you
+configured. A review of an AI verdict never bans when it times out. Version 0.1 doesn't track the record yet, so the AI never auto-bans in 0.1. A
+near-duplicate that isn't close enough to count as known spam never acts on its own either: it
+only sends the message to the AI.
+
+## What the AI sees
+
+The message, redacted, plus a short **context bundle** when the group's `ai.context` is on (the
+default; turn it off for privacy-sensitive groups): the message it replies to, up to 5 earlier
+messages from the last 10 minutes, the group's name, topic and allowed-content summary, the
+sender's tenure, role and recent activity, and replies the message already got. Phone numbers,
+emails, mentions and people's names are masked, each message is cut to 200 characters, and the
+whole context is capped at 2,000 characters, dropping the oldest first. It is sent as data the
+model is told not to follow. The bot keeps these recent messages in memory only, for at most an
+hour, and never stores them for the AI.
+
 ## Providers
 
 Set `ai.provider` in `config.yaml` (or `AI_PROVIDER`):
@@ -17,6 +51,9 @@ The API key is read from the environment variable named by `ai.api_key_env` (def
 `AI_API_KEY`). It is never read from the file, and the Anthropic adapter ignores
 `ANTHROPIC_API_KEY` and other `ANTHROPIC_*` variables, so only the key you configured is used.
 
+`google` is accepted by the configuration but has no adapter in this version; the bot refuses to
+start with it.
+
 ### Structured output
 
 `ai.structured_output` picks how the model is held to the verdict format
@@ -27,6 +64,9 @@ The API key is read from the environment variable named by `ai.api_key_env` (def
   that call is repeated in JSON mode and JSON mode is used until the bot restarts.
 - `native`: always native schema output.
 - `json`: JSON mode plus strict validation. Use this for local servers without schema support.
+
+Value limits in the schema (number ranges, string lengths, list sizes) are not sent to providers,
+which often reject them; every answer is still checked against the full schema.
 
 Output that fails validation is retried once, then treated as **unsure** (the admins decide).
 
@@ -40,8 +80,8 @@ retry on their own, so one check costs at most two calls (the second only after 
 ## Budgets
 
 AI calls are counted per group per day, and per instance per day and per month, in the `ai_usage`
-table (UTC days and months). The per-group default is 200 calls a day; the instance limits are off
-unless set. When any budget is used up, uncertain messages go straight to the admins until the
+table (UTC days and months). The per-group default is 200 calls a day (the group setting
+`ai.daily_budget_calls`); the instance limits are off unless set. When any budget is used up, uncertain messages go straight to the admins until the
 window resets; nothing is deleted because a budget ran out. The operator gets one alert per budget
 and window when 80% is used.
 

@@ -28,6 +28,9 @@ const (
 	DefaultTTL         = 30 * 24 * time.Hour // ai_cache retention (§11)
 	DefaultClusterTTL  = 24 * time.Hour      // how long a cluster or campaign reuses its first verdict
 	DefaultMaxClusters = 50_000              // bound on in-memory cluster entries
+	// DefaultFlightTimeout bounds a shared call (store lookups, budget, provider calls) once
+	// the caller that started it has gone, so a hung store can't block a cluster forever.
+	DefaultFlightTimeout = 5 * time.Minute
 )
 
 // Key is the result-cache key: sha256 over the normalized text, the context hash, the model and
@@ -86,11 +89,13 @@ type Options[V any] struct {
 	// Definitive reports whether a verdict may be cached and reused (spam or not_spam). Required.
 	Definitive func(V) bool
 	// Sanitize prepares a verdict for storage and reuse, e.g. capping and redacting the reason so
-	// no message text is kept (§17). Optional.
-	Sanitize    func(V) V
-	TTL         time.Duration // 0 means DefaultTTL
-	ClusterTTL  time.Duration // 0 means DefaultClusterTTL
-	MaxClusters int           // 0 means DefaultMaxClusters
+	// no message text is kept (§17). It also runs on the value returned with a failure, which
+	// may be the zero value. Optional.
+	Sanitize      func(V) V
+	TTL           time.Duration // 0 means DefaultTTL
+	ClusterTTL    time.Duration // 0 means DefaultClusterTTL
+	MaxClusters   int           // 0 means DefaultMaxClusters
+	FlightTimeout time.Duration // 0 means DefaultFlightTimeout
 }
 
 // Request identifies one classification.
@@ -110,6 +115,15 @@ type Cache[V any] struct {
 
 	mu       sync.Mutex
 	clusters map[string]clusterEntry[V]
+	flights  map[string]*flightState // the context of each shared call, by flight key
+}
+
+// flightState is the context of one shared call and how many callers are waiting on it. The
+// call runs until it finishes, FlightTimeout passes, or the last waiting caller gives up.
+type flightState struct {
+	ctx     context.Context
+	cancel  context.CancelFunc
+	waiters int
 }
 
 type clusterEntry[V any] struct {
@@ -128,7 +142,7 @@ func New[V any](store Store, clk clock.Clock, opts Options[V]) (*Cache[V], error
 	if store == nil || clk == nil || opts.Definitive == nil {
 		return nil, errors.New("cache: store, clock and Definitive are required")
 	}
-	if opts.TTL < 0 || opts.ClusterTTL < 0 || opts.MaxClusters < 0 {
+	if opts.TTL < 0 || opts.ClusterTTL < 0 || opts.MaxClusters < 0 || opts.FlightTimeout < 0 {
 		return nil, errors.New("cache: durations and sizes must not be negative")
 	}
 	if opts.TTL == 0 {
@@ -140,7 +154,10 @@ func New[V any](store Store, clk clock.Clock, opts Options[V]) (*Cache[V], error
 	if opts.MaxClusters == 0 {
 		opts.MaxClusters = DefaultMaxClusters
 	}
-	return &Cache[V]{store: store, clock: clk, opts: opts, clusters: map[string]clusterEntry[V]{}}, nil
+	if opts.FlightTimeout == 0 {
+		opts.FlightTimeout = DefaultFlightTimeout
+	}
+	return &Cache[V]{store: store, clock: clk, opts: opts, clusters: map[string]clusterEntry[V]{}, flights: map[string]*flightState{}}, nil
 }
 
 // Do returns the cluster's verdict, else the cached one, else calls classify. Concurrent calls
@@ -149,8 +166,9 @@ func New[V any](store Store, clk clock.Clock, opts Options[V]) (*Cache[V], error
 // A store read error is not fatal: the call goes ahead uncached and the error is returned
 // alongside the verdict for logging. A failed classify returns its error and caches nothing.
 // Only the caller whose classify ran gets its verdict unsanitized; every other caller gets the
-// sanitized copy. The shared call does not stop when the caller that started it gives up (its
-// classify is bounded by the provider timeout), so copies still waiting get an answer.
+// sanitized copy. The shared call does not stop when the caller that started it gives up, so
+// copies still waiting get an answer; it stops when no caller is waiting any more, and at
+// Options.FlightTimeout at the latest.
 func (c *Cache[V]) Do(ctx context.Context, req Request, classify func(context.Context) (V, error)) (V, Source, error) {
 	if req.Key == "" {
 		var zero V
@@ -163,11 +181,14 @@ func (c *Cache[V]) Do(ctx context.Context, req Request, classify func(context.Co
 	if req.Cluster != "" {
 		flightKey = "c:" + req.Cluster
 	}
+	fs := c.join(ctx, flightKey)
+	defer c.leave(flightKey, fs)
 	var storeErr error
 	led := false // only the caller whose function runs made the provider call
-	flightCtx := context.WithoutCancel(ctx)
 	ch := c.flight.DoChan(flightKey, func() (any, error) {
 		led = true
+		flightCtx := fs.ctx
+		defer c.finish(flightKey, fs)
 		// Re-check: a flight that just finished may have filled the cluster.
 		if v, ok := c.cluster(req.Cluster); ok {
 			return result[V]{v, v, SourceCluster}, nil
@@ -208,6 +229,45 @@ func (c *Cache[V]) Do(ctx context.Context, req Request, classify func(context.Co
 			return v, SourceFresh, r.Err
 		}
 		return v, src, storeErr
+	}
+}
+
+// join registers the caller as waiting on the flight for key, creating its context if needed.
+func (c *Cache[V]) join(ctx context.Context, key string) *flightState {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	fs := c.flights[key]
+	if fs == nil {
+		fctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), c.opts.FlightTimeout)
+		fs = &flightState{ctx: fctx, cancel: cancel}
+		c.flights[key] = fs
+	}
+	fs.waiters++
+	return fs
+}
+
+// leave unregisters a caller; the last one out cancels the call, since nobody needs its answer.
+func (c *Cache[V]) leave(key string, fs *flightState) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	fs.waiters--
+	if fs.waiters == 0 {
+		fs.cancel()
+		if c.flights[key] == fs {
+			delete(c.flights, key)
+			// A copy arriving before the cancelled call returns must start a new call, not
+			// join one that can only fail.
+			c.flight.Forget(key)
+		}
+	}
+}
+
+// finish forgets a flight's context once its call has returned, so the next call gets a new one.
+func (c *Cache[V]) finish(key string, fs *flightState) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.flights[key] == fs {
+		delete(c.flights, key)
 	}
 }
 

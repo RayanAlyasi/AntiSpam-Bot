@@ -15,6 +15,9 @@ package-lock.json
 CLAUDE.local.md
 .DS_Store
 
+# GoReleaser output
+dist/
+
 # Deployment secrets (copied from env.example)
 .env
 .env.local

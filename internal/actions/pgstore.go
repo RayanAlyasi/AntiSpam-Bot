@@ -14,7 +14,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/clock"
-	"github.com/RayanAlyasi/AntiSpam-Bot/internal/store"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/store/db"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/wa"
 )
@@ -324,7 +323,7 @@ func (s *PGStore) Control(ctx context.Context, scope string) (Control, error) {
 // UpdateControl implements Store: a locked read-modify-write in one transaction.
 func (s *PGStore) UpdateControl(ctx context.Context, scope string, change func(*Control)) (Control, error) {
 	var c Control
-	err := store.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+	err := inTx(ctx, s.pool, func(tx pgx.Tx) error {
 		var err error
 		c, err = s.updateControl(ctx, tx, scope, change)
 		return err
@@ -397,7 +396,7 @@ func optInt(v int64) pgtype.Int8 { return pgtype.Int8{Int64: v, Valid: v != 0} }
 // UpdateControlAudited implements AuditedControl: the change and its audit_log entry commit together.
 func (s *PGStore) UpdateControlAudited(ctx context.Context, scope string, change func(*Control) AuditEntry) (Control, error) {
 	var c Control
-	err := store.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+	err := inTx(ctx, s.pool, func(tx pgx.Tx) error {
 		var entry AuditEntry
 		var err error
 		if c, err = s.updateControl(ctx, tx, scope, func(c *Control) { entry = change(c) }); err != nil {
@@ -419,8 +418,35 @@ func writeAudit(ctx context.Context, q db.DBTX, e AuditEntry) error {
 	if err != nil {
 		return fmt.Errorf("encode audit diff: %w", err)
 	}
-	if _, err := store.WriteAudit(ctx, q, store.AuditEntry{Actor: e.Actor, Action: e.Action, Diff: diff}); err != nil {
+	if e.Actor == "" || e.Action == "" {
+		return fmt.Errorf("audit entry needs an actor and an action, got %q/%q", e.Actor, e.Action)
+	}
+	if _, err := db.New(q).InsertAuditLog(ctx, db.InsertAuditLogParams{Actor: e.Actor, Action: e.Action, Diff: diff}); err != nil {
 		return fmt.Errorf("write audit %s: %w", e.Action, err)
 	}
+	return nil
+}
+
+// inTx runs fn in a transaction on pool, committing when it returns nil and rolling back
+// otherwise. It mirrors store.InTx, which this package can't import: store depends on policy,
+// and policy enqueues through this package.
+func inTx(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) error {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed { // an error or a panic (which keeps propagating)
+			_ = tx.Rollback(context.WithoutCancel(ctx))
+		}
+	}()
+	if err := fn(tx); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	committed = true
 	return nil
 }

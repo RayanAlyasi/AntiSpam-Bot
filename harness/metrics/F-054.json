@@ -1,0 +1,23 @@
+{
+ "feature": "F-054",
+ "branch": "feat/wp-i-local-ban",
+ "category": "policy",
+ "core": false,
+ "harness_version": "2b4b2b9023da",
+ "commit": "d8132c6",
+ "gate_runs": 7,
+ "gate_first_pass": true,
+ "gate_failed_steps": [],
+ "acceptance_first_pass": true,
+ "judge_rounds": 4,
+ "judge_first_verdict": "FAIL",
+ "judge_final_verdict": "PASS",
+ "tamper_hits": 0,
+ "guard_blocks": 3,
+ "test_change_requests": 0,
+ "cost_usd": null,
+ "turns": null,
+ "mutation_score": null,
+ "human_verdict": null,
+ "ts": "2026-10-17T18:16:29Z"
+}

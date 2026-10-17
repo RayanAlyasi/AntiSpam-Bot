@@ -176,6 +176,25 @@ def flow_tests():
     r = git("commit", "-qm", "chore: progress")
     report("bookkeeping-only commit needs no stamp", r.returncode == 0, r.stderr)
 
+    print("-- judge verdict delivered through the transcript hand-back")
+
+    def transcript(verdict):
+        path = os.path.join(TMP, f"judge-{verdict}.jsonl")
+        entry = {"type": "assistant", "message": {"role": "assistant", "content": [
+            {"type": "tool_use", "name": "SubagentHandback", "input": {"message": f"{verdict}\nreport body"}}]}}
+        with open(path, "w") as f:
+            f.write(json.dumps({"type": "user", "message": {"role": "user", "content": "review F-001"}}) + "\n")
+            f.write(json.dumps(entry) + "\n")
+        return path
+    open(A("internal/foo/foo.go"), "a").write("// second change\n")
+    git("add", "-A")
+    hook("stamp.py", {"last_assistant_message": "", "agent_type": "judge", "agent_transcript_path": transcript("FAIL")})
+    report("hand-back FAIL writes no stamp", not os.listdir(stamps))
+    r = hook("stamp.py", {"last_assistant_message": "", "agent_type": "judge", "agent_transcript_path": transcript("PASS")})
+    report("hand-back PASS (empty last message) writes a stamp", len(os.listdir(stamps)) == 1, r.stderr)
+    report("commit allowed after hand-back PASS", guard_commit() == 0)
+    git("reset", "-q", "--hard", "HEAD")
+
     print("-- tamper audit")
 
     def tamper():

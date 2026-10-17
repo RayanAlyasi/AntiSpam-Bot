@@ -1,0 +1,25 @@
+{
+ "feature": "F-064",
+ "branch": "feat/wp-h-postgres-wiring",
+ "category": "queue",
+ "core": true,
+ "harness_version": "2b4b2b9023da",
+ "commit": "616c517",
+ "gate_runs": 12,
+ "gate_first_pass": false,
+ "gate_failed_steps": [
+  "test"
+ ],
+ "acceptance_first_pass": false,
+ "judge_rounds": 3,
+ "judge_first_verdict": "FAIL",
+ "judge_final_verdict": "PASS",
+ "tamper_hits": 0,
+ "guard_blocks": 6,
+ "test_change_requests": 0,
+ "cost_usd": null,
+ "turns": null,
+ "mutation_score": null,
+ "human_verdict": null,
+ "ts": "2026-10-17T18:22:35Z"
+}

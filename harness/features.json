@@ -1411,8 +1411,12 @@
         "F-004"
       ],
       "description": "Actions are stored with kind, payload, priority P0–P4, not_before, deadline and a unique dedupe key, and can be enqueued in the same transaction as the detection that caused them.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions (integration): TestPGEnqueueTxCommitsWithDetection, TestPGDedupeKeyUniqueForever, TestPGSetCeilingPersistsAndIsAudited",
+        "internal/actions: TestPGStoreContract, TestMemStoreContract, TestEnqueueTxCommitsWithTheDetection, TestOperatorAuditsInTheSameTransaction, TestConfigFromPacingDefaultsMatch, TestNULIsStrippedOrRefused",
+        "judge review: .agent/logs/judge-F-064.md"
+      ]
     },
     {
       "id": "F-065",
@@ -1429,8 +1433,12 @@
         "F-008"
       ],
       "description": "Exactly one executor goroutine per bot pulls actions with SKIP LOCKED ordered by priority, not_before and id, keeps an in-memory heap refilled from the table, and resumes correctly after a crash.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions (integration): TestPGOneExecutorPerBotAcrossProcesses, TestPGCrashRecoveryRerunsRunningActions, TestPGExecutorPriorityOrderAndPacing, TestPGKicksCoalesce, TestPGKillSwitchAcrossStores",
+        "internal/actions: TestPGLockAcrossStores, TestPGClaimSkipsLockedRows, TestExecutorOnPostgres, TestOneExecutorPerBotAndRecovery, TestLockLossStopsCalls",
+        "judge review: .agent/logs/judge-F-064.md"
+      ]
     },
     {
       "id": "F-066",
@@ -1895,8 +1903,14 @@
         "F-004"
       ],
       "description": "Routes that ask admins create reviews (kind, subject, proposed action, deadline, on_timeout) with a unique short code such as K7Q2, and dashboard is the default destination.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/review TestOpenAssignsUniqueCodes",
+        "TestOpenRetriesTakenCodes",
+        "TestOpenPostsToReviewGroupOnly",
+        "internal/review/pgstore TestFirstVoteWinsOnPostgres",
+        "TestStoreQueries (integration)"
+      ]
     },
     {
       "id": "F-087",

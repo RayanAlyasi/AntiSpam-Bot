@@ -36,6 +36,8 @@ They can run ahead of P1 and P2 work during a raid, so they're never starved.
 | Kick batch | 8 members per call | Kicks in one group within 2.5 s are merged; at most 4 calls in a row before other groups get a turn. |
 | Reads (lookups) | 20/min, burst 5 | A separate budget: lookups never slow down deletes. |
 
+These are the `pacing` settings in `config.yaml` ([configuration](configuration.md#pacing-outbound-write-pacing)).
+
 **Slow down only.** On a warning sign (a 429 rate limit, an unusual error, a server answer slower
 than 10 s, or a disconnect within a minute of a write) the rate drops to a quarter, but not below
 2 writes/min. It recovers by 1 write/min after every 15 calm minutes, and never above the ceiling.
@@ -80,3 +82,13 @@ audited.
 - Every action has a deadline. Work that can no longer matter is dropped and logged, for example a delete older than ~48 h or a warning older than 10 minutes.
 - If the sender deletes their message first, the pending delete is cancelled.
 - The bot never sends the same text twice in a row to different chats: messages come with alternative wordings.
+
+## What survives a restart
+
+The queue lives in Postgres (`app.actions`), so nothing queued is lost. Detections and the actions
+they cause commit in one transaction. The kill switch, an open breaker, a manual ceiling, the
+slowed-down rate and a running 429 pause are stored too (`app.action_controls`), so a restart
+never puts a bot back at full speed. An action that was running when the process stopped runs
+again. Each bot has exactly one executor, even with several processes on one database. If the
+executor's lock connection to Postgres drops, it stops writing at once and waits until it holds
+the lock again; another process may take the bot over meanwhile.

@@ -1128,8 +1128,11 @@
         "F-004"
       ],
       "description": "Every non-clean verdict is stored with score, tier reached, signals, confidence source, route, rule version, action plan and mode.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/store TestDetectionsStore (integration)",
+        "internal/policy TestDetectionRecord"
+      ]
     },
     {
       "id": "F-054",
@@ -1147,8 +1150,20 @@
         "F-006"
       ],
       "description": "Group settings are a versioned JSON document validated against a Go struct and JSON Schema, every leaf is reachable by dotted key for get/set, changes write history and the audit log, and caches refresh via NOTIFY.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/store TestSettingsSaveVersionsHistoryAuditNotify (integration)",
+        "TestSettingsConflict (integration)",
+        "internal/policy TestSettingsServiceDefaultsThenVersions",
+        "TestSettingsServiceConflictRetries",
+        "TestSettingsServiceCacheAndInvalidate",
+        "TestSettingsServiceSaveReappliesChanges",
+        "TestGetSet",
+        "TestKeysCoverEveryLeaf",
+        "TestParseRejects",
+        "TestSchemaMatchesDocument",
+        "TestParseStoredFillsNewKeys"
+      ]
     },
     {
       "id": "F-055",

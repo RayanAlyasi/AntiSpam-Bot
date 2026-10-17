@@ -5,7 +5,6 @@ import (
 	"errors"
 	"slices"
 	"sync/atomic"
-	"unicode/utf8"
 
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/ai"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/ai/aimetrics"
@@ -13,6 +12,7 @@ import (
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/ai/cache"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/ai/llm"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/clock"
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/normalize/redact"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/scoring"
 )
 
@@ -110,16 +110,16 @@ func Definitive(v ai.Verdict) bool {
 	return v.Label == ai.LabelSpam || v.Label == ai.LabelNotSpam
 }
 
-// Sanitize prepares a verdict for storage and for copies in other groups: the reason is capped
-// for spam and dropped for not_spam, so no normal-message text is kept (DESIGN.md §17).
+// Sanitize prepares a verdict for storage and for copies in other groups: the reason is redacted
+// with the shared helper (phone numbers, emails, mentions) and capped for spam, and dropped for
+// not_spam, so no normal-message text or personal data is kept (DESIGN.md §17).
 func Sanitize(v ai.Verdict) ai.Verdict {
 	v.Categories = slices.Clone(v.Categories)
-	switch {
-	case v.Label != ai.LabelSpam:
+	if v.Label != ai.LabelSpam {
 		v.Reason = ""
-	case utf8.RuneCountInString(v.Reason) > maxStoredReason:
-		v.Reason = string([]rune(v.Reason)[:maxStoredReason-1]) + "…"
+		return v
 	}
+	v.Reason = redact.Text(v.Reason, redact.Options{MaxRunes: maxStoredReason})
 	return v
 }
 

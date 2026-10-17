@@ -1,6 +1,6 @@
 # WhatsApp Anti-Spam Bot: Design Document
 
-**Status:** Draft for review (revision 12: release automation specified (release-please, GoReleaser with Immutable Releases, release App, back-merge, PR title lint, docs-check agent); revision 11: v0.1 milestone first, and the release and versioning plan in §23; revision 10: tech stack decided (Go modular monolith, Postgres only, River), no embeddings in the core, frontend decided later; revision 9: context bundle for the AI, explicit AI cost controls, provider-neutral AI classifier; revision 8: spam-only bootstrap, no collection of normal messages, certainty routing as the core flow; revision 7: generic labeled-dataset import replaces the old-database import, and a manual phone-number blacklist; revision 6: AI and learning in the first version; revision 5: new enforcement model with instant delete + ban by default, no trust grace on detection, silent bot, auto-ban matrix and ask-admins mode; revision 4: adds hacked-account handling, one-number capacity model, unbounded queue with slow-down-only pacing and capped kick batches, and the open-source/self-hosting framing to revision 3's network bans and spammer intelligence). Nothing is built yet.
+**Status:** Draft for review (revision 12: release automation specified (release-please, GoReleaser with Immutable Releases, release App, back-merge, PR title lint; no docs agent); revision 11: v0.1 milestone first, and the release and versioning plan in §23; revision 10: tech stack decided (Go modular monolith, Postgres only, River), no embeddings in the core, frontend decided later; revision 9: context bundle for the AI, explicit AI cost controls, provider-neutral AI classifier; revision 8: spam-only bootstrap, no collection of normal messages, certainty routing as the core flow; revision 7: generic labeled-dataset import replaces the old-database import, and a manual phone-number blacklist; revision 6: AI and learning in the first version; revision 5: new enforcement model with instant delete + ban by default, no trust grace on detection, silent bot, auto-ban matrix and ask-admins mode; revision 4: adds hacked-account handling, one-number capacity model, unbounded queue with slow-down-only pacing and capped kick batches, and the open-source/self-hosting framing to revision 3's network bans and spammer intelligence). Nothing is built yet.
 **Stack:** Go + [whatsmeow](https://github.com/tulir/whatsmeow) (`go.mau.fi/whatsmeow`), PostgreSQL, Docker Compose (ARM64 + AMD64); runs anywhere Docker does (the user's own instance runs on Coolify).
 **Scope:** A from-scratch rewrite. The existing Baileys/Node code in this repo is ignored.
 **Project type:** **open source and self-hosted**, aimed at big groups and communities. Anyone can run their own instance with one `docker compose up`. Throughout this document, **"operator" means whoever deploys an instance**, and "global" means "across all groups of that one deployment".
@@ -1950,7 +1950,7 @@ Poisoning guards, promotion and re-weighting come with learning in v0.2.
   - **Workflow and tokens:** one workflow on push to main with three jobs (`rp`, `goreleaser`, `back-merge`). A dedicated GitHub App, held in a `release` Environment, is the only bypass actor on the `v*` tag ruleset. An explicit tag-exists check guards against release-please's silent 422.
   - **Back-merge:** a throwaway `sync/main-<tag>` branch PR into staging, merged with a merge commit.
   - **PR titles:** `action-semantic-pull-request` on PRs into staging (Conventional types, lowercase subject).
-  - **Docs-check agent:** `claude-code-action` after CI succeeds on staging; edits README and `docs/*.md` only (never DESIGN.md); opens `docs(sync)` PRs.
+  - **No docs agent:** docs are updated in the same PR as the change, and the judge enforces it (§23.11).
   - **Actions:** all pinned by SHA (table in §23.9).
   - **Docker tags:** `X.Y.Z` is immutable; `X.Y`/`latest` move on stable releases only; `edge` builds from staging.
   - **No LTS.**
@@ -2012,7 +2012,7 @@ Poisoning guards, promotion and re-weighting come with learning in v0.2.
 14. **AI context default:** send the context bundle (replies, the previous 5 messages, group info, sender context) by default (current), or default it off and let groups opt in? It improves accuracy but sends other members' recent messages to the AI provider.
 15. **Track-record bar:** is "≥ 200 admin decisions with ≥ 98% confirmed as spam over 30 days, plus hold-out precision" the right bar before `ai` may be allowed to auto-ban?
 16. **v0.1 AI provider for the friend's instance:** which OpenAI-compatible or Anthropic model will the friend's instance use for the v0.1 AI check, and what budget? It's the same question as Q13, but it needs an answer before the first rc.
-17. **Release setup checks (§23.13):** pre-release tag behaviour, editable notes on immutable releases, `docker_signs` with `dockers_v2`, the App bypass and 422 on `createRef`, `.claude/` hooks in the docs workflow, `require_extra_approval_for_unattributed_changes`, and release-please on `release/*` and for `-rc.N`. These are verification items, not open decisions. **Maintainer prerequisites** (the release App, the `release` environment, `ANTHROPIC_API_KEY`, and the "Actions may create PRs" setting vs. a docs App) are listed in §23.12.
+17. **Release setup checks (§23.13):** pre-release tag behaviour, editable notes on immutable releases, `docker_signs` with `dockers_v2`, the App bypass and 422 on `createRef`, `require_extra_approval_for_unattributed_changes`, and release-please on `release/*` and for `-rc.N`. These are verification items, not open decisions. **Maintainer prerequisites** (the release App, the `release` environment, `ANTHROPIC_API_KEY`, and the "Actions may create PRs" setting vs. a docs App) are listed in §23.12.
 18. **Website frontend framework:** React, Svelte or Next.js for the separate frontend app (§13.1)? To be decided when the full version is built; the API (`/api/v1`, OpenAPI) comes first either way.
 
 **Project:**
@@ -2154,7 +2154,7 @@ The repository uses **Conventional Commits** (switched in PR #4), so **[release-
   - **visible:** Features (`feat`), Bug Fixes (`fix`), Performance (`perf`), Documentation (`docs`), Reverts (`revert`);
   - **hidden:** `refactor`, `chore`, `test`, `ci`, `build`.
 
-  **Visible `docs` commits trigger patch releases.** That includes the docs-check agent's `docs(sync)` PRs (§23.11), so let docs changes batch up on staging rather than releasing for each one.
+  **Visible `docs` commits trigger patch releases,** so let docs changes batch up on staging rather than releasing for each one.
 - **Breaking changes and upgrade steps** are written in the commit's **`BREAKING CHANGE:` footer** (or as `feat!:`). release-please puts them at the top of the release notes under "⚠ BREAKING CHANGES", which gives the "Breaking changes / Upgrade steps first" rule in §23.7. The GitHub release body is release-please's notes; GoReleaser's own changelog is disabled.
 - **Merging:** release-please's release PR, like the staging → main release PR, is merged with a **merge commit, never squashed**. Release PRs are the **one allowed exception** to "PRs into `main` come from `staging`".
 
@@ -2235,7 +2235,6 @@ The moving **`0.1` tag is the stable channel.** The docs tell deployers to pin *
 |---|---|---|
 | `googleapis/release-please-action` | v5.0.0 | `45996ed1f6d02564a971a2fa1b5860e934307cf7` |
 | `amannn/action-semantic-pull-request` | v6.1.1 | `48f256284bd46cdaab1048c3721360e808335d50` |
-| `anthropics/claude-code-action` | v1.0.252 | `f27be6b65a4652f08a2ba3cff79114829b588967` |
 | `goreleaser/goreleaser-action` | v7.3.0 | `a4f02ab5355a589de60d917a659ce617ed19b3de` |
 | `actions/create-github-app-token` | v3.3.0 (use `client-id`) | `64ab729a6294000f5aa4a4bc0b73d1f32bc45510` |
 | `actions/checkout` | v7.0.1 | `3d3c42e5aac5ba805825da76410c181273ba90b1` |
@@ -2288,7 +2287,7 @@ Events caused by `GITHUB_TOKEN` don't start other workflows, so a tag created in
 - The `back-merge` job cuts a throwaway branch **`sync/main-<tag>`** from `main` and opens a PR into `staging`, merged with a **merge commit, never squashed**.
 - It doesn't open a PR from `main` directly. A PR from `main` can't be updated or conflict-resolved without commits to `main` itself; the throwaway branch can be fixed by hand if a conflict appears.
 
-### 23.11 PR title lint and the docs-check agent
+### 23.11 PR title lint and docs upkeep
 
 #### PR title lint
 
@@ -2297,36 +2296,20 @@ Events caused by `GITHUB_TOKEN` don't start other workflows, so a tag created in
 - The subject **must not start with an uppercase letter**.
 - PRs into staging are squash-merged, so the PR title becomes the Conventional Commit that release-please reads.
 
-#### The docs-check agent
+#### Docs upkeep (no docs agent)
 
-The agent keeps user-facing docs in step with the code after changes land on staging.
+There is **no automated docs agent** (decided 2026-10-17). User-facing docs stay current through the normal feature flow:
+- the builder updates README and `docs/` in the **same PR** as any change to behaviour, configuration, commands or deployment;
+- the judge treats a missing docs update as a **major** finding (CLAUDE.md, "Commits and pull requests").
 
-- **Trigger:** `anthropics/claude-code-action` v1 on **`workflow_run`**, after CI **succeeds** on a push to `staging`.
-  - The action doesn't support `push`.
-  - A `workflow_run` workflow only takes effect once its file is on **`main`**.
-- **Scope:** it may edit **`README.md` and `docs/*.md` only**, and **never `docs/DESIGN.md`**.
-- **Deny rules:**
-  - `CLAUDE.md`, `.claude/**`, `harness/**`, `acceptance/**` and `.github/**`;
-  - web tools.
-- **Two jobs:**
-  1. the agent job proposes changes;
-  2. a separate job **validates the changed paths** against the allow-list and opens a **`docs(sync): …` PR into `staging`**.
-
-  The **`docs(sync)` prefix guard** stops the workflow from running on its own PRs, so it can't loop.
-- **Caps:** `--max-turns`, a job timeout, and a concurrency group (one run at a time).
-- **Credentials:**
-  - an **`ANTHROPIC_API_KEY`** repository secret;
-  - opening PRs with `GITHUB_TOKEN` needs the repository setting **"Allow GitHub Actions to create and approve pull requests"**, which is **currently off**;
-  - the alternative is a **separate, low-privilege docs App**, and **never the release App**.
+This avoids an extra paid agent run on every merge, and the repository secrets and PR-creation setting it would need.
 
 ### 23.12 The maintainer's release procedure
 
-**One-time prerequisites** (before the release features F-094, F-096 and F-097):
+**One-time prerequisites** (before the release features F-094 and F-097):
 1. Create the **release GitHub App** (Contents, Pull requests and Issues: read and write) and install it on this repository only.
 2. Add the App as the **only bypass actor** on the `v*` tag ruleset.
 3. Create the **`release` Environment**, restricted to `main` (and `release/*`), holding the App's client ID and private key.
-4. Add the **`ANTHROPIC_API_KEY`** secret for the docs-check agent.
-5. Decide between turning on **"Allow GitHub Actions to create and approve pull requests"** and creating a separate **docs App**.
 
 **Normal release:**
 1. **Release PR** `staging` → `main`, merged with a **merge commit**.
@@ -2359,7 +2342,6 @@ The agent keeps user-facing docs in step with the code after changes land on sta
 - Whether GoReleaser's **`docker_signs`** covers images built with **`dockers_v2`**.
 - Whether the tag ruleset honours the **App bypass for `createRef`** (`POST /git/refs`).
 - Whether a ruleset-blocked `createRef` really returns **422** (the case the "tag exists" check guards against).
-- Whether the repository's **`.claude/` hooks load** inside the docs-check workflow.
 - What **`require_extra_approval_for_unattributed_changes`** on the branch ruleset means for App-authored and back-merge PRs.
 - release-please on **`release/*`** (target branch) for hotfixes, and its **prerelease versioning** (`-rc.N`) for tagged release candidates.
 

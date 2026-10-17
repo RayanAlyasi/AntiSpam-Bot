@@ -192,7 +192,7 @@ func (c *Client) send(ctx context.Context, req llm.Request, native bool) (llm.Re
 		MaxTokens: maxTok,
 	}
 	if native {
-		body.ResponseFormat = responseFormat{Type: "json_schema", JSONSchema: &jsonSchemaFormat{Name: "verdict", Strict: true, Schema: req.Schema}}
+		body.ResponseFormat = responseFormat{Type: "json_schema", JSONSchema: &jsonSchemaFormat{Name: "verdict", Strict: true, Schema: llm.PortableSchema(req.Schema)}}
 	} else {
 		body.ResponseFormat = responseFormat{Type: "json_object"}
 	}

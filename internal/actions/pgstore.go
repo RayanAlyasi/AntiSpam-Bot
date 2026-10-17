@@ -2,6 +2,8 @@ package actions
 
 import (
 	"context"
+	crand "crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,6 +25,10 @@ type PGStore struct {
 	pool  *pgxpool.Pool
 	clock clock.Clock
 
+	// owner fences claims: only this store instance settles the actions it claimed, so an
+	// executor that lost its lock mid-call can't overwrite the new owner's state.
+	owner string
+
 	mu    sync.Mutex
 	locks map[wa.JID]*lockConn // executor locks held by this store
 }
@@ -34,7 +40,7 @@ func NewPGStore(pool *pgxpool.Pool, c clock.Clock) *PGStore {
 	if c == nil {
 		c = clock.Real{}
 	}
-	return &PGStore{pool: pool, clock: c}
+	return &PGStore{pool: pool, clock: c, owner: newOwner()}
 }
 
 // Enqueue implements Store in its own transaction.
@@ -219,7 +225,7 @@ func (s *PGStore) Pending(ctx context.Context, bot, chat wa.JID, kind Kind) ([]A
 
 // Claim implements Store with FOR UPDATE SKIP LOCKED.
 func (s *PGStore) Claim(ctx context.Context, id int64) (Action, bool, error) {
-	row, err := db.New(s.pool).ClaimAction(ctx, db.ClaimActionParams{ID: id, Now: s.clock.Now()})
+	row, err := db.New(s.pool).ClaimAction(ctx, db.ClaimActionParams{ID: id, Now: s.clock.Now(), Owner: s.owner})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Action{}, false, nil
 	}
@@ -241,13 +247,13 @@ func (s *PGStore) Finish(ctx context.Context, id int64, status Status, errText s
 	}
 	n, err := db.New(s.pool).FinishAction(ctx, db.FinishActionParams{
 		ID: id, Status: string(status), LastError: errText, Result: result, Now: s.clock.Now(),
-		Called: status == StatusDone || status == StatusFailed,
+		Called: status == StatusDone || status == StatusFailed, Owner: s.owner,
 	})
 	if err != nil {
 		return fmt.Errorf("finish action %d: %w", id, err)
 	}
 	if n == 0 {
-		return fmt.Errorf("finish action %d: not running", id)
+		return fmt.Errorf("finish action %d: not running, or claimed by another executor", id)
 	}
 	return nil
 }
@@ -260,13 +266,13 @@ func (s *PGStore) Retry(ctx context.Context, id int64, r RetryInfo) error {
 	}
 	n, err := db.New(s.pool).RetryAction(ctx, db.RetryActionParams{
 		ID: id, NotBefore: r.NotBefore, LastError: r.Error, Result: result, Now: s.clock.Now(),
-		Called: r.Called, Attempted: r.Attempted,
+		Called: r.Called, Attempted: r.Attempted, Owner: s.owner,
 	})
 	if err != nil {
 		return fmt.Errorf("retry action %d: %w", id, err)
 	}
 	if n == 0 {
-		return fmt.Errorf("retry action %d: not running", id)
+		return fmt.Errorf("retry action %d: not running, or claimed by another executor", id)
 	}
 	return nil
 }
@@ -414,9 +420,12 @@ type PGAuditor struct{ DB db.DBTX }
 func (a PGAuditor) Audit(ctx context.Context, e AuditEntry) error { return writeAudit(ctx, a.DB, e) }
 
 func writeAudit(ctx context.Context, q db.DBTX, e AuditEntry) error {
-	diff, err := json.Marshal(e.Diff)
-	if err != nil {
-		return fmt.Errorf("encode audit diff: %w", err)
+	diff := json.RawMessage(`{}`) // like store.WriteAudit: no diff is an empty object
+	if e.Diff != nil {
+		var err error
+		if diff, err = json.Marshal(e.Diff); err != nil {
+			return fmt.Errorf("encode audit diff: %w", err)
+		}
 	}
 	if e.Actor == "" || e.Action == "" {
 		return fmt.Errorf("audit entry needs an actor and an action, got %q/%q", e.Actor, e.Action)
@@ -430,15 +439,19 @@ func writeAudit(ctx context.Context, q db.DBTX, e AuditEntry) error {
 // inTx runs fn in a transaction on pool, committing when it returns nil and rolling back
 // otherwise. It mirrors store.InTx, which this package can't import: store depends on policy,
 // and policy enqueues through this package.
-func inTx(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) error {
+func inTx(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) (err error) {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
 	committed := false
 	defer func() {
-		if !committed { // an error or a panic (which keeps propagating)
-			_ = tx.Rollback(context.WithoutCancel(ctx))
+		if committed {
+			return
+		}
+		// An error or a panic (which keeps propagating) rolls back.
+		if rbErr := tx.Rollback(context.WithoutCancel(ctx)); rbErr != nil && !errors.Is(rbErr, pgx.ErrTxClosed) && err != nil {
+			err = errors.Join(err, fmt.Errorf("rollback: %w", rbErr))
 		}
 	}()
 	if err := fn(tx); err != nil {
@@ -449,4 +462,11 @@ func inTx(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) error 
 	}
 	committed = true
 	return nil
+}
+
+// newOwner returns a random token naming one store instance.
+func newOwner() string {
+	b := make([]byte, 12)
+	_, _ = crand.Read(b) // crypto/rand.Read never fails
+	return hex.EncodeToString(b)
 }

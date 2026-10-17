@@ -30,6 +30,7 @@ type AppAction struct {
 	Called            bool
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+	ClaimedBy         string
 }
 
 type AppActionControl struct {

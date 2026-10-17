@@ -44,7 +44,7 @@ func (q *Queries) CancelAction(ctx context.Context, arg CancelActionParams) (int
 }
 
 const candidateActions = `-- name: CandidateActions :many
-SELECT id, bot, chat, kind, priority, payload, status, attempts, not_before, deadline, message_time, dedupe_key, reason_detection_id, last_error, result, called, created_at, updated_at FROM app.actions
+SELECT id, bot, chat, kind, priority, payload, status, attempts, not_before, deadline, message_time, dedupe_key, reason_detection_id, last_error, result, called, created_at, updated_at, claimed_by FROM app.actions
 WHERE id IN (
     SELECT ranked.id FROM (
         SELECT p.id,
@@ -94,6 +94,7 @@ func (q *Queries) CandidateActions(ctx context.Context, arg CandidateActionsPara
 			&i.Called,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ClaimedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -106,19 +107,20 @@ func (q *Queries) CandidateActions(ctx context.Context, arg CandidateActionsPara
 }
 
 const claimAction = `-- name: ClaimAction :one
-UPDATE app.actions AS a SET status = 'running', attempts = a.attempts + 1, updated_at = $1
-WHERE a.id = (SELECT c.id FROM app.actions AS c WHERE c.id = $2 AND c.status = 'pending' FOR UPDATE SKIP LOCKED)
-RETURNING a.id, a.bot, a.chat, a.kind, a.priority, a.payload, a.status, a.attempts, a.not_before, a.deadline, a.message_time, a.dedupe_key, a.reason_detection_id, a.last_error, a.result, a.called, a.created_at, a.updated_at
+UPDATE app.actions AS a SET status = 'running', attempts = a.attempts + 1, updated_at = $1, claimed_by = $2
+WHERE a.id = (SELECT c.id FROM app.actions AS c WHERE c.id = $3 AND c.status = 'pending' FOR UPDATE SKIP LOCKED)
+RETURNING a.id, a.bot, a.chat, a.kind, a.priority, a.payload, a.status, a.attempts, a.not_before, a.deadline, a.message_time, a.dedupe_key, a.reason_detection_id, a.last_error, a.result, a.called, a.created_at, a.updated_at, a.claimed_by
 `
 
 type ClaimActionParams struct {
-	Now time.Time
-	ID  int64
+	Now   time.Time
+	Owner string
+	ID    int64
 }
 
 // SKIP LOCKED: a row another transaction is changing (a cancel) is skipped, not waited for.
 func (q *Queries) ClaimAction(ctx context.Context, arg ClaimActionParams) (AppAction, error) {
-	row := q.db.QueryRow(ctx, claimAction, arg.Now, arg.ID)
+	row := q.db.QueryRow(ctx, claimAction, arg.Now, arg.Owner, arg.ID)
 	var i AppAction
 	err := row.Scan(
 		&i.ID,
@@ -139,6 +141,7 @@ func (q *Queries) ClaimAction(ctx context.Context, arg ClaimActionParams) (AppAc
 		&i.Called,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ClaimedBy,
 	)
 	return i, err
 }
@@ -162,7 +165,7 @@ func (q *Queries) CountWritesSince(ctx context.Context, arg CountWritesSincePara
 const expireDueActions = `-- name: ExpireDueActions :many
 UPDATE app.actions SET status = 'expired', last_error = 'deadline passed', updated_at = $1
 WHERE bot = $2 AND status = 'pending' AND deadline <= $1
-RETURNING id, bot, chat, kind, priority, payload, status, attempts, not_before, deadline, message_time, dedupe_key, reason_detection_id, last_error, result, called, created_at, updated_at
+RETURNING id, bot, chat, kind, priority, payload, status, attempts, not_before, deadline, message_time, dedupe_key, reason_detection_id, last_error, result, called, created_at, updated_at, claimed_by
 `
 
 type ExpireDueActionsParams struct {
@@ -198,6 +201,7 @@ func (q *Queries) ExpireDueActions(ctx context.Context, arg ExpireDueActionsPara
 			&i.Called,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ClaimedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -240,7 +244,7 @@ const finishAction = `-- name: FinishAction :execrows
 UPDATE app.actions
 SET status = $1, last_error = $2, result = $3, updated_at = $4,
     called = called OR $5::boolean
-WHERE id = $6 AND status = 'running'
+WHERE id = $6 AND status = 'running' AND claimed_by = $7
 `
 
 type FinishActionParams struct {
@@ -250,6 +254,7 @@ type FinishActionParams struct {
 	Now       time.Time
 	Called    bool
 	ID        int64
+	Owner     string
 }
 
 func (q *Queries) FinishAction(ctx context.Context, arg FinishActionParams) (int64, error) {
@@ -260,6 +265,7 @@ func (q *Queries) FinishAction(ctx context.Context, arg FinishActionParams) (int
 		arg.Now,
 		arg.Called,
 		arg.ID,
+		arg.Owner,
 	)
 	if err != nil {
 		return 0, err
@@ -268,7 +274,7 @@ func (q *Queries) FinishAction(ctx context.Context, arg FinishActionParams) (int
 }
 
 const getAction = `-- name: GetAction :one
-SELECT id, bot, chat, kind, priority, payload, status, attempts, not_before, deadline, message_time, dedupe_key, reason_detection_id, last_error, result, called, created_at, updated_at FROM app.actions WHERE id = $1
+SELECT id, bot, chat, kind, priority, payload, status, attempts, not_before, deadline, message_time, dedupe_key, reason_detection_id, last_error, result, called, created_at, updated_at, claimed_by FROM app.actions WHERE id = $1
 `
 
 func (q *Queries) GetAction(ctx context.Context, id int64) (AppAction, error) {
@@ -293,6 +299,7 @@ func (q *Queries) GetAction(ctx context.Context, id int64) (AppAction, error) {
 		&i.Called,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ClaimedBy,
 	)
 	return i, err
 }
@@ -306,6 +313,20 @@ func (q *Queries) GetActionControl(ctx context.Context, scope string) (json.RawM
 	var state json.RawMessage
 	err := row.Scan(&state)
 	return state, err
+}
+
+const groupPosting = `-- name: GroupPosting :one
+SELECT COALESCE((doc->>'silent')::boolean, true)::boolean AS silent
+FROM app.group_settings WHERE group_jid = $1
+`
+
+// Whether the bot may post in a group (actions.Groups): a group with a settings document is
+// protected; a missing "silent" key counts as silent.
+func (q *Queries) GroupPosting(ctx context.Context, groupJid string) (bool, error) {
+	row := q.db.QueryRow(ctx, groupPosting, groupJid)
+	var silent bool
+	err := row.Scan(&silent)
+	return silent, err
 }
 
 const insertAction = `-- name: InsertAction :one
@@ -351,6 +372,20 @@ func (q *Queries) InsertAction(ctx context.Context, arg InsertActionParams) (int
 	return id, err
 }
 
+const isReviewGroup = `-- name: IsReviewGroup :one
+SELECT EXISTS (
+    SELECT 1 FROM app.group_settings WHERE doc->'review'->>'review_group' = $1::text
+)::boolean AS review_group
+`
+
+// A group named as some protected group's review group isn't protected itself (DESIGN.md §9.7).
+func (q *Queries) IsReviewGroup(ctx context.Context, chat string) (bool, error) {
+	row := q.db.QueryRow(ctx, isReviewGroup, chat)
+	var review_group bool
+	err := row.Scan(&review_group)
+	return review_group, err
+}
+
 const lockActionControl = `-- name: LockActionControl :one
 INSERT INTO app.action_controls (scope, state, updated_at) VALUES ($1, '{}'::jsonb, $2)
 ON CONFLICT (scope) DO UPDATE SET scope = EXCLUDED.scope
@@ -371,7 +406,7 @@ func (q *Queries) LockActionControl(ctx context.Context, arg LockActionControlPa
 }
 
 const pendingActionsInChat = `-- name: PendingActionsInChat :many
-SELECT id, bot, chat, kind, priority, payload, status, attempts, not_before, deadline, message_time, dedupe_key, reason_detection_id, last_error, result, called, created_at, updated_at FROM app.actions
+SELECT id, bot, chat, kind, priority, payload, status, attempts, not_before, deadline, message_time, dedupe_key, reason_detection_id, last_error, result, called, created_at, updated_at, claimed_by FROM app.actions
 WHERE bot = $1 AND chat = $2 AND kind = $3 AND status = 'pending'
 ORDER BY id
 `
@@ -410,6 +445,7 @@ func (q *Queries) PendingActionsInChat(ctx context.Context, arg PendingActionsIn
 			&i.Called,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ClaimedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -444,7 +480,7 @@ UPDATE app.actions
 SET status = 'pending', not_before = $1, last_error = $2, result = $3, updated_at = $4,
     called = called OR $5::boolean,
     attempts = CASE WHEN $6::boolean THEN attempts ELSE greatest(attempts - 1, 0) END
-WHERE id = $7 AND status = 'running'
+WHERE id = $7 AND status = 'running' AND claimed_by = $8
 `
 
 type RetryActionParams struct {
@@ -455,6 +491,7 @@ type RetryActionParams struct {
 	Called    bool
 	Attempted bool
 	ID        int64
+	Owner     string
 }
 
 // Without attempted, the claim's attempt is given back: no call was tried for this action.
@@ -467,6 +504,7 @@ func (q *Queries) RetryAction(ctx context.Context, arg RetryActionParams) (int64
 		arg.Called,
 		arg.Attempted,
 		arg.ID,
+		arg.Owner,
 	)
 	if err != nil {
 		return 0, err

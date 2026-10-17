@@ -65,6 +65,17 @@ def branch(root):
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
+PROTECTED_BRANCHES = ("main", "master", "staging")
+
+
+def base_branch(root):
+    """Feature work branches from and merges into staging; fall back to main before staging exists."""
+    for ref in ("staging", "origin/staging"):
+        if run(["git", "rev-parse", "--verify", "-q", ref], root).returncode == 0:
+            return ref
+    return "main"
+
+
 def feature_id(root):
     m = re.match(r"feat/(F-\d+)", branch(root))
     return m.group(1) if m else ""

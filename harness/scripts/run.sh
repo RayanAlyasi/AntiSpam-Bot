@@ -10,7 +10,7 @@ logs="$root/.agent/logs"; mkdir -p "$logs"
 
 for ((i = 1; i <= max_features; i++)); do
   [ -f "$root/.agent/STOP" ] && { echo "STOP file present; stopping."; break; }
-  git switch -q main && git pull -q --ff-only || { echo "can't update main; stopping."; break; }
+  git switch -q staging && git pull -q --ff-only || { echo "can't update staging; stopping."; break; }
   out="$logs/run-$(date +%Y%m%d-%H%M%S).json"
   echo "== session $i =="
   # Never --bare: it would skip the hooks, skills, agents and CLAUDE.md that make this safe.

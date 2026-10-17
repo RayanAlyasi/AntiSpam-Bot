@@ -39,6 +39,6 @@ Create, on a branch `feat/F-000-skeleton`:
    - Order by dependency.
    - `core: true` for the action queue, identity, scoring, enforcement and network bans.
    - Phase 0 (the spike with a real number) is a single human-run feature, `F-000a`.
-10. **Check:** `make check-fast` must pass on the skeleton. Then commit. This skeleton commit needs a judge PASS like everything else, so run the judge agent first.
+10. **Check:** `make check-fast` must pass on the skeleton. Then commit. This skeleton commit needs a judge PASS like everything else, so run the judge agent first. Push the branch and open the PR with `gh pr create --base staging`, following CLAUDE.md's commit and PR style.
 
 Report: the module path, the package list, the feature count per phase, and the two config files waiting in `harness/proposed/`.

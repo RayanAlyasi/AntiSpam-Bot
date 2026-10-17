@@ -76,6 +76,17 @@ The **kill switch** (pause all actions) stops every action on every bot, lockdow
 within about a second, until it's turned off. Pausing, resuming and closing the breaker are
 audited.
 
+## Silent groups
+
+Before every message, edit or reaction in a group, the queue checks the group's settings:
+
+- a group the bot protects gets nothing posted while `silent` is on (the default);
+- with `silent` off it gets at most 1 post per minute;
+- a group named as a review group isn't protected, so review items can be posted there;
+- a group the bot can't place gets no posts at all.
+
+Deletes, kicks and lockdowns aren't posts and still run in silent groups.
+
 ## Duplicates, expiry and cancellation
 
 - Every action has a dedupe key, so a retry, an edit of the spam or a second confirmation never deletes or kicks twice.

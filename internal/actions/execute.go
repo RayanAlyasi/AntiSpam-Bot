@@ -91,7 +91,7 @@ func (e *Executor) execute(ctx context.Context, picked Action) error {
 			return e.refuse(sctx, a, "silent: the bot never posts in a silent protected group")
 		case p.Protected:
 			if d := e.postWindow(a.Chat).wait(now); d > 0 {
-				return e.d.Store.Retry(sctx, a.ID, RetryInfo{NotBefore: now.Add(d)})
+				return e.retry(sctx, a.ID, RetryInfo{NotBefore: now.Add(d)})
 			}
 			protectedPost = true
 		}
@@ -99,11 +99,11 @@ func (e *Executor) execute(ctx context.Context, picked Action) error {
 	var text string
 	if a.Kind == KindSend {
 		if text, ok = e.chooseText(a); !ok {
-			return e.d.Store.Retry(sctx, a.ID, RetryInfo{NotBefore: now})
+			return e.retry(sctx, a.ID, RetryInfo{NotBefore: now})
 		}
 	}
 	if err := e.takeWrite(ctx, a.Chat, a, false); err != nil {
-		return e.d.Store.Retry(sctx, a.ID, RetryInfo{NotBefore: now})
+		return e.retry(sctx, a.ID, RetryInfo{NotBefore: now})
 	}
 	res, callErr := e.call(ctx, a, text)
 	class := classify(ctx, callErr)
@@ -125,7 +125,7 @@ func (e *Executor) execute(ctx context.Context, picked Action) error {
 // refuse finishes a post that the queue won't make, without calling WhatsApp.
 func (e *Executor) refuse(ctx context.Context, a Action, reason string) error {
 	e.log.Warn().Int64("action", a.ID).Str("kind", string(a.Kind)).Msg(reason)
-	return e.d.Store.Finish(ctx, a.ID, StatusRefused, reason, Result{})
+	return e.finish(ctx, a.ID, StatusRefused, reason, Result{})
 }
 
 // member is one action of a coalesced batch.
@@ -209,7 +209,7 @@ func (e *Executor) executeBatch(ctx context.Context, picked Action) error {
 		for _, m := range members {
 			if !m.settled && !m.a.Deadline.After(now) && !resolved(m.a, outcomes) {
 				m.settled = true
-				errs = append(errs, e.d.Store.Finish(sctx, m.a.ID, StatusExpired, "deadline passed during a batch", outcomesOf(m.a, outcomes)))
+				errs = append(errs, e.finish(sctx, m.a.ID, StatusExpired, "deadline passed during a batch", outcomesOf(m.a, outcomes)))
 			}
 		}
 		chunk := nextChunk(members, outcomes, e.cfg.MaxKickBatch)
@@ -353,7 +353,7 @@ func (e *Executor) finishResolved(ctx context.Context, members []*member, outcom
 		if len(failed) > 0 {
 			status, errText = StatusFailed, strings.Join(failed, "; ")
 		}
-		errs = append(errs, e.d.Store.Finish(ctx, m.a.ID, status, errText, outcomesOf(m.a, outcomes)))
+		errs = append(errs, e.finish(ctx, m.a.ID, status, errText, outcomesOf(m.a, outcomes)))
 	}
 	return errors.Join(errs...)
 }
@@ -380,7 +380,7 @@ func (e *Executor) settleRest(ctx context.Context, members []*member, class erro
 			errs = append(errs, e.dispose(ctx, m.a, class, err, res))
 			continue
 		}
-		errs = append(errs, e.d.Store.Retry(ctx, m.a.ID, RetryInfo{NotBefore: at, Called: m.called, Result: res}))
+		errs = append(errs, e.retry(ctx, m.a.ID, RetryInfo{NotBefore: at, Called: m.called, Result: res}))
 	}
 	return errors.Join(errs...)
 }
@@ -605,29 +605,29 @@ func (e *Executor) dispose(ctx context.Context, a Action, class errorClass, err 
 	called := class.reachedWhatsApp()
 	switch class {
 	case classOK:
-		return e.d.Store.Finish(ctx, a.ID, StatusDone, "", res)
+		return e.finish(ctx, a.ID, StatusDone, "", res)
 	case classNotAdmin, classNotFound:
-		return e.d.Store.Finish(ctx, a.ID, StatusFailed, errText, res)
+		return e.finish(ctx, a.ID, StatusFailed, errText, res)
 	case classRateLimited:
 		e.mu.Lock()
 		until := e.pausedUntil
 		e.mu.Unlock()
-		return e.d.Store.Retry(ctx, a.ID, RetryInfo{NotBefore: until, Error: errText, Called: called, Attempted: true, Result: res})
+		return e.retry(ctx, a.ID, RetryInfo{NotBefore: until, Error: errText, Called: called, Attempted: true, Result: res})
 	case classShutdown:
-		return e.d.Store.Retry(ctx, a.ID, RetryInfo{NotBefore: now, Error: errText, Result: res})
+		return e.retry(ctx, a.ID, RetryInfo{NotBefore: now, Error: errText, Result: res})
 	case classExpired:
 		e.log.Info().Int64("action", a.ID).Str("kind", string(a.Kind)).Msg("action expired while waiting for its call")
-		return e.d.Store.Finish(ctx, a.ID, StatusExpired, "deadline passed", res)
+		return e.finish(ctx, a.ID, StatusExpired, "deadline passed", res)
 	case classTransient, classUnusual, classTempBan:
 		// A temporary ban retries like a transient error: an action the open breaker still
 		// allows (a lockdown) must not hammer a banned account.
 		if a.Attempts >= e.cfg.MaxAttempts {
-			return e.d.Store.Finish(ctx, a.ID, StatusFailed, fmt.Sprintf("gave up after %d attempts: %s", a.Attempts, errText), res)
+			return e.finish(ctx, a.ID, StatusFailed, fmt.Sprintf("gave up after %d attempts: %s", a.Attempts, errText), res)
 		}
 		e.mu.Lock()
 		d := backoff(a.Attempts, e.cfg.BackoffBase, e.cfg.BackoffMax, e.rnd.Float64)
 		e.mu.Unlock()
-		return e.d.Store.Retry(ctx, a.ID, RetryInfo{NotBefore: now.Add(d), Error: errText, Called: called, Attempted: true, Result: res})
+		return e.retry(ctx, a.ID, RetryInfo{NotBefore: now.Add(d), Error: errText, Called: called, Attempted: true, Result: res})
 	default:
 		return fmt.Errorf("unhandled error class %d", class)
 	}
@@ -687,8 +687,11 @@ func (e *Executor) slowDown(now time.Time) {
 // the bot to full speed.
 func (e *Executor) persistRate(ctx context.Context) {
 	e.mu.Lock()
-	rate, warned, recovered := e.rate, e.lastWarning, e.lastRecovery
+	rate, warned, recovered, lost := e.rate, e.lastWarning, e.lastRecovery, e.lockLost
 	e.mu.Unlock()
+	if lost {
+		return // a standing-by executor mustn't overwrite the owner's rate
+	}
 	if _, err := e.d.Store.UpdateControl(context.WithoutCancel(ctx), string(e.d.Bot), func(c *Control) {
 		c.Rate, c.LastWarning, c.LastRecovery = rate, warned, recovered
 	}); err != nil {
@@ -815,8 +818,14 @@ func (e *Executor) Read(ctx context.Context, fn func(context.Context) error) err
 	}
 	e.callMu.Lock()
 	defer e.callMu.Unlock()
-	// Re-check under the call lock: a write may have just hit a 429 or a ban, or the operator
-	// may have paused everything while this read waited.
+	// Re-check under the call lock: the executor must still own the bot, a write may have just
+	// hit a 429 or a ban, or the operator may have paused everything while this read waited.
+	e.mu.Lock()
+	locked, lost := e.locked, e.lockLost
+	e.mu.Unlock()
+	if lost || (locked && !e.checkLock(ctx)) {
+		return fmt.Errorf("read for %s: %w", maskJID(e.d.Bot), ErrLockLost)
+	}
 	if err := e.refreshControl(ctx); err != nil {
 		return fmt.Errorf("re-read control state before a read: %w", err)
 	}
@@ -836,5 +845,37 @@ func (e *Executor) Read(ctx context.Context, fn func(context.Context) error) err
 	// The consequences are applied before the call lock is released, so no write slips in
 	// between a 429 and its pause.
 	e.reactUrgent(ctx, classify(ctx, err), err)
+	return err
+}
+
+// settleAttempts and settleBackoff: a settle write that fails (a database blip) is tried again
+// before the action is left running for Recover, which would make WhatsApp do it twice.
+const (
+	settleAttempts = 4
+	settleBackoff  = 100 * time.Millisecond
+)
+
+// finish settles an action as final, retrying the store write.
+func (e *Executor) finish(ctx context.Context, id int64, status Status, errText string, res Result) error {
+	return e.settle(ctx, func() error { return e.d.Store.Finish(ctx, id, status, errText, res) })
+}
+
+// retry puts an action back to pending, retrying the store write.
+func (e *Executor) retry(ctx context.Context, id int64, r RetryInfo) error {
+	return e.settle(ctx, func() error { return e.d.Store.Retry(ctx, id, r) })
+}
+
+func (e *Executor) settle(ctx context.Context, write func() error) error {
+	var err error
+	d := settleBackoff
+	for i := range settleAttempts {
+		if err = write(); err == nil {
+			return nil
+		}
+		if i < settleAttempts-1 {
+			e.sleep(ctx, d)
+			d *= 4
+		}
+	}
 	return err
 }

@@ -1637,8 +1637,12 @@
         "F-018"
       ],
       "description": "With silent on, the queue refuses any send to a protected group; with silent off, in-group posts are limited to 1 per group per minute; a test checks no code path can post in a protected group while silent.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestSilentGroupRefusesEveryPost, TestNonSilentGroupOnePostPerMinute",
+        "internal/actions: TestSilentModeRefusesPosts, TestSilentWhenGroupStateFails, TestPGGroupsPostingRules (integration), TestExecutorRefusesPostsInSilentGroupOnPostgres (integration)",
+        "judge review: .agent/logs/judge-F-064.md"
+      ]
     },
     {
       "id": "F-076",

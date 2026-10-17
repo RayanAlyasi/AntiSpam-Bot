@@ -45,7 +45,7 @@ ORDER BY id;
 
 -- name: ClaimAction :one
 -- SKIP LOCKED: a row another transaction is changing (a cancel) is skipped, not waited for.
-UPDATE app.actions AS a SET status = 'running', attempts = a.attempts + 1, updated_at = @now
+UPDATE app.actions AS a SET status = 'running', attempts = a.attempts + 1, updated_at = @now, claimed_by = @owner
 WHERE a.id = (SELECT c.id FROM app.actions AS c WHERE c.id = @id AND c.status = 'pending' FOR UPDATE SKIP LOCKED)
 RETURNING a.*;
 
@@ -53,7 +53,7 @@ RETURNING a.*;
 UPDATE app.actions
 SET status = @status, last_error = @last_error, result = @result, updated_at = @now,
     called = called OR @called::boolean
-WHERE id = @id AND status = 'running';
+WHERE id = @id AND status = 'running' AND claimed_by = @owner;
 
 -- name: RetryAction :execrows
 -- Without attempted, the claim's attempt is given back: no call was tried for this action.
@@ -61,7 +61,7 @@ UPDATE app.actions
 SET status = 'pending', not_before = @not_before, last_error = @last_error, result = @result, updated_at = @now,
     called = called OR @called::boolean,
     attempts = CASE WHEN @attempted::boolean THEN attempts ELSE greatest(attempts - 1, 0) END
-WHERE id = @id AND status = 'running';
+WHERE id = @id AND status = 'running' AND claimed_by = @owner;
 
 -- name: ExpireDueActions :many
 UPDATE app.actions SET status = 'expired', last_error = 'deadline passed', updated_at = @now
@@ -86,3 +86,15 @@ RETURNING state;
 
 -- name: SetActionControl :exec
 UPDATE app.action_controls SET state = @state, updated_at = @now WHERE scope = @scope;
+
+-- name: GroupPosting :one
+-- Whether the bot may post in a group (actions.Groups): a group with a settings document is
+-- protected; a missing "silent" key counts as silent.
+SELECT COALESCE((doc->>'silent')::boolean, true)::boolean AS silent
+FROM app.group_settings WHERE group_jid = @group_jid;
+
+-- name: IsReviewGroup :one
+-- A group named as some protected group's review group isn't protected itself (DESIGN.md §9.7).
+SELECT EXISTS (
+    SELECT 1 FROM app.group_settings WHERE doc->'review'->>'review_group' = @chat::text
+)::boolean AS review_group;

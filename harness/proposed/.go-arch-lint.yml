@@ -1,0 +1,79 @@
+# Proposed by the initializer session (F-000). Move to the repo root: mv harness/proposed/.go-arch-lint.yml .go-arch-lint.yml
+# Deny by default: a component may import only the components listed under its mayDependOn.
+# Vendor rules (whatsmeow only in internal/wa, no pgx/River in domain packages) are enforced by
+# depguard in .golangci.yml, so this file is about the module map between our own packages.
+#
+# Layers:
+#   domain   normalize, envelope, detect, scoring, policy: pure; receive data, return decisions.
+#   infra    store (Postgres), wa-adapter (whatsmeow), ai (providers), clock, config.
+#   services inbox, identity, actions, review, api: orchestrate domain + infra.
+#   main     cmd/antispam wires everything.
+version: 3
+workdir: .
+
+allow:
+  depOnAnyVendor: true
+
+excludeFiles:
+  - "^.*_test\\.go$"
+
+components:
+  main:       { in: cmd/** }
+  # go-arch-lint rejects components whose directory doesn't exist yet. Uncomment when the first
+  # goose migration adds migrations/ (with its embed.go); store already lists it below.
+  # migrations: { in: migrations/** }
+  clock:      { in: internal/clock/** }
+  config:     { in: internal/config/** }
+  wa:         { in: internal/wa }
+  wa-fake:    { in: internal/wa/fake/** }
+  wa-adapter: { in: internal/wa/adapter/** }
+  normalize:  { in: internal/normalize/** }
+  envelope:   { in: internal/envelope/** }
+  detect:     { in: internal/detect/** }
+  scoring:    { in: internal/scoring/** }
+  policy:     { in: internal/policy/** }
+  ai:         { in: internal/ai/** }
+  store:      { in: internal/store/** }
+  inbox:      { in: internal/inbox/** }
+  identity:   { in: internal/identity/** }
+  actions:    { in: internal/actions/** }
+  review:     { in: internal/review/** }
+  api:        { in: internal/api/** }
+
+commonComponents:
+  - clock
+
+# Components without an entry here (config, wa, normalize) may import no other component.
+deps:
+  main:
+    anyProjectDeps: true
+
+  wa-fake:
+    mayDependOn: [wa]
+  wa-adapter:
+    mayDependOn: [wa, envelope, normalize, config]
+
+  envelope:
+    mayDependOn: [wa, normalize]
+  detect:
+    mayDependOn: [wa, envelope, normalize, ai]
+  scoring:
+    mayDependOn: [detect, envelope]
+  policy:
+    mayDependOn: [wa, envelope, detect, scoring]
+  ai:
+    mayDependOn: [envelope, normalize, config]
+
+  store:
+    mayDependOn: [config, wa, envelope, detect, scoring, policy] # add migrations with the component above
+
+  inbox:
+    mayDependOn: [config, wa, envelope, store]
+  identity:
+    mayDependOn: [config, wa, store]
+  actions:
+    mayDependOn: [config, wa, envelope, policy, store]
+  review:
+    mayDependOn: [config, wa, envelope, detect, scoring, policy, identity, actions, store]
+  api:
+    mayDependOn: [config, wa, envelope, detect, scoring, policy, ai, store, inbox, identity, actions, review]

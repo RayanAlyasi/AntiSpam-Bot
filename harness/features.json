@@ -1,5 +1,4899 @@
 {
   "version": 1,
-  "note": "Filled by the initializer session from docs/DESIGN.md §20. Agents may change only `passes` and `evidence` (checked by the tamper audit).",
-  "features": []
+  "note": "Filled by the initializer session from docs/DESIGN.md §20. Agents may change only `passes` and `evidence` (checked by the tamper audit). Ordered by milestone, then dependency: all v0.1 features come first.",
+  "features": [
+    {
+      "id": "F-000",
+      "milestone": "v0.1",
+      "phase": "0",
+      "title": "Go module skeleton, WAClient with fake, Clock, CI",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§4",
+        "§4.1",
+        "§18",
+        "§19"
+      ],
+      "depends_on": [],
+      "description": "The module builds with go 1.26/toolchain 1.27.2, every DESIGN.md §4 package exists with a doc.go, the WAClient interface has a recording fake that injects 429/temp-ban/not-admin/timeout errors, a Clock has real and fake implementations, and make check-fast is green.",
+      "passes": true,
+      "evidence": [
+        "make check-fast and make check green on feat/F-000-skeleton (build, vet, race tests with -shuffle, integration tag, tamper)",
+        "harness/proposed/.golangci.yml: golangci-lint config verify OK and 0 issues on the skeleton; deliberate violations (whatsmeow/pgx/fake imports, fmt.Println, time.Now) all reported",
+        "harness/proposed/.go-arch-lint.yml: go-arch-lint check OK; a forbidden policy->store import and an unmapped package both fail",
+        "docker buildx linux/amd64 + linux/arm64 with CGO_ENABLED=0 built and both images ran and exited 0; ci.yml passes actionlint with every action pinned to a commit SHA",
+        "judge review: .agent/logs/judge-F-000.md"
+      ]
+    },
+    {
+      "id": "F-000a",
+      "milestone": "v0.1",
+      "phase": "0",
+      "title": "Phase 0 spike with a real test number (human-run)",
+      "category": "spike",
+      "core": false,
+      "design_refs": [
+        "§2",
+        "§20"
+      ],
+      "depends_on": [
+        "F-000"
+      ],
+      "description": "A human pairs a dedicated test number and records the capability report and fixture corpus listed in DESIGN.md §20 phase 0 (revokes, batched removes at 1/5/8/10/20, edits, view-once, status shapes, join-request nodes, business IQ, pacing). Agents never run this; it passes when the report and testdata/fixtures/ are committed by a human.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-001",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "zerolog setup with per-module levels and phone masking",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§16",
+        "§4.1"
+      ],
+      "depends_on": [
+        "F-000"
+      ],
+      "description": "The binary logs JSON with zerolog, supports a log level per module, attaches a request/detection ID, and a masking helper renders phone numbers as +966 5•• ••• •12 wherever they are logged.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-002",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Optional config.yaml with safe defaults and env overrides",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§19.1"
+      ],
+      "depends_on": [
+        "F-000"
+      ],
+      "description": "The bot starts with no config file; an optional config.yaml sets pacing, presets, AI and scoring defaults, every key has a documented default, and environment variables override the file.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-003",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Postgres pool, transactions and testcontainers helper",
+      "category": "storage",
+      "core": false,
+      "design_refs": [
+        "§14",
+        "§4.1"
+      ],
+      "depends_on": [
+        "F-001"
+      ],
+      "description": "internal/store opens a pgx v5 pool from DATABASE_URL in UTC, exposes a transaction helper that rolls back on error, and integration tests get a fresh testcontainers Postgres through one helper.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-004",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "goose migrations embedded and run on start, sqlc wired",
+      "category": "storage",
+      "core": false,
+      "design_refs": [
+        "§14",
+        "§4.1"
+      ],
+      "depends_on": [
+        "F-003"
+      ],
+      "description": "Migrations live in migrations/, are embedded in the binary and run on start; schemas app and whatsmeow exist; sqlc.yaml generates into internal/store/db and make check-gen is green.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-005",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "River job runner with its tables in a goose migration",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§4.1"
+      ],
+      "depends_on": [
+        "F-004"
+      ],
+      "description": "River's tables are created by a goose migration, a River client starts with the workers role, jobs enqueue transactionally with InsertTx, and a periodic test job runs on schedule.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-006",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "audit_log table and writer",
+      "category": "storage",
+      "core": false,
+      "design_refs": [
+        "§8.6",
+        "§13.3",
+        "§14"
+      ],
+      "depends_on": [
+        "F-004"
+      ],
+      "description": "Every settings change, command, manual action and automated action can be written to audit_log with actor, group, action and a JSON diff, readable per group.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-007",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Prometheus /metrics, /healthz and /readyz",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§16"
+      ],
+      "depends_on": [
+        "F-001",
+        "F-003"
+      ],
+      "description": "The binary serves /metrics, /healthz (process alive) and /readyz (database reachable and at least one bot connected), suitable for Coolify health checks.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-008",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Roles (connector, workers, api) and graceful shutdown",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§4",
+        "§4.1"
+      ],
+      "depends_on": [
+        "F-001",
+        "F-002"
+      ],
+      "description": "The binary runs the connector, workers and api roles together by default or a subset via flag, and stops all of them cleanly on SIGTERM within a bounded time.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-009",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "whatsmeow adapter implementing WAClient with error mapping",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§2.3",
+        "§2.4",
+        "§10.5"
+      ],
+      "depends_on": [
+        "F-000"
+      ],
+      "description": "internal/wa/adapter implements every WAClient method on whatsmeow (revoke via BuildRevoke, edits via BuildEdit, batched participant updates), converts JIDs both ways, and maps 429, temporary ban, not-admin, not-found and timeouts to the wa error values.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-010",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "whatsmeow sqlstore on Postgres and the bots table",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§2.4",
+        "§14"
+      ],
+      "depends_on": [
+        "F-004",
+        "F-009"
+      ],
+      "description": "whatsmeow's device store lives in schema whatsmeow on the same Postgres, the bots table records each number's JID/LID/status, and devices are loaded at start.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-011",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Per-bot connector lease in Postgres",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§3",
+        "§15"
+      ],
+      "depends_on": [
+        "F-004"
+      ],
+      "description": "A process connects a bot number only while it holds that bot's row lease (renewed every 10 s); a second process never connects the same session, preventing StreamReplaced.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-012",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Operator pairing command (QR or pair code)",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§2.4",
+        "§19.3",
+        "§8.5"
+      ],
+      "depends_on": [
+        "F-010"
+      ],
+      "description": "`antispam pair` pairs a number by QR or 8-character pairing code, then sets the about text to the appeal line and the add-to-groups privacy setting, without sending any message.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-013",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Connector event loop and internal event types",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§5.1",
+        "§2.4"
+      ],
+      "depends_on": [
+        "F-009",
+        "F-010",
+        "F-011",
+        "F-008"
+      ],
+      "description": "The connector owns one whatsmeow client per leased bot, converts message, group, picture, push-name, ban and connection events into internal event types, and hands them off without analysing on the receive loop.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-014",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Inbox insert with dedupe and synchronous ack",
+      "category": "storage",
+      "core": false,
+      "design_refs": [
+        "§5.1",
+        "§14"
+      ],
+      "depends_on": [
+        "F-004",
+        "F-013"
+      ],
+      "description": "Message and undecryptable events are inserted into inbox (raw proto + info JSON) with dedupe on chat, message ID and edit sequence, and acked only after the insert commits.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-015",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Inbox worker with SKIP LOCKED claims, NOTIFY wakeup and 72 h retention",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§5.1",
+        "§15",
+        "§14",
+        "§17"
+      ],
+      "depends_on": [
+        "F-014",
+        "F-005"
+      ],
+      "description": "Workers claim unprocessed inbox rows with FOR UPDATE SKIP LOCKED, wake on LISTEN/NOTIFY, mark rows processed and resume after a crash; a periodic job deletes inbox rows older than 72 h.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-016",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Route events: moderated groups, status, DMs",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§5.1"
+      ],
+      "depends_on": [
+        "F-015"
+      ],
+      "description": "Only configured group chats go to moderation; status@broadcast goes to person reputation only; DMs go to the command/auth/review handler; messages from the bot, admins and allow-listed members skip moderation but are still parsed for commands.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-017",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Operator alerts and connection health",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§5.1",
+        "§16",
+        "§10.5"
+      ],
+      "depends_on": [
+        "F-013",
+        "F-007",
+        "F-001",
+        "F-002"
+      ],
+      "description": "Operator alerts go to webhook/Telegram/email sinks (deduplicated, logged when none is set); connection events update wa_connected and reconnect metrics; TemporaryBan, LoggedOut and StreamReplaced raise an alert and a breaker signal.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-018",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Group state from events plus a 6 h refresh",
+      "category": "storage",
+      "core": false,
+      "design_refs": [
+        "§2.3",
+        "§14",
+        "§11"
+      ],
+      "depends_on": [
+        "F-004",
+        "F-013",
+        "F-005"
+      ],
+      "description": "groups rows track name, topic, size, addressing mode and whether the bot is admin; JoinedGroup and GroupInfo events update them and a periodic job refreshes group info every 6 h.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-019",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "In-process cache layer and participant/admin cache",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§9.5",
+        "§11",
+        "§13.3"
+      ],
+      "depends_on": [
+        "F-018",
+        "F-000"
+      ],
+      "description": "A thin otter wrapper gives typed caches with TTL, size bounds and invalidation; the participant cache built on it answers 'is X an admin of G', is updated by join/leave/promote/demote events and forces a refresh when older than 10 minutes.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-020",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "persons and identities with MatchPerson by LID or PN",
+      "category": "identity",
+      "core": true,
+      "design_refs": [
+        "§7.7",
+        "§14"
+      ],
+      "depends_on": [
+        "F-004"
+      ],
+      "description": "Every person has an internal ID; identities store each JID normalized (LID primary, PN when known); MatchPerson(jid) finds the person from either identifier alone, and a PN-only person gets its LID looked up.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-021",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Learn phone numbers from free sources",
+      "category": "identity",
+      "core": true,
+      "design_refs": [
+        "§7.7"
+      ],
+      "depends_on": [
+        "F-020",
+        "F-013"
+      ],
+      "description": "Phone numbers are recorded from SenderAlt, participant events, GroupInfo.SenderPN, GroupParticipant.PhoneNumber, the LID store and DMs, with the source on each identity row; no lookups beyond these are attempted.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-022",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Merge, back-fill and recycled numbers",
+      "category": "identity",
+      "core": true,
+      "design_refs": [
+        "§7.7"
+      ],
+      "depends_on": [
+        "F-021",
+        "F-006"
+      ],
+      "description": "identity.resolved merges a PN-only person into the LID person (re-pointing memberships, strikes, detections, bans, corpus; person_merges and audit) and emits a back-fill event; a known number seen with a different LID closes the old link (valid_to), never carries bans, and is flagged for the operator.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-023",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Members table with first-seen and pre-existing status",
+      "category": "storage",
+      "core": false,
+      "design_refs": [
+        "§8.1",
+        "§14"
+      ],
+      "depends_on": [
+        "F-018",
+        "F-020"
+      ],
+      "description": "members rows per (group, person) track role, joined_at, first_seen, message and clean counts; members already present when the bot joins are marked pre-existing (established).",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-024",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Content Envelope types",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§5.3"
+      ],
+      "depends_on": [
+        "F-000"
+      ],
+      "description": "internal/envelope defines Envelope, Kind and the text, URL, media, contact, channel, invite, quoted, status and ad references exactly as DESIGN.md §5.3 describes, with no whatsmeow import.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-025",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Recursive FutureProof unwrapper with depth cap",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§5.2"
+      ],
+      "depends_on": [
+        "F-024",
+        "F-009"
+      ],
+      "description": "After UnwrapRaw, every remaining FutureProofMessage wrapper (found by reflection) and ProtocolMessage.EditedMessage is unwrapped up to depth 5, recording the removed wrappers; a fuzz test shows crafted nesting never panics or loops.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-026",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Envelope builder: text, link previews, mentions, quotes, ads",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§5.3",
+        "§6.1"
+      ],
+      "depends_on": [
+        "F-025"
+      ],
+      "description": "Conversation and ExtendedText messages produce body and link-preview text surfaces, preview URLs, mentions (including group mentions), the quoted message and ExternalAdReply fields.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-027",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Envelope builder: images, video, audio, documents, stickers",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§5.3",
+        "§6.2",
+        "§6.3",
+        "§6.4",
+        "§6.5",
+        "§6.6"
+      ],
+      "depends_on": [
+        "F-026"
+      ],
+      "description": "Media messages produce MediaRefs with SHA256, mimetype, size and inline thumbnail plus caption, file name, title, page count, sticker flags, accessibility label and sticker-pack text surfaces.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-028",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Envelope builder: vCard parser, contact cards and business contacts",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§5.3",
+        "§6.7"
+      ],
+      "depends_on": [
+        "F-026",
+        "F-024"
+      ],
+      "description": "A tolerant, fuzz-tested vCard parser extracts FN, ORG, TEL waid, URL and X-WA-BIZ-* fields; contact, contacts-array and document-embedded vCards become ContactRefs with a text surface per field, waid numbers for matching and IsSelfContact recorded.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-029",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Envelope builder: channels, invites, polls, locations, events, commerce",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§5.3",
+        "§6.8",
+        "§6.9",
+        "§6.10",
+        "§6.11",
+        "§6.12"
+      ],
+      "depends_on": [
+        "F-026"
+      ],
+      "description": "Forwarded-newsletter info, channel and group invites produce ChannelRefs and InviteRefs; every poll version, location, event, product, order, payment request and interactive message yields its text surfaces and URLs.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-030",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Envelope builder: status shares, quoted status, status mentions, Group Status",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§2.1",
+        "§5.3",
+        "§6.18"
+      ],
+      "depends_on": [
+        "F-026"
+      ],
+      "description": "ForwardOrigin STATUS, status source and attribution types, attribution URLs, reshared channel JIDs and Group Status authors fill StatusRef; quoted status content and status-mention/group-status wrappers reach the envelope like any other content.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-031",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Edits, sender revokes, view-once and undecryptable messages",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§2.1",
+        "§6.14",
+        "§6.15"
+      ],
+      "depends_on": [
+        "F-026"
+      ],
+      "description": "A MESSAGE_EDIT becomes an envelope with IsEdit and the original message ID; a sender revoke becomes a revoke event; view-once and undecryptable messages become content-less envelopes with sender and ID.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-032",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Unknown message types via protoreflect plus coverage test",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6.13",
+        "§18"
+      ],
+      "depends_on": [
+        "F-027",
+        "F-028",
+        "F-029",
+        "F-030",
+        "F-031"
+      ],
+      "description": "Unknown message fields have every string extracted by protoreflect into text surfaces and counted in an unknown-kind metric; a reflection test fails when a waE2E.Message field type is neither handled nor explicitly ignored.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-033",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "message_index without text, with 7 d / 30 d retention",
+      "category": "storage",
+      "core": false,
+      "design_refs": [
+        "§14",
+        "§17"
+      ],
+      "depends_on": [
+        "F-024",
+        "F-015",
+        "F-020"
+      ],
+      "description": "Each processed group message writes a text-free message_index row (fingerprint, SimHash, domains, media hashes, verdict); normal rows expire after 7 days, spam or actioned rows after 30.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-034",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "NFKC and invisible-character stripping",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§7.2"
+      ],
+      "depends_on": [
+        "F-000"
+      ],
+      "description": "Normalization applies NFKC and strips zero-width, bidi, tag, variation-selector, soft-hyphen and combining-mark floods, returning the stripped count as a signal input; fuzz tested.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-035",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "TR39 confusables skeleton",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§7.2"
+      ],
+      "depends_on": [
+        "F-034"
+      ],
+      "description": "An embedded TR39 confusables table maps Cyrillic, Greek and other look-alikes to their Latin skeleton, so 'frее' with Cyrillic е matches 'free'.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-036",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Leetspeak variant, separator collapsing, repeat squeeze, spam emoji",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§7.2"
+      ],
+      "depends_on": [
+        "F-034"
+      ],
+      "description": "A separate leetspeak variant folds 0/1/3/4/5/$/@ without damaging numbers; f.r.e.e, f r e e and freeeee collapse to free; common spam emoji sequences map to tokens while Raw keeps them.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-037",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Arabic and Persian normalization",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§7.2"
+      ],
+      "depends_on": [
+        "F-034"
+      ],
+      "description": "Tashkeel and tatweel are removed, alef forms unified, ى→ي and ة→ه in the match variant, Persian ک/ی mapped to Arabic, and Arabic-Indic/Persian digits become ASCII.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-038",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Phone-number extraction to E.164",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§7.2",
+        "§9.8"
+      ],
+      "depends_on": [
+        "F-037"
+      ],
+      "description": "Phone numbers written with spaces, separators, Arabic digits or spelled-out digits are extracted and normalized to E.164 with nyaruka/phonenumbers using the group's default country; fuzz tested.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-039",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Normalize every envelope text surface",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§5.3",
+        "§7.2"
+      ],
+      "depends_on": [
+        "F-035",
+        "F-036",
+        "F-038",
+        "F-024"
+      ],
+      "description": "Each envelope text surface gets its Norm variants filled while Raw is kept for evidence, and extracted phone numbers are attached to the envelope.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-040",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Analyzer interface, registry and tiered runner",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6",
+        "§7.1",
+        "§22.2"
+      ],
+      "depends_on": [
+        "F-024"
+      ],
+      "description": "Analyzers implement Name/Tier/Applies/Analyze and register by name with enable flags; the runner executes tiers in order within their budgets and short-circuits on CERTAIN or a clean score.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-041",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "rules and fingerprints tables with in-memory sets and NOTIFY refresh",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§12.3",
+        "§14"
+      ],
+      "depends_on": [
+        "F-004",
+        "F-040"
+      ],
+      "description": "Rules (scope global/bot/group, type, action class, weight, enabled) and fingerprints are loaded into memory at start and refreshed via LISTEN/NOTIFY within a second of a change.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-042",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Aho-Corasick keyword and phrase matching (T0)",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§7.2",
+        "§6.1"
+      ],
+      "depends_on": [
+        "F-041",
+        "F-039"
+      ],
+      "description": "Keyword and phrase rules match normalized text with Aho-Corasick in microseconds, emitting hard or weighted signals per rule class with the matched phrase as evidence.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-043",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "RE2 regex rules with limits",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§7.2",
+        "§17"
+      ],
+      "depends_on": [
+        "F-041",
+        "F-039"
+      ],
+      "description": "Regex rules run with Go RE2 on normalized text, and patterns over the length or complexity limit are rejected when saved.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-044",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Fuzzy phrase matching (T1)",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§7.2",
+        "§7.3"
+      ],
+      "depends_on": [
+        "F-042"
+      ],
+      "description": "Token-set similarity and Damerau-Levenshtein catch near-misses of short phrases and emit `rules`-source signals only, never CERTAIN evidence.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-045",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Language and script anomaly signals (T1)",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6.1"
+      ],
+      "depends_on": [
+        "F-039",
+        "F-040"
+      ],
+      "description": "Mixed scripts inside words and invisible-character counts produce weighted signals, and ordinary bilingual Arabic/English messages don't fire.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-046",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Tolerant URL extraction",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6"
+      ],
+      "depends_on": [
+        "F-034",
+        "F-024"
+      ],
+      "description": "URLs are extracted from text, previews, vCards, locations and event links, including hxxp, example[.]com, spaced dots and IDN forms; fuzz tested.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-047",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "URL canonicalization, eTLD+1 and WhatsApp-native targets",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6"
+      ],
+      "depends_on": [
+        "F-046"
+      ],
+      "description": "URLs are canonicalized (lower-case host, punycode↔Unicode, tracking parameters stripped), get their eTLD+1 from the public suffix list, and chat.whatsapp.com, whatsapp.com/channel and wa.me links are classified as WhatsApp-native targets.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-048",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Per-group and global domain allow/deny lists",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6",
+        "§12.1"
+      ],
+      "depends_on": [
+        "F-047",
+        "F-041"
+      ],
+      "description": "Domains are checked against the group's allow/deny lists, then the global allow-list and deny-list; a deny hit is `known` evidence and an allow-listed domain never fires.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-049",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Exact T0 matches: media/sticker hashes, channels, invites, advertised numbers",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§7.1",
+        "§6.2",
+        "§6.4",
+        "§6.8",
+        "§6.9"
+      ],
+      "depends_on": [
+        "F-041",
+        "F-027",
+        "F-029",
+        "F-047",
+        "F-039"
+      ],
+      "description": "Blocklisted or confirmed media/sticker SHA256s, channel JIDs, invite codes and advertised numbers (keyed hashes of E.164 from text, vCards and wa.me links) are CERTAIN `known` evidence, without downloading anything.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-050",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Log-odds scoring with versioned weights and explanations",
+      "category": "scoring",
+      "core": true,
+      "design_refs": [
+        "§7.3"
+      ],
+      "depends_on": [
+        "F-040"
+      ],
+      "description": "The score is sigmoid(bias + Σ weights) from a versioned weight file, and every result renders a human explanation listing each signal with its weight.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-051",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Certainty bands and confidence sources",
+      "category": "scoring",
+      "core": true,
+      "design_refs": [
+        "§7.0",
+        "§7.3"
+      ],
+      "depends_on": [
+        "F-050"
+      ],
+      "description": "Each verdict gets a band (CERTAIN, UNCERTAIN, still uncertain, clean) and the strongest confidence source (known, rules, ai); heuristics alone never reach the delete line, with property tests.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-052",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Invisible just-joined signal",
+      "category": "scoring",
+      "core": true,
+      "design_refs": [
+        "§8.2",
+        "§12.1"
+      ],
+      "depends_on": [
+        "F-050",
+        "F-023"
+      ],
+      "description": "A sender who joined within the window (default 24 h) gets the just-joined weight (default +0.8) decaying to 0, configurable and never visible to members.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-053",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "detections table with signals, route, mode and rule version",
+      "category": "storage",
+      "core": true,
+      "design_refs": [
+        "§7.3",
+        "§14"
+      ],
+      "depends_on": [
+        "F-051",
+        "F-004"
+      ],
+      "description": "Every non-clean verdict is stored with score, tier reached, signals, confidence source, route, rule version, action plan and mode.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-054",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Group settings document, dotted keys, versions and NOTIFY",
+      "category": "policy",
+      "core": false,
+      "design_refs": [
+        "§12.1",
+        "§13.0"
+      ],
+      "depends_on": [
+        "F-004",
+        "F-006"
+      ],
+      "description": "Group settings are a versioned JSON document validated against a Go struct and JSON Schema, every leaf is reachable by dotted key for get/set, changes write history and the audit log, and caches refresh via NOTIFY.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-055",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Presets Relaxed/Standard/Strict/Ask-admins",
+      "category": "policy",
+      "core": true,
+      "design_refs": [
+        "§12.2",
+        "§9.2"
+      ],
+      "depends_on": [
+        "F-054"
+      ],
+      "description": "Presets fill the auto-ban matrix and extras exactly as DESIGN.md §9.2/§12.2, switching preset resets the matrix, and the diff from the preset is reported.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-056",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Per-type content policy as hard violations",
+      "category": "policy",
+      "core": true,
+      "design_refs": [
+        "§9.3",
+        "§12.1",
+        "§6.18",
+        "§6.5"
+      ],
+      "depends_on": [
+        "F-054",
+        "F-030",
+        "F-031",
+        "F-023",
+        "F-027",
+        "F-040"
+      ],
+      "description": "Each content type (including links, status shares/mentions, Group Status posts, view-once, forwarded-many-times and blocked document extensions or double extensions) is allow/block/block_for_new/block_for_untrusted, producing hard policy signals separate from the spam score.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-057",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Trust and established standing (routing only)",
+      "category": "policy",
+      "core": true,
+      "design_refs": [
+        "§8.1",
+        "§12.1"
+      ],
+      "depends_on": [
+        "F-023",
+        "F-054"
+      ],
+      "description": "Trust per (group, member) grows with tenure and clean messages, drops with strikes (decaying), is full for vouched or allow-listed members, and established (≥7 days and ≥20 clean, pre-existing or vouched) never changes the score.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-058",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Auto-ban matrix with evidence sources",
+      "category": "policy",
+      "core": true,
+      "design_refs": [
+        "§9.2"
+      ],
+      "depends_on": [
+        "F-055",
+        "F-051"
+      ],
+      "description": "For each content type the matrix cell (auto_ban with require_source and else, ask, delete_only, allow) gives the action for spam from new/unknown senders; auto_ban never bans on sources outside require_source.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-059",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Decision routing to an action plan",
+      "category": "policy",
+      "core": true,
+      "design_refs": [
+        "§8.3",
+        "§8.7"
+      ],
+      "depends_on": [
+        "F-058",
+        "F-057",
+        "F-056",
+        "F-053"
+      ],
+      "description": "The decision engine maps band, source, standing and settings to the §8.3 routes; known spam is deleted whatever the sender's trust, established members are never auto-banned, and admins, the bot and allow-listed members are never acted on.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-060",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Always-ask-admins modes (a) and (b)",
+      "category": "policy",
+      "core": true,
+      "design_refs": [
+        "§8.3"
+      ],
+      "depends_on": [
+        "F-059"
+      ],
+      "description": "ask_delete_first deletes certain or AI-verified spam and sends the ban to admins; ask_before_action does nothing until an admin decides; neither mode ever auto-bans, proven by a property test.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-061",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Policy violations: silent delete, optional ask/ban and repeat",
+      "category": "policy",
+      "core": true,
+      "design_refs": [
+        "§9.3"
+      ],
+      "depends_on": [
+        "F-059"
+      ],
+      "description": "A violation alone is deleted silently with no ban or strike by default; policy.action ask/ban and policy.repeat are opt-in, and if a message is both spam and a violation the spam route applies.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-062",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Shadow, enforce and paused modes",
+      "category": "policy",
+      "core": true,
+      "design_refs": [
+        "§8.4"
+      ],
+      "depends_on": [
+        "F-059"
+      ],
+      "description": "In shadow mode every would-be action is recorded as a detection with mode shadow and nothing is enqueued; paused does nothing; enforce acts.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-063",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Property tests for the §18 decision invariants",
+      "category": "policy",
+      "core": true,
+      "design_refs": [
+        "§18"
+      ],
+      "depends_on": [
+        "F-060",
+        "F-061",
+        "F-062"
+      ],
+      "description": "rapid property tests cover: only CERTAIN evidence auto-bans by default, delete_only never bans, allow never deletes spam, require_source is honoured, thresholds are monotonic, established members and admins are never auto-banned.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-064",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "actions table and transactional enqueue",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§10.1",
+        "§10.2",
+        "§14"
+      ],
+      "depends_on": [
+        "F-004"
+      ],
+      "description": "Actions are stored with kind, payload, priority P0–P4, not_before, deadline and a unique dedupe key, and can be enqueued in the same transaction as the detection that caused them.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-065",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Serial executor per bot with SKIP LOCKED and crash recovery",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§10.1"
+      ],
+      "depends_on": [
+        "F-064",
+        "F-008"
+      ],
+      "description": "Exactly one executor goroutine per bot pulls actions with SKIP LOCKED ordered by priority, not_before and id, keeps an in-memory heap refilled from the table, and resumes correctly after a crash.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-066",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Delete and kick actions through WAClient",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§9.1",
+        "§10"
+      ],
+      "depends_on": [
+        "F-065"
+      ],
+      "description": "Revoke and remove-participant actions execute only through WAClient, record their result, and dedupe on revoke:<group>:<msgid> and kick keys.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-067",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Send, edit and react actions at P3",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§10.2",
+        "§10.3"
+      ],
+      "depends_on": [
+        "F-065"
+      ],
+      "description": "DM, review, edit and reaction actions execute at P3 through WAClient, with template variants so the same text is never sent twice in a row to different chats.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-068",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Fixed write ceiling with burst and jitter",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§10.3"
+      ],
+      "depends_on": [
+        "F-065"
+      ],
+      "description": "Writes are spaced with base ~1 s plus 0–1.5 s jitter under a ceiling of 20/min with a burst of 10; a property test under synctest shows the effective rate never exceeds the ceiling.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-069",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Slow-down on warning signs, recovery capped at the ceiling",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§10.3",
+        "§10.5"
+      ],
+      "depends_on": [
+        "F-068",
+        "F-006",
+        "F-017"
+      ],
+      "description": "A 429, unusual errors, slow acks or a disconnect after writes cut the rate to a quarter (min 2/min); it recovers +1/min per 15 calm minutes and never above the ceiling; a manual ceiling raise is audited; a 7,500 writes/day alert fires.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-070",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Per-group buckets, round robin and sub-budgets",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§10.3"
+      ],
+      "depends_on": [
+        "F-068"
+      ],
+      "description": "Each group is limited to 10 writes/min with round robin within a priority, OTPs and reviews have reserved P3 sub-budgets, and reads (IQs) use separate buckets that never consume write budget.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-071",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Newest-first, deadline-aware ordering, expiry and cancellation",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§10.4"
+      ],
+      "depends_on": [
+        "F-066"
+      ],
+      "description": "Deletes in a group run newest first, anything near WhatsApp's ~48 h delete window moves ahead, expired actions are dropped and logged, and a sender's own revoke cancels the pending delete.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-072",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Coalesced kicks up to max_kick_batch",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§10.4"
+      ],
+      "depends_on": [
+        "F-066"
+      ],
+      "description": "Kicks and join-request rejections for one group within a 2–3 s window merge into calls of at most max_kick_batch (default 8), each JID individually eligible, and larger sets split into paced calls.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-073",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Backoff, 429 pause and permanent errors",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§10.5"
+      ],
+      "depends_on": [
+        "F-069"
+      ],
+      "description": "Transient errors retry with min(2^n·2 s, 5 min) full-jitter backoff up to 6 attempts; a 429 pauses the bot's executor 60 s then slows down; not-admin and not-found fail fast and update group state.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-074",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Circuit breaker and global kill switch",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§10.5"
+      ],
+      "depends_on": [
+        "F-073",
+        "F-017"
+      ],
+      "description": "A temporary ban, logout or repeated 429s open the breaker so only P0 lockdowns run (configurable), the operator is alerted, detections continue for later cleanup, and a global pause stops all actions.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-075",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Silent mode enforced at the queue",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§9.7",
+        "§10.3",
+        "§18"
+      ],
+      "depends_on": [
+        "F-067",
+        "F-018"
+      ],
+      "description": "With silent on, the queue refuses any send to a protected group; with silent off, in-group posts are limited to 1 per group per minute; a test checks no code path can post in a protected group while silent.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-076",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Hourly ban cap, deletion circuit and kill switches",
+      "category": "policy",
+      "core": true,
+      "design_refs": [
+        "§8.6",
+        "§10.4"
+      ],
+      "depends_on": [
+        "F-059",
+        "F-072"
+      ],
+      "description": "Per-group max bans per hour (default 10) defers extra bans into one review item instead of dropping them, a max-deletions-per-minute circuit pauses and alerts, and per-rule kill switches disable a rule at once.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-077",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Local ban = kick + rejoin block",
+      "category": "enforcement",
+      "core": true,
+      "design_refs": [
+        "§9.1",
+        "§9.6"
+      ],
+      "depends_on": [
+        "F-066",
+        "F-023",
+        "F-020",
+        "F-006"
+      ],
+      "description": "A ban records group_bans with reason spam/other, kicks through the queue and blocks rejoin to that group: a banned identity that joins again is kicked at P0; unban lifts the block without re-adding.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-078",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "locales/ar.yaml and en.yaml with template variants",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§22.2",
+        "§13.7"
+      ],
+      "depends_on": [
+        "F-000"
+      ],
+      "description": "All user-facing text comes from locales/<lang>.yaml with several variants per message and Arabic command aliases, and a test fails when a key exists in one language only.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-079",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "DM handling and inbound-first thread tracking",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§5.1",
+        "§9.7",
+        "§13.6"
+      ],
+      "depends_on": [
+        "F-016",
+        "F-067",
+        "F-021",
+        "F-078"
+      ],
+      "description": "DMs are routed to handlers by intent, every inbound DM marks an open thread with that person, and outbound DMs are refused to anyone without an open thread except the documented one-reply-per-day command exception.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-080",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Command framework: parser, admin check, contexts",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.7",
+        "§9.7"
+      ],
+      "depends_on": [
+        "F-079",
+        "F-019",
+        "F-006"
+      ],
+      "description": "Commands with prefix '.' (and Arabic aliases) are parsed in groups, review groups and DMs; non-admins are ignored; in a protected group the command message is deleted and the reply goes by DM; DMs use .use/.groups context for 1 hour; changes are audited.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-081",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": ".set, .get and .settings by dotted key",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§12.1",
+        "§13.7"
+      ],
+      "depends_on": [
+        "F-080",
+        "F-054"
+      ],
+      "description": "`.set <key> <value>` validates with the same schema as the API and writes history and audit; `.get <key>` and `.settings` show values, with errors explained in the admin's language.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-082",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Friendly settings commands, .autoban and .askadmins",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.7",
+        "§9.2"
+      ],
+      "depends_on": [
+        "F-081",
+        "F-055",
+        "F-062",
+        "F-060"
+      ],
+      "description": ".status, .mode, .preset, .silent, .newsignal, .policy, .block/.allow/.blocknew, .autoban <type> … and .askadmins change the same dotted keys as .set; .preset resets the matrix and `.autoban … auto ai` is refused until a track record exists.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-083",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": ".ban, .kick, .unban, .allow, .unallow, .undo",
+      "category": "enforcement",
+      "core": true,
+      "design_refs": [
+        "§13.7",
+        "§9.6"
+      ],
+      "depends_on": [
+        "F-080",
+        "F-077"
+      ],
+      "description": "`.ban` requires a reason spam|other (asking, and defaulting to other), `.kick` kicks without a rejoin block, `.unban` lifts a local ban, `.allow/.unallow` manage the member allow-list, and `.undo` reverses the bot's last reversible action in the group.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-084",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": ".domain and .word with dry-run counts",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.7",
+        "§8.4"
+      ],
+      "depends_on": [
+        "F-080",
+        "F-048",
+        "F-042",
+        "F-015"
+      ],
+      "description": "`.domain allow|block` and `.word block|unblock` edit group lists, and `.word block` first replies with how many recent messages (72 h inbox, in memory) it would have matched.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-085",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Inbound-first onboarding by DM",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.6",
+        "§9.7"
+      ],
+      "depends_on": [
+        "F-079",
+        "F-019",
+        "F-054"
+      ],
+      "description": "A START DM gets the three setup steps; when the bot is promoted it DMs the promoting admin only if they have an open thread, otherwise waits; a not-admin group gets at most one reminder per day in an existing thread; a group invite link sent by an admin is joined only after checking they admin it.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-086",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Review items with short codes",
+      "category": "review",
+      "core": false,
+      "design_refs": [
+        "§9.5",
+        "§14"
+      ],
+      "depends_on": [
+        "F-059",
+        "F-004"
+      ],
+      "description": "Routes that ask admins create reviews (kind, subject, proposed action, deadline, on_timeout) with a unique short code such as K7Q2, and dashboard is the default destination.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-087",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Review group destination",
+      "category": "review",
+      "core": false,
+      "design_refs": [
+        "§9.5"
+      ],
+      "depends_on": [
+        "F-086",
+        "F-080"
+      ],
+      "description": "`.reviewgroup here` in a separate non-protected group sets it as the destination (a protected group is refused), `.reviewgroup off` clears it, one review group can serve several groups, and the bot warns when it contains non-admins.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-088",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "End-to-end fast lane: inbox to actions",
+      "category": "detection",
+      "core": true,
+      "design_refs": [
+        "§4",
+        "§7.1",
+        "§8.7",
+        "§18"
+      ],
+      "depends_on": [
+        "F-039",
+        "F-049",
+        "F-048",
+        "F-042",
+        "F-043",
+        "F-044",
+        "F-045",
+        "F-056",
+        "F-052",
+        "F-059",
+        "F-076",
+        "F-033",
+        "F-016",
+        "F-072",
+        "F-074",
+        "F-075"
+      ],
+      "description": "An inbox message flows through envelope, normalization, T0/T1 analyzers, scoring and routing into detections and enqueued actions in one transaction; end-to-end tests with the fake client show known spam from a max-trust member is deleted and sent to admins, and from a new member deleted and banned under Standard.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-089",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Replay harness for inbox events and fixtures",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§18",
+        "§4"
+      ],
+      "depends_on": [
+        "F-088"
+      ],
+      "description": "A replay command and test helper feed stored inbox rows or fixture events through the full pipeline with the fake client and report verdicts, so rule changes can be compared; CI runs the replay tests.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-090",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Golden envelope tests from spike fixtures",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§18",
+        "§20"
+      ],
+      "depends_on": [
+        "F-000a",
+        "F-032",
+        "F-089"
+      ],
+      "description": "Each spike fixture under testdata/fixtures/ produces an envelope that matches its golden file, including status, group-status and broadcast shapes.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-091",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "docker-compose.yml, .env.example, README and CONTRIBUTING",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§19.1",
+        "§22"
+      ],
+      "depends_on": [
+        "F-008",
+        "F-004"
+      ],
+      "description": "`docker compose up -d` starts bot + postgres with healthchecks, .env.example documents every variable, and README (unofficial-client ban risk), CONTRIBUTING (development with the fake WAClient) and CODE_OF_CONDUCT exist.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-092",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "GoReleaser release on v* tags",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§19.1",
+        "§19.2"
+      ],
+      "depends_on": [
+        "F-000"
+      ],
+      "description": ".goreleaser.yaml and .github/workflows/release.yml build linux and darwin amd64/arm64 binaries (CGO off, -trimpath, version/commit/date ldflags) and dockers_v2 multi-arch images to ghcr.io/rayanalyasi/antispam-bot tagged X.Y.Z always and X.Y/latest only on stable releases (no bare 0 tag on 0.x), with OCI labels, SBOMs, cosign keyless signatures and actions/attest provenance; the workflow refuses a tag that isn't SemVer or whose commit isn't on main or release/*.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-093",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Edge images from staging",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§19.1"
+      ],
+      "depends_on": [
+        "F-092"
+      ],
+      "description": ".github/workflows/edge.yml publishes images from staging tagged edge and sha-<7>, never latest.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-094",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "release-please release automation",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§22"
+      ],
+      "depends_on": [
+        "F-092"
+      ],
+      "description": "A release PR on main keeps CHANGELOG.md and the version up to date from Conventional Commits (on 0.x: feat bumps the minor, fix the patch, a breaking change the minor, with the pre-major options set explicitly); merging it creates the tag that triggers the GoReleaser release. staging is promoted to main with a merge commit, never squashed, so release-please sees every feature commit. Exact configuration comes from a follow-up spec.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-095",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Conventional Commits check on PR titles",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§22"
+      ],
+      "depends_on": [
+        "F-000"
+      ],
+      "description": "A CI check fails a PR whose title doesn't follow Conventional Commits (feat, fix, docs, refactor, test, build, ci, chore; ! or BREAKING CHANGE for breaking changes), since feature PRs are squash-merged with the title as the commit message.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-096",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Docs drift check after merges into staging",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§22"
+      ],
+      "depends_on": [
+        "F-000"
+      ],
+      "description": "After each merge into staging a workflow checks whether user-facing docs have drifted from the change and, if so, opens a docs: PR into staging. It may edit only README.md and docs/ except docs/DESIGN.md and docs/AGENTIC_ENVIRONMENT.md (never CLAUDE.md, .claude/, harness/ or other protected paths), says how the check runs and which secrets it needs, and skips runs triggered by its own docs: merges.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-097",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Sync main back into staging after a release",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§22"
+      ],
+      "depends_on": [
+        "F-094"
+      ],
+      "description": "After each release, a workflow opens a PR that merges main back into staging (merged with a merge commit, never squashed) so the release commit and changelog reach staging; on a conflict it leaves the PR open with a note for the maintainer.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-098",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Dependabot and weekly whatsmeow bump",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§19.3",
+        "§21"
+      ],
+      "depends_on": [
+        "F-000"
+      ],
+      "description": ".github/dependabot.yml updates gomod, github-actions, docker and docker-compose weekly in groups, and a weekly workflow opens a PR into staging that bumps whatsmeow to its latest commit.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-099",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Refuse to start on a newer database schema",
+      "category": "storage",
+      "core": false,
+      "design_refs": [
+        "§19.3"
+      ],
+      "depends_on": [
+        "F-004"
+      ],
+      "description": "On start the binary compares the database's goose version with the newest migration it embeds and exits with a clear message (which version is needed) when the database is newer, instead of running against an unknown schema.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-100",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "SECURITY.md, versions and upgrading doc, pinned compose example",
+      "category": "docs",
+      "core": false,
+      "design_refs": [
+        "§19",
+        "§22"
+      ],
+      "depends_on": [
+        "F-091",
+        "F-092"
+      ],
+      "description": "SECURITY.md describes private vulnerability reporting, a 'Versions & upgrading' doc explains tags, the 0.x policy and upgrade steps, and the example docker-compose.yml pins ghcr.io/rayanalyasi/antispam-bot:0.1 and a Postgres major version; the docs tell deployers to run new groups in shadow mode first, because v0.1 ships before the hold-out recall and shadow-precision gates of DESIGN.md §20.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-101",
+      "milestone": "v0.1",
+      "phase": "1b",
+      "title": "Shared redaction helper",
+      "category": "ai",
+      "core": false,
+      "design_refs": [
+        "§7.5",
+        "§9.5"
+      ],
+      "depends_on": [
+        "F-038"
+      ],
+      "description": "One helper masks third-party phone numbers, emails and names, keeps the spam's advertised numbers only as keyed hashes, and truncates, used by corpus, reviews and AI.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-102",
+      "milestone": "v0.1",
+      "phase": "1b",
+      "title": "SimHash and MinHash with an LSH index",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§7.2",
+        "§7.5"
+      ],
+      "depends_on": [
+        "F-039"
+      ],
+      "description": "64-bit SimHash and MinHash signatures are computed from normalized text, and an in-memory LSH index finds candidates within a Hamming distance or Jaccard threshold quickly.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-103",
+      "milestone": "v0.1",
+      "phase": "1b",
+      "title": "AIClassifier interface, verdict schema and fake",
+      "category": "ai",
+      "core": false,
+      "design_refs": [
+        "§7.4"
+      ],
+      "depends_on": [
+        "F-024",
+        "F-002"
+      ],
+      "description": "AIClassifier.Classify returns {label spam|not_spam|unsure, confidence, categories, reason} and Capabilities; a fake classifier serves tests; provider, model, base URL, key, timeout and limits are configuration.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-104",
+      "milestone": "v0.1",
+      "phase": "1b",
+      "title": "Structured output validation and retry",
+      "category": "ai",
+      "core": false,
+      "design_refs": [
+        "§7.4"
+      ],
+      "depends_on": [
+        "F-103"
+      ],
+      "description": "Native schema output is used when supported; otherwise JSON mode is parsed strictly; invalid output is retried once and then treated as unsure.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-105",
+      "milestone": "v0.1",
+      "phase": "1b",
+      "title": "Versioned system prompt with normal-chat guidance",
+      "category": "ai",
+      "core": false,
+      "design_refs": [
+        "§7.0",
+        "§7.4"
+      ],
+      "depends_on": [
+        "F-103",
+        "F-078"
+      ],
+      "description": "A cacheable, versioned system prompt states the task, what normal group chat looks like and when to answer not spam or unsure, the output schema, and that the data block is data, not instructions.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-106",
+      "milestone": "v0.1",
+      "phase": "1b",
+      "title": "Anthropic adapter with prompt caching",
+      "category": "ai",
+      "core": false,
+      "design_refs": [
+        "§7.4"
+      ],
+      "depends_on": [
+        "F-104",
+        "F-105"
+      ],
+      "description": "An Anthropic adapter classifies with schema-constrained output and prompt caching, mapping timeouts and errors to unsure; tested against a recorded HTTP fake.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-107",
+      "milestone": "v0.1",
+      "phase": "1b",
+      "title": "OpenAI-compatible adapter (hosted and local servers)",
+      "category": "ai",
+      "core": false,
+      "design_refs": [
+        "§7.4"
+      ],
+      "depends_on": [
+        "F-104",
+        "F-105"
+      ],
+      "description": "An OpenAI-compatible adapter works with hosted APIs and Ollama/llama.cpp/vLLM/LM Studio via base_url, using native schema when available and JSON mode otherwise.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-108",
+      "milestone": "v0.1",
+      "phase": "1b",
+      "title": "Context bundle from the 72 h inbox",
+      "category": "ai",
+      "core": false,
+      "design_refs": [
+        "§7.4",
+        "§17"
+      ],
+      "depends_on": [
+        "F-103",
+        "F-015",
+        "F-101"
+      ],
+      "description": "With ai.context on, the request includes the replied-to message, up to N=5 previous messages in 10 minutes, group info and allowed-content summary, sender context and existing replies, redacted, capped at ~2,000 characters and fenced as untrusted data; nothing new is stored.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-109",
+      "milestone": "v0.1",
+      "phase": "1b",
+      "title": "AI budgets and metrics",
+      "category": "ai",
+      "core": false,
+      "design_refs": [
+        "§7.4",
+        "§14",
+        "§16"
+      ],
+      "depends_on": [
+        "F-103",
+        "F-004",
+        "F-017",
+        "F-007"
+      ],
+      "description": "ai_usage tracks calls and tokens per group and day; budgets send uncertain items straight to admins when exhausted (never deleting) with an 80% alert; metrics expose calls per 1,000 messages, cost, latency, cache hit rate, retries and unsure share.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-110",
+      "milestone": "v0.1",
+      "phase": "1b",
+      "title": "AI result cache and one call per cluster",
+      "category": "ai",
+      "core": false,
+      "design_refs": [
+        "§7.4",
+        "§11"
+      ],
+      "depends_on": [
+        "F-103",
+        "F-102",
+        "F-004"
+      ],
+      "description": "Results are cached on hash(normalized text + context hash + model + prompt version) for 30 days, and copies in the same SimHash cluster or campaign reuse the first verdict.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-111",
+      "milestone": "v0.1",
+      "phase": "1b",
+      "title": "T3 verification of the UNCERTAIN band",
+      "category": "ai",
+      "core": true,
+      "design_refs": [
+        "§7.0",
+        "§7.4",
+        "§8.3"
+      ],
+      "depends_on": [
+        "F-109",
+        "F-110",
+        "F-108",
+        "F-088"
+      ],
+      "description": "Only UNCERTAIN messages go to the AI; spam ≥ ai.spam_confidence is deleted with the ban sent to admins, not spam ≥ 0.9 is logged, and unsure, low confidence, timeout, error or no AI configured go to admins with nothing deleted.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-112",
+      "milestone": "v0.1",
+      "phase": "1b",
+      "title": "Early-AI safety: ai evidence never auto-bans without a track record",
+      "category": "policy",
+      "core": true,
+      "design_refs": [
+        "§9.2",
+        "§18"
+      ],
+      "depends_on": [
+        "F-111",
+        "F-058"
+      ],
+      "description": "A ban resting on source ai routes to ask admins in every preset until the instance meets the track-record bar; property tests show AI-only evidence and looser near-duplicates never auto-ban.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-113",
+      "milestone": "v0.1",
+      "phase": "1b",
+      "title": "Corpus entries, confirmations and learned rules",
+      "category": "learning",
+      "core": false,
+      "design_refs": [
+        "§7.5",
+        "§14"
+      ],
+      "depends_on": [
+        "F-004",
+        "F-101",
+        "F-102"
+      ],
+      "description": "corpus_entries store redacted and normalized text, fingerprints, links, hashed numbers, media hashes and provenance; corpus_confirmations and learned_rules link entries to groups and rules; label is spam only.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-114",
+      "milestone": "v0.1",
+      "phase": "1b",
+      "title": "Evidence snapshots for deletions and confirmed-spam capture",
+      "category": "storage",
+      "core": false,
+      "design_refs": [
+        "§3",
+        "§7.5",
+        "§14"
+      ],
+      "depends_on": [
+        "F-053",
+        "F-113"
+      ],
+      "description": "Every deletion keeps a redacted evidence snapshot (text + thumbnail) for 30 days, and spam an admin confirms (.spam, review ✅) is stored as a corpus entry so exact and near-duplicate matching can catch it next time.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-115",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Review message rendering and posting",
+      "category": "review",
+      "core": false,
+      "design_refs": [
+        "§9.5"
+      ],
+      "depends_on": [
+        "F-087",
+        "F-067",
+        "F-078",
+        "F-114"
+      ],
+      "description": "Review items post as text (or the inline thumbnail with a caption) with who/what/why/score/source, third-party numbers and emails masked and text truncated to ~300 characters, and review_messages maps our message IDs to the review.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-116",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Reactions and reply keywords as votes",
+      "category": "review",
+      "core": false,
+      "design_refs": [
+        "§9.5"
+      ],
+      "depends_on": [
+        "F-115"
+      ],
+      "description": "Reactions on a review message (✅👍 ban, ❌👎 not spam, removal withdraws) and replies quoting it (ban/kick/طرد/حظر, ok/not spam/ليس سبام, delete only, clear) become votes; `.review K7Q2 ban` and `.pending` work too.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-117",
+      "milestone": "v0.1",
+      "phase": "1b",
+      "title": "Near-duplicate matching against the corpus (T1)",
+      "category": "scoring",
+      "core": true,
+      "design_refs": [
+        "§7.0",
+        "§7.5"
+      ],
+      "depends_on": [
+        "F-113",
+        "F-088"
+      ],
+      "description": "After the fingerprint allow-list check, SimHash ≤ 3 bits or MinHash ≥ 0.9 to a confirmed entry is CERTAIN known evidence and looser closeness is a rules signal that only sends the message to the AI.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-118",
+      "milestone": "v0.1",
+      "phase": "1b",
+      "title": "Overturns retract confirmed spam and delete evidence text",
+      "category": "learning",
+      "core": true,
+      "design_refs": [
+        "§3",
+        "§7.5",
+        "§13.7",
+        "§17",
+        "§18"
+      ],
+      "depends_on": [
+        "F-117",
+        "F-114"
+      ],
+      "description": "Every not-spam decision (.notspam, review ❌, an overturned .spam or bot deletion) deletes the evidence-snapshot text, removes the strike and restores trust; if the message was confirmed spam, its corpus entry leaves the matching indexes at once (NOTIFY) and only a fingerprint allow-list entry, checked first by near-duplicate matching, is kept; tests cover both cases and assert no text of the overturned message remains.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-119",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Reply .spam and .notspam",
+      "category": "enforcement",
+      "core": true,
+      "design_refs": [
+        "§13.7",
+        "§7.5"
+      ],
+      "depends_on": [
+        "F-080",
+        "F-077",
+        "F-114",
+        "F-118"
+      ],
+      "description": "Replying .spam deletes the message, bans the sender (allowed for established members because it's an admin decision) and records confirmed spam; .notspam/.ok restores trust, records the false positive and retracts what the confirmation added.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-120",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Admin-only, first-wins decisions",
+      "category": "review",
+      "core": true,
+      "design_refs": [
+        "§9.5"
+      ],
+      "depends_on": [
+        "F-116",
+        "F-077",
+        "F-019",
+        "F-118"
+      ],
+      "description": "Only current admins of the protected group can decide; the first valid vote wins atomically even under concurrent votes; late voters get one 👌 and 'already handled'; every vote is stored; the decision executes through the normal action path.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-121",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Outcome edit or follow-up reply",
+      "category": "review",
+      "core": false,
+      "design_refs": [
+        "§9.5"
+      ],
+      "depends_on": [
+        "F-120"
+      ],
+      "description": "A decided review message is edited to show who decided and what happened while within 20 minutes, and gets a quoting follow-up reply after that.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-122",
+      "milestone": "v0.1",
+      "phase": "1a",
+      "title": "Review timeouts, fallbacks and .review commands",
+      "category": "review",
+      "core": true,
+      "design_refs": [
+        "§9.5",
+        "§8.3",
+        "§13.7"
+      ],
+      "depends_on": [
+        "F-120",
+        "F-005",
+        "F-087"
+      ],
+      "description": "Pending reviews time out (6 h, or 15 min in ask_before_action) into keep_deleted_no_ban, delete_no_ban, auto_ban or dismiss, auto_ban refused in ask modes, for established members and hacked accounts; `.review group|dashboard` and `.review timeout …` configure it.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-123",
+      "milestone": "v0.1",
+      "phase": "1c",
+      "title": "Blacklist table and number normalization",
+      "category": "enforcement",
+      "core": true,
+      "design_refs": [
+        "§9.8",
+        "§14"
+      ],
+      "depends_on": [
+        "F-038",
+        "F-004"
+      ],
+      "description": "number_blacklist stores E.164 numbers with keyed hashes, scope and reason; input in international, local-with-default-country, 00-prefixed, Arabic-digit and wa.me forms normalizes correctly, several per command, and invalid numbers are reported.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-124",
+      "milestone": "v0.1",
+      "phase": "1c",
+      "title": ".blacklist add/remove/list/check",
+      "category": "enforcement",
+      "core": true,
+      "design_refs": [
+        "§9.8",
+        "§13.7"
+      ],
+      "depends_on": [
+        "F-123",
+        "F-080"
+      ],
+      "description": "Admins add, remove, list (masked except the last digits) and check numbers per group; the operator adds instance-wide entries with --instance; every change is audit-logged.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-125",
+      "milestone": "v0.1",
+      "phase": "1c",
+      "title": "Blacklist identity resolution",
+      "category": "identity",
+      "core": true,
+      "design_refs": [
+        "§9.8",
+        "§7.7"
+      ],
+      "depends_on": [
+        "F-123",
+        "F-022",
+        "F-070"
+      ],
+      "description": "Blacklisted numbers resolve to LIDs via batched GetUserInfo within the read budget, both identities link to the person, and numbers not on WhatsApp still work as content signals.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-126",
+      "milestone": "v0.1",
+      "phase": "1c",
+      "title": "Blacklist enforcement",
+      "category": "enforcement",
+      "core": true,
+      "design_refs": [
+        "§9.8"
+      ],
+      "depends_on": [
+        "F-125",
+        "F-077",
+        "F-072",
+        "F-060"
+      ],
+      "description": "A blacklisted member is banned silently (admins never acted on, the adder told instead), a blacklisted joiner is kicked, their join requests rejected and messages deleted at P1; in ask-admins groups instance-wide entries become review items.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-127",
+      "milestone": "v0.1",
+      "phase": "1c",
+      "title": "Blacklisted number in content is known spam",
+      "category": "scoring",
+      "core": true,
+      "design_refs": [
+        "§9.8",
+        "§7.3"
+      ],
+      "depends_on": [
+        "F-123",
+        "F-049"
+      ],
+      "description": "A blacklisted number in a vCard waid/TEL, a wa.me link or advertised in text is CERTAIN known evidence, and removing it from the list lifts the signal.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-128",
+      "milestone": "v0.2",
+      "phase": "1a",
+      "title": "Membership history: join method, added-by, join-to-first-message",
+      "category": "identity",
+      "core": true,
+      "design_refs": [
+        "§7.6",
+        "§14"
+      ],
+      "depends_on": [
+        "F-023"
+      ],
+      "description": "Every join records the method (invite link, added, approved, pre-existing), who added or approved, the first-message time and join-to-first-message seconds, and leaves record the reason.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-129",
+      "milestone": "v0.2",
+      "phase": "1a",
+      "title": "Rule-pack YAML format with must/must-not-match tests",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§12.3",
+        "§22.2"
+      ],
+      "depends_on": [
+        "F-042",
+        "F-043",
+        "F-048"
+      ],
+      "description": "rules/packs/<name>.yaml packs (keywords, phrases, regexes, domains, numbers, hashes, metadata) load into global rules, and a test runs every pack against its own tests: block so a pack that hits normal phrasing fails CI.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-130",
+      "milestone": "v0.2",
+      "phase": "1a",
+      "title": "Lockdown action (announce, join approval, invite reset)",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§9.1",
+        "§9.4"
+      ],
+      "depends_on": [
+        "F-065"
+      ],
+      "description": "A lockdown action sets announce mode and optionally join approval and resets the invite link through WAClient at P0, and an unlock action reverses announce and approval.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-131",
+      "milestone": "v0.2",
+      "phase": "1a",
+      "title": "Backlog metrics and early lockdown",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§9.4",
+        "§10.4",
+        "§15",
+        "§10.1",
+        "§16"
+      ],
+      "depends_on": [
+        "F-130",
+        "F-071",
+        "F-065",
+        "F-007"
+      ],
+      "description": "Metrics expose queue depth, wait time, rate vs ceiling and backlog ETA per group and bot; when a group's projected delete backlog exceeds 60 s it is locked at once and reopened after auto_lockdown_minutes or when the visible spam is gone, whichever is later.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-132",
+      "milestone": "v0.2",
+      "phase": "1a",
+      "title": ".lockdown and .unlock",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§9.4",
+        "§13.7"
+      ],
+      "depends_on": [
+        "F-080",
+        "F-131"
+      ],
+      "description": "`.lockdown 15m` locks the group for the given time and `.unlock` reopens it early, both through the action queue.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-133",
+      "milestone": "v0.2",
+      "phase": "1a",
+      "title": "Name and picture history for confirmed spammers",
+      "category": "identity",
+      "core": true,
+      "design_refs": [
+        "§7.6",
+        "§20"
+      ],
+      "depends_on": [
+        "F-020",
+        "F-114"
+      ],
+      "description": "When someone is confirmed as a spammer, their push-name history and profile picture ID/hash are captured in name_history and profile_snapshots, and nothing is captured for ordinary members.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-134",
+      "milestone": "v0.2",
+      "phase": "1a",
+      "title": "/api/v1 server with OpenAPI spec and operator tokens",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.1"
+      ],
+      "depends_on": [
+        "F-008",
+        "F-001",
+        "F-007"
+      ],
+      "description": "The api role serves /api/v1 with a checked-in OpenAPI spec, consistent JSON errors and request IDs, authenticated for now by operator API tokens; a test fails when a route is missing from the spec.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-135",
+      "milestone": "v0.2",
+      "phase": "1a",
+      "title": "Settings API with .set parity",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§12.1",
+        "§13.0"
+      ],
+      "depends_on": [
+        "F-134",
+        "F-081"
+      ],
+      "description": "GET/PATCH group settings by dotted key use the same validation, history and audit as `.set`, and a parity test changes every key through both paths.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-136",
+      "milestone": "v0.2",
+      "phase": "1a",
+      "title": "API for groups, detections and reviews",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.4"
+      ],
+      "depends_on": [
+        "F-134",
+        "F-120"
+      ],
+      "description": "The API lists groups with status, detections with explanations and reviews, and can decide a review, using the same decision path as WhatsApp.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-137",
+      "milestone": "v0.2",
+      "phase": "1b",
+      "title": "Google (Gemini) adapter",
+      "category": "ai",
+      "core": false,
+      "design_refs": [
+        "§7.4"
+      ],
+      "depends_on": [
+        "F-104",
+        "F-105"
+      ],
+      "description": "A Google adapter classifies with structured output behind the same interface and config shape.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-138",
+      "milestone": "v0.2",
+      "phase": "1b",
+      "title": "Learn only from confirmed spam",
+      "category": "learning",
+      "core": false,
+      "design_refs": [
+        "§7.5",
+        "§21"
+      ],
+      "depends_on": [
+        "F-113",
+        "F-119",
+        "F-120",
+        "F-115"
+      ],
+      "description": "Review spam decisions, .spam, .ban spam and website confirmations create corpus entries; reason other never does; auto-kicks ≥ 0.98 with ≥ 2 families and auto_apply timeouts are provisional; an optional 'was it spam?' question for removals in the WhatsApp app learns only from a yes.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-139",
+      "milestone": "v0.2",
+      "phase": "1b",
+      "title": "Group-scoped learned rules from confirmed spam",
+      "category": "learning",
+      "core": false,
+      "design_refs": [
+        "§7.5"
+      ],
+      "depends_on": [
+        "F-138",
+        "F-041"
+      ],
+      "description": "Confirmed URLs, domains, numbers, channels, invites, media hashes and SimHashes become group-scoped learned rules; globally allow-listed or top-site domains get a weighted signal and an operator suggestion instead.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-140",
+      "milestone": "v0.2",
+      "phase": "1b",
+      "title": "Few-shot example selection without embeddings",
+      "category": "ai",
+      "core": false,
+      "design_refs": [
+        "§7.4",
+        "§7.5"
+      ],
+      "depends_on": [
+        "F-113",
+        "F-111"
+      ],
+      "description": "Up to k≈4 redacted confirmed-spam examples are chosen by shared URLs/domains/numbers/channels/invites, then SimHash/MinHash closeness, then keywords, then campaign or category.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-141",
+      "milestone": "v0.2",
+      "phase": "1b",
+      "title": "Overturns also retract learned rules",
+      "category": "learning",
+      "core": false,
+      "design_refs": [
+        "§7.5",
+        "§17"
+      ],
+      "depends_on": [
+        "F-139",
+        "F-118"
+      ],
+      "description": "On top of the corpus retraction, an overturn removes the group-scoped learned rules the entry created (learned_rules).",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-142",
+      "milestone": "v0.2",
+      "phase": "1b",
+      "title": "Learning limits and admin reputation",
+      "category": "learning",
+      "core": false,
+      "design_refs": [
+        "§7.5"
+      ],
+      "depends_on": [
+        "F-139",
+        "F-141"
+      ],
+      "description": "Each admin adds at most 20 learned patterns per day and each group at most M (extras queue for the operator), young groups contribute provisional entries only, and admins whose decisions get overturned have later contributions marked provisional.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-143",
+      "milestone": "v0.2",
+      "phase": "1b",
+      "title": "Recent-traffic check before activating a learned pattern",
+      "category": "learning",
+      "core": false,
+      "design_refs": [
+        "§7.5",
+        "§8.4"
+      ],
+      "depends_on": [
+        "F-139",
+        "F-033",
+        "F-015"
+      ],
+      "description": "Before a learned pattern activates it is matched in memory against the group's 72 h inbox and message_index; one that would match more than x% of recent non-spam traffic is rejected with a reason, storing nothing extra.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-144",
+      "milestone": "v0.2",
+      "phase": "1b",
+      "title": "Rollback by admin or group and burst alerts",
+      "category": "learning",
+      "core": false,
+      "design_refs": [
+        "§7.5"
+      ],
+      "depends_on": [
+        "F-142",
+        "F-017"
+      ],
+      "description": "The operator can revert everything learned from one admin or one group in one action, and a burst detector alerts on unusual spikes of learned patterns.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-145",
+      "milestone": "v0.2",
+      "phase": "1b",
+      "title": "Corpus retention and group deletion",
+      "category": "learning",
+      "core": false,
+      "design_refs": [
+        "§7.5",
+        "§14"
+      ],
+      "depends_on": [
+        "F-113",
+        "F-005"
+      ],
+      "description": "Corpus raw text expires after 180 days, fingerprints 180 days after their last hit, and a group's corpus is deleted when the bot leaves the group or the owner asks.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-146",
+      "milestone": "v0.2",
+      "phase": "1b",
+      "title": "Property test: normal text is never stored",
+      "category": "privacy",
+      "core": false,
+      "design_refs": [
+        "§17",
+        "§18",
+        "§7.5"
+      ],
+      "depends_on": [
+        "F-141",
+        "F-108",
+        "F-145"
+      ],
+      "description": "A test drives normal, overturned and AI-context messages through the pipeline and asserts no table outside the 72 h inbox gains their text.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-147",
+      "milestone": "v0.2",
+      "phase": "1c",
+      "title": "Corpus import parsing and validation (JSONL/CSV)",
+      "category": "learning",
+      "core": false,
+      "design_refs": [
+        "§7.8"
+      ],
+      "depends_on": [
+        "F-113"
+      ],
+      "description": "`antispam corpus import` parses JSONL and CSV with the documented fields, defaults label to spam, reports rejected lines clearly, and `--dry-run` writes nothing; docs/CORPUS_FORMAT.md documents the format with synthetic examples.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-148",
+      "milestone": "v0.2",
+      "phase": "1c",
+      "title": "Import: normalize, fingerprint, dedupe and store",
+      "category": "learning",
+      "core": false,
+      "design_refs": [
+        "§7.8"
+      ],
+      "depends_on": [
+        "F-147",
+        "F-117"
+      ],
+      "description": "Records are normalized and fingerprinted, deduped within the file and against the corpus, and stored as corpus entries with source import, the chosen scope and an import_batches row.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-149",
+      "milestone": "v0.2",
+      "phase": "1c",
+      "title": "Cluster-aware hold-out split",
+      "category": "learning",
+      "core": false,
+      "design_refs": [
+        "§7.8",
+        "§18"
+      ],
+      "depends_on": [
+        "F-148"
+      ],
+      "description": "A hold-out slice (default 20%) stratified by category and kind is split by cluster_id or computed near-duplicate cluster, so no cluster lands on both sides, and stored in eval_corpus.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-150",
+      "milestone": "v0.2",
+      "phase": "1c",
+      "title": "Ham records in memory only, and undoing an import",
+      "category": "learning",
+      "core": false,
+      "design_refs": [
+        "§7.8"
+      ],
+      "depends_on": [
+        "F-148"
+      ],
+      "description": "Ham records are never stored as text, only used for an in-memory false-positive report and optional allow-list fingerprints; `antispam corpus remove --import <id>` removes every entry, fingerprint and learned rule of a batch.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-151",
+      "milestone": "v0.2",
+      "phase": "1c",
+      "title": "Recall on the hold-out per band and type",
+      "category": "eval",
+      "core": false,
+      "design_refs": [
+        "§18",
+        "§20"
+      ],
+      "depends_on": [
+        "F-149",
+        "F-089",
+        "F-111"
+      ],
+      "description": "An eval command replays the hold-out through the full pipeline and reports the share caught per band (CERTAIN, AI-verified, sent to admins, missed), type and preset, with a diff between rule versions; CI fails when recall drops.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-152",
+      "milestone": "v0.2",
+      "phase": "1c",
+      "title": "Model comparison on the hold-out",
+      "category": "eval",
+      "core": false,
+      "design_refs": [
+        "§7.4",
+        "§18"
+      ],
+      "depends_on": [
+        "F-151",
+        "F-106",
+        "F-107",
+        "F-137"
+      ],
+      "description": "The eval command runs several configured providers/models on the hold-out and reports recall, unsure share, cost and latency side by side.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-153",
+      "milestone": "v0.2",
+      "phase": "1c",
+      "title": "Shadow-mode review and precision report",
+      "category": "eval",
+      "core": false,
+      "design_refs": [
+        "§8.4",
+        "§20"
+      ],
+      "depends_on": [
+        "F-062",
+        "F-120"
+      ],
+      "description": "Would-be actions in shadow mode are reviewable, each review outcome counts toward precision per band, source and type, and a summary ('this week we would have deleted 42 messages and banned 3 people') is produced.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-154",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Bounded media decoding and media_cache",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§17",
+        "§11"
+      ],
+      "depends_on": [
+        "F-027",
+        "F-004"
+      ],
+      "description": "Thumbnails and images decode in a bounded worker pool with size, pixel and time limits (decompression bombs rejected), and results are cached by SHA256 in media_cache.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-155",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Thumbnail pHash/dHash with a BK-tree",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6.2",
+        "§7.0"
+      ],
+      "depends_on": [
+        "F-154",
+        "F-041"
+      ],
+      "description": "Inline thumbnails get pHash/dHash, a BK-tree finds known-spam hashes within distance, ≤ 4 is CERTAIN known and looser is a rules signal.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-156",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Profile fetch and cache",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6.16",
+        "§11"
+      ],
+      "depends_on": [
+        "F-070",
+        "F-020",
+        "F-019"
+      ],
+      "description": "Profile snapshots (about text, picture ID/hash, verified name) are fetched with batched UserInfo and ExistingID picture checks within the read budget, cached 24 h and invalidated by Picture/UserAbout events.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-157",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Business profile description and website via raw IQ",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§2.1",
+        "§6.16"
+      ],
+      "depends_on": [
+        "F-000a",
+        "F-009"
+      ],
+      "description": "The adapter reads the business profile description and website (raw IQ or upstream patch, as confirmed in the spike) in addition to whatsmeow's parsed fields.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-158",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Profile scanning analyzer",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6.16",
+        "§6.19",
+        "§6.20"
+      ],
+      "depends_on": [
+        "F-156",
+        "F-157",
+        "F-155",
+        "F-042",
+        "F-088",
+        "F-057"
+      ],
+      "description": "Push name, about, business description/website and picture hash are scanned on join and first message as weighted signals; members' own status posts and DM spam to the bot (including broadcasts) only lower that person's reputation.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-159",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "SSRF-safe HTTP client",
+      "category": "security",
+      "core": false,
+      "design_refs": [
+        "§17",
+        "§6"
+      ],
+      "depends_on": [
+        "F-000"
+      ],
+      "description": "An HTTP client refuses private, link-local and metadata IPs (checked at dial time), caps redirects at 5, times out after 3 s and limits body size.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-160",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "link_cache with positive and negative TTLs",
+      "category": "storage",
+      "core": false,
+      "design_refs": [
+        "§11",
+        "§14"
+      ],
+      "depends_on": [
+        "F-004"
+      ],
+      "description": "Resolution results are cached by key with 24 h (invites/channels), 7 d (unshortened URLs) and 1 h negative TTLs.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-161",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Invite-link and channel resolution (T2)",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6.9",
+        "§6.8"
+      ],
+      "depends_on": [
+        "F-160",
+        "F-070",
+        "F-029"
+      ],
+      "description": "Invite codes resolve via GroupInfoFromLink and channels via NewsletterInfo(+FromInvite) within the read budget and link cache; names, topics, descriptions, sizes, subscriber counts and verification feed signals.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-162",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "wa.me link resolution",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§2.1",
+        "§6"
+      ],
+      "depends_on": [
+        "F-160",
+        "F-070",
+        "F-047"
+      ],
+      "description": "wa.me/message, wa.me/qr and wa.me/<phone> links resolve to the business name, pre-filled text or account, which feed the text and number pipelines.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-163",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Status attribution and reshare analysis",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6.18"
+      ],
+      "depends_on": [
+        "F-030",
+        "F-048",
+        "F-049"
+      ],
+      "description": "Attribution action URLs go to the URL analyzer, reshared channel JIDs to the channel analyzer, RESHARED_FROM_POST_MANY_TIMES is a mild signal, and a reply whose only payload is a spammy quoted status counts as spam.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-164",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Shortener expansion",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6"
+      ],
+      "depends_on": [
+        "F-159",
+        "F-160",
+        "F-047"
+      ],
+      "description": "Known shorteners are expanded with the SSRF-safe client (HEAD then GET), and the final target goes through the URL analyzer.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-165",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "URLhaus/OpenPhish feeds and optional Safe Browsing",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6",
+        "§4"
+      ],
+      "depends_on": [
+        "F-005",
+        "F-048",
+        "F-159"
+      ],
+      "description": "A River job refreshes URLhaus and OpenPhish into the domain/URL reputation tables, and Google Safe Browsing/Web Risk is checked when a key is configured.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-166",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Domain age (RDAP) and look-alike domains",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6"
+      ],
+      "depends_on": [
+        "F-159",
+        "F-004",
+        "F-047",
+        "F-035"
+      ],
+      "description": "RDAP registration dates (cached 1–7 days) make very new domains a weighted signal, and hosts whose confusable skeleton matches a protected brand or that are close to an allow-listed domain add a weighted signal.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-167",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Verdict cache by envelope fingerprint",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§11"
+      ],
+      "depends_on": [
+        "F-088",
+        "F-019"
+      ],
+      "description": "Verdicts are cached by text-free envelope fingerprint for 7 days, and clean verdicts are purged when the rule-set version changes.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-168",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Cross-group campaign signal",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§15",
+        "§6.17"
+      ],
+      "depends_on": [
+        "F-102",
+        "F-033"
+      ],
+      "description": "The same SimHash, sticker hash, channel, number or domain appearing across groups or senders within a window adds a weighted campaign signal in every opted-in group.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-169",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Behaviour signals: floods, mentions, forwards, join-then-post",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6.17",
+        "§7.6"
+      ],
+      "depends_on": [
+        "F-088",
+        "F-019",
+        "F-128"
+      ],
+      "description": "Counters emit weighted signals for floods, mass mentions, high forwarding scores, post-then-self-delete, reaction floods, posting within seconds of joining and the same fingerprint from one sender in ≥ k groups.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-170",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Join-raid response",
+      "category": "enforcement",
+      "core": true,
+      "design_refs": [
+        "§9.4"
+      ],
+      "depends_on": [
+        "F-169",
+        "F-130",
+        "F-072",
+        "F-076"
+      ],
+      "description": "≥ 8 joins in 2 minutes with ≥ 3 suspicious profiles turns on join approval, resets the invite link, kicks suspicious joiners in capped batches within the hourly cap, sends the rest as one review item and alerts admins.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-171",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Message-flood response",
+      "category": "enforcement",
+      "core": true,
+      "design_refs": [
+        "§9.4"
+      ],
+      "depends_on": [
+        "F-168",
+        "F-131"
+      ],
+      "description": "Many senders posting near-duplicates triggers early announce mode, batched bans and newest-first cleanup, with automatic reopening and one alert in the review destination.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-172",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Optional warn/mute/ban ladder with strikes",
+      "category": "enforcement",
+      "core": true,
+      "design_refs": [
+        "§9.3",
+        "§14"
+      ],
+      "depends_on": [
+        "F-059",
+        "F-004"
+      ],
+      "description": "With ladder.enabled, strikes within the window step through the configured actions for new/unknown senders, replacing the matrix's auto_ban for early strikes; established members still go to admins; the ladder is inert when disabled (property test).",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-173",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Mute emulation and .mute/.unmute",
+      "category": "enforcement",
+      "core": true,
+      "design_refs": [
+        "§9.3"
+      ],
+      "depends_on": [
+        "F-172",
+        "F-071"
+      ],
+      "description": "A muted member's new messages are deleted at P1, a flooding muted member escalates to a ban, warnings are DM or in-group only as configured, and .mute/.unmute work only with the ladder on.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-174",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Join-request detection",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§2.3",
+        "§9.6"
+      ],
+      "depends_on": [
+        "F-000a",
+        "F-013",
+        "F-070"
+      ],
+      "description": "Join requests are detected by parsing GroupInfo.UnknownChanges (shape from the spike) or by polling GetGroupRequestParticipants for approval-mode groups.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-175",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Join screening",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§8.2",
+        "§12.1"
+      ],
+      "depends_on": [
+        "F-158",
+        "F-174"
+      ],
+      "description": "A profile scan runs on every join and join request and only feeds the score or opens a join-screening review.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-176",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Join-approval autopilot (opt-in)",
+      "category": "enforcement",
+      "core": true,
+      "design_refs": [
+        "§8.2"
+      ],
+      "depends_on": [
+        "F-175",
+        "F-072"
+      ],
+      "description": "With autopilot on, clean requesters are approved, obvious spam profiles rejected in batches, and the rest left for humans.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-177",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Edit re-analysis",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6.14",
+        "§2.1"
+      ],
+      "depends_on": [
+        "F-088",
+        "F-033"
+      ],
+      "description": "An edit is fully re-analysed against the original message ID, a benign-to-spam edit adds a signal, and deletion uses the original ID.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-178",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "View-once and undecryptable policy",
+      "category": "policy",
+      "core": false,
+      "design_refs": [
+        "§6.15",
+        "§9.2"
+      ],
+      "depends_on": [
+        "F-056",
+        "F-088"
+      ],
+      "description": "View-once from new or untrusted members can be blocked by policy and deleted by ID, and the matrix's view_once cell applies; content is never inspected.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-179",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Per-person activity baselines",
+      "category": "identity",
+      "core": true,
+      "design_refs": [
+        "§8.7",
+        "§14"
+      ],
+      "depends_on": [
+        "F-128",
+        "F-005"
+      ],
+      "description": "activity_stats keeps each person's hour-of-day histogram, median interval, cross-group burst maximum and totals, updated incrementally.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-180",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Possibly-compromised signal family",
+      "category": "enforcement",
+      "core": true,
+      "design_refs": [
+        "§8.7"
+      ],
+      "depends_on": [
+        "F-179",
+        "F-168",
+        "F-156"
+      ],
+      "description": "Cross-group bursts, first-ever links or contacts, campaign content, unusual hours, bursts after silence and profile change before spam are detected against the member's own history; two signals, or one plus known spam, mark a compromise event.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-181",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Hacked-account review",
+      "category": "enforcement",
+      "core": true,
+      "design_refs": [
+        "§8.7",
+        "§18"
+      ],
+      "depends_on": [
+        "F-180",
+        "F-120"
+      ],
+      "description": "A compromise event deletes the spam and opens a 'may be hacked' review; there is never an automatic ban, strike, spammer profile, person learning or network ban (property test); for admins it only alerts.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-182",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Restriction while pending, .restrict and .clear",
+      "category": "enforcement",
+      "core": true,
+      "design_refs": [
+        "§8.7",
+        "§13.7"
+      ],
+      "depends_on": [
+        "F-181"
+      ],
+      "description": "With restrict_while_pending on, the member's links/media/forwards are deleted everywhere until decided; .restrict/.restricted manage manual restrictions; .clear, a clear reply or the API closes the review without a ban and lifts restrictions.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-183",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "DM reviewers with opt-in",
+      "category": "review",
+      "core": false,
+      "design_refs": [
+        "§9.5"
+      ],
+      "depends_on": [
+        "F-122",
+        "F-079"
+      ],
+      "description": "`.reviewers add/remove` chooses reviewers, each must opt in once (REVIEWER code link, login or `.reviewer on`), pending reviewers get nothing, and `.review dm` sends items by DM; votes must come from chosen reviewers.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-184",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Review destination fallback chain",
+      "category": "review",
+      "core": false,
+      "design_refs": [
+        "§9.5",
+        "§14"
+      ],
+      "depends_on": [
+        "F-183"
+      ],
+      "description": "If the destination is unusable (no active reviewers, bot removed from the review group), items go dm → group → dashboard and the owner is told once.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-185",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Quiet hours, digests and per-reviewer caps",
+      "category": "review",
+      "core": false,
+      "design_refs": [
+        "§9.5"
+      ],
+      "depends_on": [
+        "F-183",
+        "F-005"
+      ],
+      "description": "Quiet hours delay DMs without stopping timeouts, a daily digest can replace per-item messages, more than 10 review DMs per hour fold into a digest with 'all ok / all spam', and updates to more than 3 other reviewers are batched.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-186",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Confirm-before-kick option",
+      "category": "review",
+      "core": true,
+      "design_refs": [
+        "§13.4",
+        "§9.5"
+      ],
+      "depends_on": [
+        "F-120"
+      ],
+      "description": "With confirm-before-kick on, a ban decision by one admin waits for confirmation (or the dashboard) before the kick executes.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-187",
+      "milestone": "v0.3",
+      "phase": "2",
+      "title": "Precision report at the delete threshold",
+      "category": "eval",
+      "core": false,
+      "design_refs": [
+        "§20",
+        "§18"
+      ],
+      "depends_on": [
+        "F-151",
+        "F-153"
+      ],
+      "description": "The eval tooling reports precision at T_delete from reviewed shadow and live decisions per type, the phase 2 exit metric.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-188",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Dashboard users, sessions and CSRF",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.2",
+        "§13.1"
+      ],
+      "depends_on": [
+        "F-134",
+        "F-004"
+      ],
+      "description": "Sessions are opaque random IDs in HttpOnly Secure SameSite=Lax cookies stored hashed in Postgres with a 30-day sliding expiry, 'log out other devices' works, and cookie-authenticated writes need a CSRF token.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-189",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Login by messaging the bot",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.2"
+      ],
+      "depends_on": [
+        "F-188",
+        "F-079",
+        "F-021"
+      ],
+      "description": "The login page shows a code and a wa.me link with LOGIN <code>; when the bot receives that DM from the matching number, the waiting browser (SSE or polling) is logged in.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-190",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Outbound OTP login with eligibility check",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.2"
+      ],
+      "depends_on": [
+        "F-189",
+        "F-019",
+        "F-070"
+      ],
+      "description": "A code is sent only to numbers that admin a protected group or are operators; only an HMAC is stored with 5-minute TTL and 5 attempts bound to the browser; per-number, per-IP and global rate limits and lockout apply.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-191",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Permissions: admins, owners and operators",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.3",
+        "§13.1"
+      ],
+      "depends_on": [
+        "F-188",
+        "F-019"
+      ],
+      "description": "Requests check current admin status (refreshing a cache older than 10 minutes), owners can change everything, an owner-only lock is honoured, operators come from OPERATOR_PHONES, and non-browser clients use short-lived API tokens with explicit CORS for other origins.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-192",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "HSTS, CSP and fail2ban-friendly logs",
+      "category": "security",
+      "core": false,
+      "design_refs": [
+        "§17"
+      ],
+      "depends_on": [
+        "F-188"
+      ],
+      "description": "Responses carry HSTS and a strict CSP, auth failures produce fail2ban-friendly log lines, and the operator area can be limited by IP.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-193",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Settings preview API",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.4",
+        "§8.4"
+      ],
+      "depends_on": [
+        "F-135",
+        "F-089"
+      ],
+      "description": "Before saving, a settings change can be replayed against the last week's detections to report how many decisions it would change.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-194",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Frontend app scaffold (framework chosen by a human first)",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.1",
+        "§21"
+      ],
+      "depends_on": [
+        "F-191",
+        "F-078"
+      ],
+      "description": "Once a human records the framework choice (open question 16), a separate mobile-first, RTL-aware Arabic/English frontend app builds in CI and its static output is served same-origin by the Go binary.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-195",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Website login pages",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.2"
+      ],
+      "depends_on": [
+        "F-194",
+        "F-190"
+      ],
+      "description": "The website offers tap-to-message login by default with the OTP fallback, works on a phone and shows clear errors and lockouts.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-196",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "My groups and group overview pages",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.4",
+        "§13.3"
+      ],
+      "depends_on": [
+        "F-195",
+        "F-191",
+        "F-136"
+      ],
+      "description": "Admins see their groups with status and today's stats, a detection timeline with explanations, undo buttons and charts, and the activity/audit log for their groups.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-197",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Protection settings page",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.4",
+        "§12"
+      ],
+      "depends_on": [
+        "F-196",
+        "F-193"
+      ],
+      "description": "Preset picker, auto-ban grid with an advanced evidence column, ask-admins switch, content rules in plain language, just-joined toggle and ladder, each change previewed before saving.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-198",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Lists page with dry-run",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.4",
+        "§8.4"
+      ],
+      "depends_on": [
+        "F-196",
+        "F-084"
+      ],
+      "description": "Allowed members, domain lists, blocked words with a test box showing dry-run matches, and global pack subscriptions are editable.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-199",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Reviews and notifications settings page",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.4",
+        "§9.5"
+      ],
+      "depends_on": [
+        "F-196",
+        "F-184",
+        "F-185"
+      ],
+      "description": "The destination picker, reviewer checkboxes with opt-in status, review-group instructions and warnings, timeout/fallback, quiet hours, reaction mapping and a sample review preview.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-200",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Review queue and history pages",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.4"
+      ],
+      "depends_on": [
+        "F-196"
+      ],
+      "description": "Open items can be decided (ban / not spam / delete only) with masked evidence, closing them in WhatsApp too; history filters by group, decider and outcome and shows later overturns.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-201",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Learned patterns and blacklist pages",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.4",
+        "§7.5",
+        "§9.8"
+      ],
+      "depends_on": [
+        "F-196",
+        "F-141",
+        "F-124"
+      ],
+      "description": "Each group sees what learning added with provenance, hit counts and one-click retract, and manages blacklisted numbers (masked) with the same rules as the commands.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-202",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Website and command parity test",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.0",
+        "§20"
+      ],
+      "depends_on": [
+        "F-197",
+        "F-199"
+      ],
+      "description": "A test changes every setting exposed on the website through the `.set` path and asserts identical stored documents and audit entries.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-203",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Onboarding on the website",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.6"
+      ],
+      "depends_on": [
+        "F-196",
+        "F-085"
+      ],
+      "description": "Waiting and not-admin groups are shown with next steps, admins choose a review destination, and an optional 24 h shadow first run sends its summary to the review destination.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-204",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Operator pages: pairing, health, queue, budgets, kill switch",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.4",
+        "§19.3",
+        "§10.3"
+      ],
+      "depends_on": [
+        "F-195",
+        "F-012",
+        "F-131",
+        "F-109"
+      ],
+      "description": "Operators pair numbers by QR or code on the website, see bot health and ban status, queue depth, AI spend, global packs and promotion queue, change the ceiling (marked risky, audited) and use the kill switch.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-205",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Group offboarding deletes its data",
+      "category": "privacy",
+      "core": false,
+      "design_refs": [
+        "§17",
+        "§7.5"
+      ],
+      "depends_on": [
+        "F-145",
+        "F-018"
+      ],
+      "description": "When the bot leaves a group (or the owner asks), the group's settings, corpus, reviews and member data are deleted per the retention rules.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-206",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Template privacy notice",
+      "category": "docs",
+      "core": false,
+      "design_refs": [
+        "§17",
+        "§17.1",
+        "§7.5"
+      ],
+      "depends_on": [
+        "F-085"
+      ],
+      "description": "A template privacy notice explains what is stored, why, for how long and how to appeal or request deletion, naming the configured AI provider, and is linked from onboarding, the about text and the website.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-207",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "docs/SELF_HOSTING.md",
+      "category": "docs",
+      "core": false,
+      "design_refs": [
+        "§19"
+      ],
+      "depends_on": [
+        "F-091",
+        "F-204"
+      ],
+      "description": "The guide covers requirements, compose up, operator login, pairing, adding the bot, reverse proxy examples (Caddy/Traefik/nginx/Coolify), backups, upgrades, privacy and ban-risk advice.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-208",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Synthetic load generator",
+      "category": "eval",
+      "core": false,
+      "design_refs": [
+        "§18",
+        "§15"
+      ],
+      "depends_on": [
+        "F-088",
+        "F-089"
+      ],
+      "description": "A generator replays synthetic events at 10× expected peak and reports CPU, memory, inbox lag and queue behaviour on ARM64.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-209",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Staging release checklist (human-run)",
+      "category": "docs",
+      "core": false,
+      "design_refs": [
+        "§18"
+      ],
+      "depends_on": [
+        "F-204"
+      ],
+      "description": "A scripted checklist for a second number in a private test group covers every message type, delete/kick, edits, raid simulation and login, to run before each release and whatsmeow bump.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-210",
+      "milestone": "v0.4",
+      "phase": "3",
+      "title": "Release with the website and self-hosting guide",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§20",
+        "§22"
+      ],
+      "depends_on": [
+        "F-207",
+        "F-092",
+        "F-206"
+      ],
+      "description": "A release that ships the website is cut through the release workflow, with release notes and the README pointing at the self-hosting guide.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-211",
+      "milestone": "v0.5",
+      "phase": "4",
+      "title": "Vision tier (T4) for images and stickers",
+      "category": "ai",
+      "core": false,
+      "design_refs": [
+        "§7.1",
+        "§7.4"
+      ],
+      "depends_on": [
+        "F-111",
+        "F-154"
+      ],
+      "description": "Images, stickers and thumbnails go to a configured vision adapter only when visual evidence decides and cheaper tiers are inconclusive, within the AI budgets.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-212",
+      "milestone": "v0.5",
+      "phase": "4",
+      "title": "Vision on profile pictures",
+      "category": "ai",
+      "core": false,
+      "design_refs": [
+        "§6.16",
+        "§7.4"
+      ],
+      "depends_on": [
+        "F-211",
+        "F-158"
+      ],
+      "description": "Ambiguous profile pictures can be classified by the vision tier, as a weighted signal only.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-213",
+      "milestone": "v0.5",
+      "phase": "4",
+      "title": "'Unrelated groups' definition",
+      "category": "learning",
+      "core": false,
+      "design_refs": [
+        "§7.5",
+        "§9.6"
+      ],
+      "depends_on": [
+        "F-018",
+        "F-019"
+      ],
+      "description": "Two groups are unrelated when owners differ, member overlap is under 20%, they aren't in the same community and the deciding admins differ; shared by promotion and network quorum.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-214",
+      "milestone": "v0.5",
+      "phase": "4",
+      "title": "Global promotion of learned patterns",
+      "category": "learning",
+      "core": false,
+      "design_refs": [
+        "§7.5"
+      ],
+      "depends_on": [
+        "F-213",
+        "F-139"
+      ],
+      "description": "A pattern confirmed in ≥ 3 unrelated groups within 30 days is promoted to global for opted-in groups, high-impact types need operator approval, and overturns from ≥ 2 unrelated groups demote it and alert the operator.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-215",
+      "milestone": "v0.5",
+      "phase": "4",
+      "title": "Weekly bounded re-weighting",
+      "category": "learning",
+      "core": false,
+      "design_refs": [
+        "§7.5"
+      ],
+      "depends_on": [
+        "F-151",
+        "F-153",
+        "F-005"
+      ],
+      "description": "A weekly job refits signal weights by logistic regression on decided reviews, limits each change to ±20%, applies it only if the overturn rate doesn't rise and hold-out recall doesn't drop, needs operator approval for global changes, and uses per-group offsets only with ≥ 50 labels.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-216",
+      "milestone": "v0.5",
+      "phase": "4",
+      "title": "Track record and opt-in for ai auto-bans",
+      "category": "policy",
+      "core": true,
+      "design_refs": [
+        "§9.2"
+      ],
+      "depends_on": [
+        "F-112",
+        "F-120"
+      ],
+      "description": "The instance tracks decisions per deciding source; once ai has ≥ 200 decisions with ≥ 98% confirmed over 30 days plus shadow precision, an operator or admin may explicitly add ai to matrix cells; it never happens automatically.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-217",
+      "milestone": "v0.5",
+      "phase": "4",
+      "title": "Appeals end to end",
+      "category": "enforcement",
+      "core": true,
+      "design_refs": [
+        "§8.5",
+        "§14"
+      ],
+      "depends_on": [
+        "F-120",
+        "F-079",
+        "F-077"
+      ],
+      "description": "A DM 'appeal' (or any DM from someone banned) starts an appeal routed as a review; approval lifts the ban, clears strikes, sets a temporary allow-list and sends an invite in the existing thread; appeals.notify_removed (off by default) DMs removed people once.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-218",
+      "milestone": "v0.5",
+      "phase": "4",
+      "title": "/appeal page",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§8.5"
+      ],
+      "depends_on": [
+        "F-217",
+        "F-194"
+      ],
+      "description": "A public /appeal page explains the process and opens the inbound wa.me appeal flow.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-219",
+      "milestone": "v0.5",
+      "phase": "4",
+      "title": "Overturn-rate dashboard and auto-disable",
+      "category": "eval",
+      "core": false,
+      "design_refs": [
+        "§8.5",
+        "§16"
+      ],
+      "depends_on": [
+        "F-141",
+        "F-196"
+      ],
+      "description": "Overturn rates per rule, source and group are shown, and rules above the configured overturn rate are disabled automatically with an operator alert.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-220",
+      "milestone": "v0.5",
+      "phase": "4",
+      "title": "Per-rule shadow deployment",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§18"
+      ],
+      "depends_on": [
+        "F-041",
+        "F-062"
+      ],
+      "description": "A new rule or weight set can run in shadow on live traffic, recording its would-be effect without acting.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-221",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Organisations",
+      "category": "network",
+      "core": true,
+      "design_refs": [
+        "§9.6",
+        "§14"
+      ],
+      "depends_on": [
+        "F-018",
+        "F-213"
+      ],
+      "description": "Groups join an organisation by same owner, same community (linked parent / subgroups) or an admin-of-all link on the website, stored in organisations and group_orgs.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-222",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Network scope settings and .network",
+      "category": "network",
+      "core": true,
+      "design_refs": [
+        "§9.6",
+        "§13.7"
+      ],
+      "depends_on": [
+        "F-221",
+        "F-081"
+      ],
+      "description": "network.contribute and network.enforce (off/org/all) are settable by website and `.network off|org|all`; `.network` shows bans affecting the group and pending identity matches.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-223",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Network candidates and risk signal",
+      "category": "network",
+      "core": true,
+      "design_refs": [
+        "§9.6"
+      ],
+      "depends_on": [
+        "F-222",
+        "F-077"
+      ],
+      "description": "A spam ban that doesn't meet the network rule records a candidate, and other in-scope groups get a strong risk signal (stricter thresholds, join-screening review) but no automatic kick.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-224",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Network quorum rule and protections",
+      "category": "network",
+      "core": true,
+      "design_refs": [
+        "§9.6",
+        "§18"
+      ],
+      "depends_on": [
+        "F-223",
+        "F-142",
+        "F-057"
+      ],
+      "description": "A network ban activates only for human-confirmed spam meeting (a) score ≥ 0.97 with ≥ 2 families, (b) confirmation in ≥ 2 unrelated groups in 30 days, or (c) operator decision, and never for admins anywhere, established members elsewhere, flagged admins or past the per-admin daily limit; each negative case is tested.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-225",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Operator approval queue for network bans",
+      "category": "network",
+      "core": true,
+      "design_refs": [
+        "§9.6",
+        "§13.4"
+      ],
+      "depends_on": [
+        "F-224"
+      ],
+      "description": "Candidates that need the operator (automatic kicks without human confirmation, admins, established members) wait in an approval queue the operator can approve or reject.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-226",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Network-ban job and prioritized child actions",
+      "category": "network",
+      "core": true,
+      "design_refs": [
+        "§9.6",
+        "§10",
+        "§14"
+      ],
+      "depends_on": [
+        "F-224",
+        "F-072",
+        "F-071"
+      ],
+      "description": "An active ban plans one job with prioritized child actions per in-scope group (P0/P1/P2/P4), idempotent by (ban, group, action), and every step is recorded in network_actions and audit_log, visible to operators and per group to admins.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-227",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Identity-pending watch rules",
+      "category": "network",
+      "core": true,
+      "design_refs": [
+        "§9.6",
+        "§7.7"
+      ],
+      "depends_on": [
+        "F-226",
+        "F-022"
+      ],
+      "description": "When a group uses an identifier not yet linked, the ban becomes a watch rule that applies the first time the person appears there (join, message, participant refresh) or when the identity resolves.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-228",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Re-scan recorded messages, delete only spam",
+      "category": "network",
+      "core": true,
+      "design_refs": [
+        "§9.6"
+      ],
+      "depends_on": [
+        "F-226",
+        "F-117",
+        "F-015"
+      ],
+      "description": "The person's recorded messages from the last 72 h go back through the pipeline with the ban evidence; only those sharing a fingerprint, touching the campaign or scoring ≥ T_delete are deleted, the rest are kept, and 2–30-day-old matches are listed as too old to delete.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-229",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Rejoin kicks and join-request rejection",
+      "category": "network",
+      "core": true,
+      "design_refs": [
+        "§9.6"
+      ],
+      "depends_on": [
+        "F-226",
+        "F-174",
+        "F-060"
+      ],
+      "description": "A network-banned joiner in an in-scope group is kicked at P0 (batched in raids), matching join requests are rejected, and in ask-admins groups an incoming ban becomes a review item.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-230",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Admin re-add override",
+      "category": "network",
+      "core": true,
+      "design_refs": [
+        "§9.6"
+      ],
+      "depends_on": [
+        "F-229"
+      ],
+      "description": "When a current admin deliberately re-adds a network-banned person (not via invite link), the bot allow-lists them in that group, doesn't kick, and tells the admins once with an undo.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-231",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Network-ban report",
+      "category": "network",
+      "core": true,
+      "design_refs": [
+        "§9.6"
+      ],
+      "depends_on": [
+        "F-228",
+        "F-115"
+      ],
+      "description": "The originating group gets one summary (kicked, deleted, kept, too old, skipped) and each affected group a digest line with the reason category and an undo.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-232",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Network-wide unban",
+      "category": "network",
+      "core": true,
+      "design_refs": [
+        "§9.6",
+        "§8.5"
+      ],
+      "depends_on": [
+        "F-226",
+        "F-217",
+        "F-141"
+      ],
+      "description": "An upheld appeal, the operator or the sole contributing group lifts the ban everywhere: cancels pending actions, removes rejoin blocks, restores trust, retracts learned patterns and the spammer profile, notifies groups and sends invite links in the person's own thread.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-233",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Network ban across 40 groups within pacing",
+      "category": "network",
+      "core": true,
+      "design_refs": [
+        "§20",
+        "§18"
+      ],
+      "depends_on": [
+        "F-228",
+        "F-229"
+      ],
+      "description": "A synctest scenario bans a person across 40 groups with batched kicks and re-scans, finishing within pacing limits without exceeding the ceiling or per-group caps.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-234",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Spammer profiles",
+      "category": "intel",
+      "core": false,
+      "design_refs": [
+        "§7.6",
+        "§14"
+      ],
+      "depends_on": [
+        "F-133",
+        "F-128",
+        "F-223"
+      ],
+      "description": "Confirmed spammers (never possibly-hacked accounts) get a profile linking identities, names, snapshots, group footprint, content and timing; ordinary members never do.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-235",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Campaign graph",
+      "category": "intel",
+      "core": false,
+      "design_refs": [
+        "§7.6"
+      ],
+      "depends_on": [
+        "F-234",
+        "F-168"
+      ],
+      "description": "Accounts and artifacts (domains, number hashes, channels, picture hashes, SimHash clusters, invites) form a graph whose components above a threshold become campaigns, and new accounts touching one get a campaign prior.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-236",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Nightly intelligence patterns with lift",
+      "category": "intel",
+      "core": false,
+      "design_refs": [
+        "§7.6"
+      ],
+      "depends_on": [
+        "F-234",
+        "F-005"
+      ],
+      "description": "A nightly job computes number-prefix clusters, picture and name reuse, shared artifacts, join-to-spam timing and repeat inviters against the base rate of legitimate members, keeping only high-lift, well-supported patterns.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-237",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Capped identity-prior signals",
+      "category": "scoring",
+      "core": true,
+      "design_refs": [
+        "§7.6",
+        "§18"
+      ],
+      "depends_on": [
+        "F-236",
+        "F-235",
+        "F-051"
+      ],
+      "description": "Priors add at most +1.0 combined and +0.3 for number prefix, never count as a signal family, never act alone (property test), are per-group switchable, and a prefix signal with rising overturns disables itself.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-238",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Spammer views for group admins",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.4",
+        "§17.1"
+      ],
+      "depends_on": [
+        "F-234",
+        "F-196"
+      ],
+      "description": "Group admins see only spammers from their groups and their groups' data, with cross-group counts; every view is written to intel_access_log and there is no bulk export.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-239",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Operator intelligence views",
+      "category": "web",
+      "core": false,
+      "design_refs": [
+        "§13.4"
+      ],
+      "depends_on": [
+        "F-238",
+        "F-237",
+        "F-225"
+      ],
+      "description": "Operators search by name, number, LID, domain or picture similarity, see timelines, the campaign view, patterns with lift and switches, and the network-ban queue.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-240",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Intelligence retention jobs",
+      "category": "privacy",
+      "core": false,
+      "design_refs": [
+        "§17.1",
+        "§14"
+      ],
+      "depends_on": [
+        "F-234",
+        "F-005"
+      ],
+      "description": "Expiry jobs delete (not hide) spammer profiles 12 months after last activity unless banned, keep 10 snapshots per person, and delete non-spammer membership history after 30 days.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-241",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Column-level encryption for identity data",
+      "category": "privacy",
+      "core": false,
+      "design_refs": [
+        "§17.1"
+      ],
+      "depends_on": [
+        "F-234"
+      ],
+      "description": "Photos and identity fields are encrypted at rest with a key held outside the database, and the optional encrypted review thumbnail (off by default) expires after 30 days.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-242",
+      "milestone": "v0.6",
+      "phase": "5",
+      "title": "Upheld appeals and deletion requests delete intelligence",
+      "category": "privacy",
+      "core": false,
+      "design_refs": [
+        "§17.1"
+      ],
+      "depends_on": [
+        "F-232",
+        "F-240",
+        "F-079"
+      ],
+      "description": "An upheld appeal deletes the person's profile, snapshots, names, campaign links, stats and corpus, keeping a minimal audit with a keyed hash; a 'delete my data' DM goes to the operator and is honoured within 7 days unless tied to an active justified ban.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-243",
+      "milestone": "v0.7",
+      "phase": "6",
+      "title": "Signed feed format",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§15"
+      ],
+      "depends_on": [
+        "F-129"
+      ],
+      "description": "Rule-pack and fingerprint feeds are versioned files signed with the publisher's key, containing no message text, names, photos or identities.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-244",
+      "milestone": "v0.7",
+      "phase": "6",
+      "title": "Subscribe to feeds",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§15"
+      ],
+      "depends_on": [
+        "F-243",
+        "F-159",
+        "F-005"
+      ],
+      "description": "Operators subscribe to feeds over HTTPS; imported entries are weighted signals only, never hard blocks or network bans, unless the operator promotes them.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-245",
+      "milestone": "v0.7",
+      "phase": "6",
+      "title": "Publish feeds",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§15"
+      ],
+      "depends_on": [
+        "F-243",
+        "F-214"
+      ],
+      "description": "An operator can publish their promoted rules and hashed fingerprints as a signed feed.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-246",
+      "milestone": "v0.7",
+      "phase": "6",
+      "title": "Multiple bot numbers",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§15"
+      ],
+      "depends_on": [
+        "F-010",
+        "F-011",
+        "F-065"
+      ],
+      "description": "Several numbers run in one deployment, each group is assigned to the bot that is admin there, and each bot keeps its own serial executor and pacing.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-247",
+      "milestone": "v0.7",
+      "phase": "6",
+      "title": "Primary and standby bots per group",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§15"
+      ],
+      "depends_on": [
+        "F-246"
+      ],
+      "description": "With two bots in a group the primary acts and the standby reads, taking over when the primary loses admin or is banned; onboarding suggests the least-loaded number and the operator can migrate a group.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-248",
+      "milestone": "v0.7",
+      "phase": "6",
+      "title": "Failover during a temporary ban",
+      "category": "queue",
+      "core": true,
+      "design_refs": [
+        "§15",
+        "§10.5"
+      ],
+      "depends_on": [
+        "F-247",
+        "F-074"
+      ],
+      "description": "When a bot is temp-banned its groups' actions re-route to a standby in the same group, otherwise wait for the ban to expire within their deadlines.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-249",
+      "milestone": "v0.7",
+      "phase": "6",
+      "title": "-media image with ffmpeg, libwebp and tesseract",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§19.2"
+      ],
+      "depends_on": [
+        "F-092",
+        "F-154"
+      ],
+      "description": "A second Debian-slim image tag runs media workers that call ffmpeg/libwebp/tesseract as resource-limited subprocesses.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-250",
+      "milestone": "v0.7",
+      "phase": "6",
+      "title": "Animated sticker frames and video keyframes",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6.4",
+        "§6.3"
+      ],
+      "depends_on": [
+        "F-249",
+        "F-155"
+      ],
+      "description": "Animated stickers get a first-frame pHash and OCR, and videos get ffmpeg keyframes for pHash and the vision tier.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-251",
+      "milestone": "v0.7",
+      "phase": "6",
+      "title": "OCR into the text pipeline",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6.2",
+        "§6.5"
+      ],
+      "depends_on": [
+        "F-249",
+        "F-042"
+      ],
+      "description": "Image text and PDF first pages are OCR'd and the text goes through normalization and the text analyzers.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-252",
+      "milestone": "v0.7",
+      "phase": "6",
+      "title": "Optional voice transcription",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§6.6"
+      ],
+      "depends_on": [
+        "F-249",
+        "F-111"
+      ],
+      "description": "Voice notes can be transcribed (opt-in) and analysed as text, within budgets.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-253",
+      "milestone": "v0.7",
+      "phase": "6",
+      "title": "External HTTP analyzer interface",
+      "category": "detection",
+      "core": false,
+      "design_refs": [
+        "§22.2"
+      ],
+      "depends_on": [
+        "F-040",
+        "F-101"
+      ],
+      "description": "An optional external analyzer receives a redacted envelope over HTTP/JSON and returns signals within a timeout, treated as T2-level and off by default.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-254",
+      "milestone": "v0.7",
+      "phase": "6",
+      "title": "Multi-node operation",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§15"
+      ],
+      "depends_on": [
+        "F-246",
+        "F-019"
+      ],
+      "description": "Analysis workers and the web server run statelessly on several nodes, with Valkey/Redis for shared hot caches when there is more than one node.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-255",
+      "milestone": "v0.7",
+      "phase": "6",
+      "title": "Monthly partitioning",
+      "category": "storage",
+      "core": false,
+      "design_refs": [
+        "§15"
+      ],
+      "depends_on": [
+        "F-033",
+        "F-053",
+        "F-014"
+      ],
+      "description": "inbox, detections and message_index are partitioned by month and retention drops whole partitions.",
+      "passes": false,
+      "evidence": []
+    },
+    {
+      "id": "F-256",
+      "milestone": "v0.7",
+      "phase": "6",
+      "title": "Optional OpenTelemetry tracing",
+      "category": "infra",
+      "core": false,
+      "design_refs": [
+        "§16"
+      ],
+      "depends_on": [
+        "F-088"
+      ],
+      "description": "With tracing on, each message gets spans through the tiers; it's off by default.",
+      "passes": false,
+      "evidence": []
+    }
+  ]
 }

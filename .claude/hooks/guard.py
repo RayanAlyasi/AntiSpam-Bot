@@ -46,13 +46,13 @@ def check_write(path):
     if agent in h.AGENT_WRITES:
         if not h.matches(r, h.AGENT_WRITES[agent]):
             block(f"the {agent} agent may only write {', '.join(h.AGENT_WRITES[agent]) or 'nothing'}; not {r}.")
-        if r.endswith("_test.go") and h.is_tracked(r, root):
-            block(f"{r} is a committed test and can't be changed." + TEST_CHANGE)
+        if r.endswith("_test.go") and h.in_base(r, root):
+            block(f"{r} is an existing test from the base branch and can't be changed." + TEST_CHANGE)
         return
     if h.matches(r, h.PROTECTED_WRITE):
         block(f"{r} is protected (checks, fixtures, hidden tests and harness config are human-controlled)." + TEST_CHANGE)
-    if r.endswith("_test.go") and h.is_tracked(r, root):
-        block(f"{r} is a committed test and can't be changed. Add new tests in new files." + TEST_CHANGE)
+    if r.endswith("_test.go") and h.in_base(r, root):
+        block(f"{r} is an existing test from the base branch and can't be changed. Add new tests in new files." + TEST_CHANGE)
 
 
 # ---- Bash ----------------------------------------------------------------------

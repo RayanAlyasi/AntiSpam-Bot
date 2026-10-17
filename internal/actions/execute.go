@@ -206,15 +206,23 @@ func (e *Executor) executeBatch(ctx context.Context, picked Action) error {
 		// Members whose deadline passed meanwhile (the call lock can wait behind a slow read)
 		// don't get the rest of their JIDs sent.
 		now := e.clk.Now()
+		var expired []int64
 		for _, m := range members {
 			if !m.settled && !m.a.Deadline.After(now) && !resolved(m.a, outcomes) {
 				m.settled = true
-				errs = append(errs, e.finish(sctx, m.a.ID, StatusExpired, "deadline passed during a batch", outcomesOf(m.a, outcomes)))
+				errs = append(errs, e.finishQuiet(sctx, m.a.ID, StatusExpired, "deadline passed during a batch", outcomesOf(m.a, outcomes)))
+				expired = append(expired, m.a.ID)
+			}
+		}
+		reportExpired := func() {
+			for _, id := range expired {
+				e.report(sctx, id) // after the call lock is released
 			}
 		}
 		chunk := nextChunk(members, outcomes, e.cfg.MaxKickBatch)
 		if len(chunk) == 0 {
 			e.callMu.Unlock()
+			reportExpired()
 			break
 		}
 		for _, m := range members {
@@ -225,6 +233,7 @@ func (e *Executor) executeBatch(ctx context.Context, picked Action) error {
 		results, callErr := e.doParticipants(ctx, picked, chunk)
 		e.reactUrgent(ctx, classify(ctx, callErr), callErr)
 		e.callMu.Unlock()
+		reportExpired()
 		class := classify(ctx, callErr)
 		if class.reachedWhatsApp() {
 			e.wrote(ctx, picked.Chat, false)
@@ -583,10 +592,13 @@ func (e *Executor) react(ctx context.Context, chat wa.JID, class errorClass, err
 		e.warn(ctx, WarnUnusual)
 	case classNotAdmin:
 		sctx := context.WithoutCancel(ctx)
-		if n, ferr := e.d.Store.FailPending(sctx, e.d.Bot, chat, adminKinds, "bot is not an admin of the group"); ferr != nil {
+		if failed, ferr := e.d.Store.FailChat(sctx, e.d.Bot, chat, adminKinds, "bot is not an admin of the group"); ferr != nil {
 			e.log.Error().Err(ferr).Msg("fail pending admin actions")
-		} else if n > 0 {
-			e.log.Warn().Int("actions", n).Msg("pending admin actions failed: bot is no longer admin")
+		} else if len(failed) > 0 {
+			e.log.Warn().Int("actions", len(failed)).Msg("pending admin actions failed: bot is no longer admin")
+			for _, a := range failed {
+				e.finished(sctx, a)
+			}
 		}
 		if nerr := e.d.Groups.NotAdmin(sctx, e.d.Bot, chat); nerr != nil {
 			e.log.Error().Err(nerr).Msg("record lost admin")
@@ -857,7 +869,43 @@ const (
 
 // finish settles an action as final, retrying the store write.
 func (e *Executor) finish(ctx context.Context, id int64, status Status, errText string, res Result) error {
+	err := e.finishQuiet(ctx, id, status, errText, res)
+	e.report(ctx, id)
+	return err
+}
+
+// finishQuiet settles an action as final without telling Deps.OnFinished; the caller reports it
+// with report, e.g. once it no longer holds the call lock.
+func (e *Executor) finishQuiet(ctx context.Context, id int64, status Status, errText string, res Result) error {
 	return e.settle(ctx, func() error { return e.d.Store.Finish(ctx, id, status, errText, res) })
+}
+
+// report tells Deps.OnFinished about action id if it is final. It looks even after a failed
+// settle write, which may have committed before its error came back.
+func (e *Executor) report(ctx context.Context, id int64) {
+	if e.d.OnFinished == nil {
+		return
+	}
+	a, err := e.d.Store.Get(ctx, id)
+	if err != nil {
+		e.log.Error().Err(err).Int64("action", id).Msg("read finished action for OnFinished")
+		return
+	}
+	if a.Status.Final() {
+		e.finished(ctx, a)
+	}
+}
+
+// finished tells Deps.OnFinished about a final action.
+func (e *Executor) finished(ctx context.Context, a Action) {
+	if e.d.OnFinished == nil {
+		return
+	}
+	hctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), e.cfg.CallTimeout)
+	defer cancel()
+	if err := e.d.OnFinished(hctx, a); err != nil {
+		e.log.Error().Err(err).Int64("action", a.ID).Msg("OnFinished hook failed")
+	}
 }
 
 // retry puts an action back to pending, retrying the store write.

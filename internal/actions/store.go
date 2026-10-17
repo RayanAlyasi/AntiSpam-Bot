@@ -54,6 +54,8 @@ type Store interface {
 	ExpireDue(ctx context.Context, bot wa.JID, now time.Time) ([]Action, error)
 	// FailPending moves the bot's pending actions of the given kinds in chat to failed.
 	FailPending(ctx context.Context, bot, chat wa.JID, kinds []Kind, reason string) (int, error)
+	// FailChat is FailPending returning the actions it failed.
+	FailChat(ctx context.Context, bot, chat wa.JID, kinds []Kind, reason string) ([]Action, error)
 	// WritesSince counts the bot's actions that reached WhatsApp (done or failed after a call)
 	// since t.
 	WritesSince(ctx context.Context, bot wa.JID, since time.Time) (int, error)

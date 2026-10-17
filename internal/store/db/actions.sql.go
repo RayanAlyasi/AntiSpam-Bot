@@ -240,6 +240,66 @@ func (q *Queries) FailPendingActions(ctx context.Context, arg FailPendingActions
 	return result.RowsAffected(), nil
 }
 
+const failPendingActionsReturning = `-- name: FailPendingActionsReturning :many
+UPDATE app.actions SET status = 'failed', last_error = $1, updated_at = $2
+WHERE bot = $3 AND chat = $4 AND status = 'pending' AND kind = ANY($5::text[])
+RETURNING id, bot, chat, kind, priority, payload, status, attempts, not_before, deadline, message_time, dedupe_key, reason_detection_id, last_error, result, called, created_at, updated_at, claimed_by
+`
+
+type FailPendingActionsReturningParams struct {
+	Reason string
+	Now    time.Time
+	Bot    string
+	Chat   string
+	Kinds  []string
+}
+
+func (q *Queries) FailPendingActionsReturning(ctx context.Context, arg FailPendingActionsReturningParams) ([]AppAction, error) {
+	rows, err := q.db.Query(ctx, failPendingActionsReturning,
+		arg.Reason,
+		arg.Now,
+		arg.Bot,
+		arg.Chat,
+		arg.Kinds,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AppAction{}
+	for rows.Next() {
+		var i AppAction
+		if err := rows.Scan(
+			&i.ID,
+			&i.Bot,
+			&i.Chat,
+			&i.Kind,
+			&i.Priority,
+			&i.Payload,
+			&i.Status,
+			&i.Attempts,
+			&i.NotBefore,
+			&i.Deadline,
+			&i.MessageTime,
+			&i.DedupeKey,
+			&i.ReasonDetectionID,
+			&i.LastError,
+			&i.Result,
+			&i.Called,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ClaimedBy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const finishAction = `-- name: FinishAction :execrows
 UPDATE app.actions
 SET status = $1, last_error = $2, result = $3, updated_at = $4,

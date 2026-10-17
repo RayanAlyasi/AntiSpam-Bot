@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"cmp"
 	"context"
 	crand "crypto/rand"
 	"encoding/hex"
@@ -8,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"slices"
 	"sync"
 	"time"
 
@@ -299,6 +301,24 @@ func (s *PGStore) FailPending(ctx context.Context, bot, chat wa.JID, kinds []Kin
 		return 0, fmt.Errorf("fail pending actions: %w", err)
 	}
 	return int(n), nil
+}
+
+// FailChat implements Store.
+func (s *PGStore) FailChat(ctx context.Context, bot, chat wa.JID, kinds []Kind, reason string) ([]Action, error) {
+	names := make([]string, len(kinds))
+	for i, k := range kinds {
+		names[i] = string(k)
+	}
+	rows, err := db.New(s.pool).FailPendingActionsReturning(ctx, db.FailPendingActionsReturningParams{
+		Bot: string(bot), Chat: string(chat), Kinds: names, Reason: reason, Now: s.clock.Now(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("fail pending actions: %w", err)
+	}
+	out, err := fromRows(rows)
+	// UPDATE … RETURNING has no order; return them by ID, like MemStore.
+	slices.SortFunc(out, func(a, b Action) int { return cmp.Compare(a.ID, b.ID) })
+	return out, err
 }
 
 // WritesSince implements Store.

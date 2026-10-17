@@ -13,18 +13,64 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getDetectionByMessage = `-- name: GetDetectionByMessage :one
+SELECT id, group_jid, msg_id, person_id, score, tier_reached, signals, verdict, confidence_source,
+    route, rule_version, action_plan, mode, network_ban_id, evidence_ref, created_at, edit_seq
+FROM app.detections
+WHERE group_jid = $1 AND msg_id = $2 AND edit_seq = $3 AND mode = $4
+`
+
+type GetDetectionByMessageParams struct {
+	GroupJid string
+	MsgID    string
+	EditSeq  int32
+	Mode     string
+}
+
+func (q *Queries) GetDetectionByMessage(ctx context.Context, arg GetDetectionByMessageParams) (AppDetection, error) {
+	row := q.db.QueryRow(ctx, getDetectionByMessage,
+		arg.GroupJid,
+		arg.MsgID,
+		arg.EditSeq,
+		arg.Mode,
+	)
+	var i AppDetection
+	err := row.Scan(
+		&i.ID,
+		&i.GroupJid,
+		&i.MsgID,
+		&i.PersonID,
+		&i.Score,
+		&i.TierReached,
+		&i.Signals,
+		&i.Verdict,
+		&i.ConfidenceSource,
+		&i.Route,
+		&i.RuleVersion,
+		&i.ActionPlan,
+		&i.Mode,
+		&i.NetworkBanID,
+		&i.EvidenceRef,
+		&i.CreatedAt,
+		&i.EditSeq,
+	)
+	return i, err
+}
+
 const insertDetection = `-- name: InsertDetection :one
-INSERT INTO app.detections (group_jid, msg_id, person_id, score, tier_reached, signals, verdict,
+INSERT INTO app.detections (group_jid, msg_id, edit_seq, person_id, score, tier_reached, signals, verdict,
     confidence_source, route, rule_version, action_plan, mode, network_ban_id, evidence_ref)
-VALUES ($1, $2, $3, $4, $5, $6, $7,
-    $8, $9, $10, $11, $12,
-    $13, $14)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
+    $9, $10, $11, $12, $13,
+    $14, $15)
+ON CONFLICT (group_jid, msg_id, edit_seq, mode) DO NOTHING
 RETURNING id, created_at
 `
 
 type InsertDetectionParams struct {
 	GroupJid         string
 	MsgID            string
+	EditSeq          int32
 	PersonID         pgtype.Int8
 	Score            float64
 	TierReached      string
@@ -44,10 +90,13 @@ type InsertDetectionRow struct {
 	CreatedAt time.Time
 }
 
+// A message version already recorded in this mode gets no new row (ON CONFLICT DO NOTHING
+// returns none), and the caller reads the existing one.
 func (q *Queries) InsertDetection(ctx context.Context, arg InsertDetectionParams) (InsertDetectionRow, error) {
 	row := q.db.QueryRow(ctx, insertDetection,
 		arg.GroupJid,
 		arg.MsgID,
+		arg.EditSeq,
 		arg.PersonID,
 		arg.Score,
 		arg.TierReached,
@@ -68,7 +117,7 @@ func (q *Queries) InsertDetection(ctx context.Context, arg InsertDetectionParams
 
 const listDetectionsByGroup = `-- name: ListDetectionsByGroup :many
 SELECT id, group_jid, msg_id, person_id, score, tier_reached, signals, verdict, confidence_source,
-    route, rule_version, action_plan, mode, network_ban_id, evidence_ref, created_at
+    route, rule_version, action_plan, mode, network_ban_id, evidence_ref, created_at, edit_seq
 FROM app.detections
 WHERE group_jid = $1
   AND ($2::bigint = 0 OR id < $2::bigint)
@@ -109,6 +158,7 @@ func (q *Queries) ListDetectionsByGroup(ctx context.Context, arg ListDetectionsB
 			&i.NetworkBanID,
 			&i.EvidenceRef,
 			&i.CreatedAt,
+			&i.EditSeq,
 		); err != nil {
 			return nil, err
 		}

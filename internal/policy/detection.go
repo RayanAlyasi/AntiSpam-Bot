@@ -14,6 +14,7 @@ type DetectionRecord struct {
 	ID          int64
 	Group       wa.JID
 	MsgID       wa.MessageID
+	EditSeq     int // 0 for the original message, n for its n-th edit
 	PersonID    *int64
 	Score       float64
 	TierReached string
@@ -34,6 +35,7 @@ type DetectionRecord struct {
 type DetectionRef struct {
 	Group       wa.JID
 	MsgID       wa.MessageID
+	EditSeq     int // 0 for the original message, n for its n-th edit
 	PersonID    *int64
 	TierReached string // the highest tier that ran: t0..t4
 	RuleVersion string // the weights/rules version that produced the finding
@@ -47,7 +49,7 @@ func NewDetection(ref DetectionRef, f Finding, d Decision, p Plan) (DetectionRec
 		return DetectionRecord{}, false
 	}
 	return DetectionRecord{
-		Group: ref.Group, MsgID: ref.MsgID, PersonID: ref.PersonID,
+		Group: ref.Group, MsgID: ref.MsgID, EditSeq: ref.EditSeq, PersonID: ref.PersonID,
 		Score: f.Score, TierReached: ref.TierReached,
 		Signals: f.Signals, Violations: f.Violations,
 		Verdict: d.Verdict, Source: f.Source, Route: d.Route,
@@ -58,7 +60,11 @@ func NewDetection(ref DetectionRef, f Finding, d Decision, p Plan) (DetectionRec
 
 // DetectionStore keeps detections. Implementations live in the store package.
 type DetectionStore interface {
-	InsertDetection(ctx context.Context, d DetectionRecord) (DetectionRecord, error)
+	// RecordDetection stores d and reports whether it was new. The first decision for a
+	// message version (group, message, edit) in a mode is kept: a redelivery or a later
+	// decision with the same key gets the stored record back with created=false, and the
+	// caller must not enqueue its actions again.
+	RecordDetection(ctx context.Context, d DetectionRecord) (stored DetectionRecord, created bool, err error)
 }
 
 // Record is NewDetection for an Engine outcome.

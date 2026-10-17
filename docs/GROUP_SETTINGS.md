@@ -81,7 +81,9 @@ Per type: `allow` (default), `block`, `block_for_new` (senders who joined within
 `status_mentions`, `group_status_posts`. `content.link_domains.allow` exempts domains from a links
 rule; `content.link_domains.block` blocks links to a domain even when links are allowed.
 `content.document_extensions_block` (default `apk exe scr bat js`) blocks documents with those
-extensions, and documents that hide an executable behind an innocent extension (`invoice.pdf.exe`).
+extensions, documents that hide an executable behind an innocent extension (`invoice.pdf.exe`),
+and documents whose declared type is one of those executables (an APK renamed `invoice.pdf`). Link
+domains are matched without ports and in their ASCII form, so `BIT．ly:443` matches `bit.ly`.
 
 A violation is not spam. By default (`policy.action: delete_only`) it's deleted silently: no ban, no
 strike, no message. Opt in to `policy.action: ask` or `ban`, or to escalation with

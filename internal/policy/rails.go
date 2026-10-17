@@ -2,6 +2,7 @@ package policy
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"sync"
 	"time"
@@ -93,10 +94,30 @@ func (r *Rails) Killed(code string) bool {
 	return r.killed[code]
 }
 
-// FilterFinding removes the signals and violations of killed rules from a finding. A
-// finding that was CERTAIN only through killed known-spam evidence drops to still uncertain
-// (admins decide), and one with no spam evidence left becomes clean. The score is left as is.
+// FilterFinding removes the signals and violations of killed rules from a finding without
+// knowing the group's thresholds: whatever spam evidence is left (a positive signal that isn't
+// an identity prior) goes to admins as still uncertain. Engine.Route uses FilterFindingFor,
+// which also takes the killed weights out of the score.
 func (r *Rails) FilterFinding(f Finding) Finding {
+	return r.filter(f, nil)
+}
+
+// FilterFindingFor removes the signals and violations of killed rules from a finding (DESIGN.md
+// §8.6: a killed rule stops acting at once). The score is recomputed without the killed
+// weights, and the band is re-derived only where the killed items were its evidence:
+//   - known spam whose only known evidence was killed,
+//   - a CERTAIN violation-only finding whose violations were all killed,
+//   - a heuristic (rules) finding that lost any of its signals
+//
+// each become still uncertain (admins decide) when spam evidence that isn't a prior remains
+// and the recomputed score still reaches T_review, and clean otherwise. AI-verified findings
+// keep their band: the AI judged the message itself (see harness/deviations/F-076.md).
+func (r *Rails) FilterFindingFor(f Finding, s Settings) Finding {
+	review := s.Detection.Thresholds.Review
+	return r.filter(f, &review)
+}
+
+func (r *Rails) filter(f Finding, review *float64) Finding {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if len(r.killed) == 0 {
@@ -108,19 +129,50 @@ func (r *Rails) FilterFinding(f Finding) Finding {
 	if len(out.Signals) == len(f.Signals) && len(out.Violations) == len(f.Violations) {
 		return out
 	}
-	positive, known := false, false
+	killedWeight, removedKnown, removedSignal := 0.0, false, false
+	for _, s := range f.Signals {
+		if r.killed[s.Code] {
+			killedWeight += s.Weight
+			removedSignal = true
+			removedKnown = removedKnown || (s.Known && s.Weight > 0)
+		}
+	}
+	if removedSignal {
+		out.Score = withoutLogOdds(f.Score, killedWeight)
+	}
+	evidence, known := false, false
 	for _, s := range out.Signals {
-		positive = positive || s.Weight > 0
+		evidence = evidence || (s.Weight > 0 && !s.Prior)
 		known = known || (s.Known && s.Weight > 0)
 	}
+	// What's left is still worth an admin's look only if it is real evidence and, when the
+	// group's T_review is known, the remaining score reaches it.
+	stillSuspicious := evidence && (review == nil || out.Score >= *review)
+	rederive := func() {
+		if stillSuspicious {
+			out.Band, out.Source = BandStillUncertain, SourceRules
+		} else {
+			out.Band, out.Source = BandClean, SourceNone
+		}
+	}
 	switch {
-	case !positive && len(out.Violations) == 0:
-		// Nothing left that could act: a killed content rule or killed spam evidence is silent.
-		out.Band, out.Source = BandClean, SourceNone
-	case out.Source == SourceKnown && !known:
-		out.Band, out.Source = BandStillUncertain, SourceRules
+	case f.Source == SourceKnown && removedKnown && !known:
+		rederive()
+	case f.Band == BandCertain && f.Source == SourceNone && len(out.Violations) < len(f.Violations) && len(out.Violations) == 0:
+		rederive()
+	case f.Source == SourceRules && removedSignal:
+		rederive()
 	}
 	return out
+}
+
+// withoutLogOdds returns the probability p with weight taken out of its log-odds. p is
+// clamped away from 0 and 1 first so the log-odds stay finite.
+func withoutLogOdds(p, weight float64) float64 {
+	const eps = 1e-9
+	p = min(max(p, eps), 1-eps)
+	x := math.Log(p/(1-p)) - weight
+	return 1 / (1 + math.Exp(-x))
 }
 
 // CircuitOpen reports whether a group's deletion circuit is open.

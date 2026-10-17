@@ -1,0 +1,25 @@
+{
+ "feature": "F-040",
+ "branch": "feat/F-040-detect-scoring-ai-core",
+ "category": "detection",
+ "core": false,
+ "harness_version": "8731488edd1b",
+ "commit": "1de460f",
+ "gate_runs": 14,
+ "gate_first_pass": true,
+ "gate_failed_steps": [
+  "tamper"
+ ],
+ "acceptance_first_pass": true,
+ "judge_rounds": 7,
+ "judge_first_verdict": "NONE",
+ "judge_final_verdict": "PASS",
+ "tamper_hits": 1,
+ "guard_blocks": 14,
+ "test_change_requests": 0,
+ "cost_usd": null,
+ "turns": null,
+ "mutation_score": null,
+ "human_verdict": null,
+ "ts": "2026-10-17T13:59:45Z"
+}

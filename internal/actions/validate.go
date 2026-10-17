@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // prepare applies Enqueue's defaults to a at now and validates it. dropped is non-empty when
@@ -57,12 +58,18 @@ func validate(a Action) error {
 		return invalid("priority %d is not P0–P4", a.Priority)
 	case a.DedupeKey == "":
 		return invalid("%s action without a dedupe key", a.Kind)
-	case strings.ContainsRune(a.DedupeKey+string(a.Bot)+string(a.Chat)+string(a.Payload.Target.ID)+string(a.Payload.Target.Sender), 0):
-		return invalid("NUL in a key, JID or message ID")
+	}
+	// Keys, JIDs and message IDs go to Postgres text columns as they are: no NUL, valid UTF-8.
+	ids := []string{a.DedupeKey, string(a.Bot), string(a.Chat), string(a.Payload.Target.ID), string(a.Payload.Target.Sender)}
+	if r := a.Payload.ReplyTo; r != nil {
+		ids = append(ids, string(r.ID), string(r.Sender))
 	}
 	for _, j := range a.Payload.JIDs {
-		if strings.ContainsRune(string(j), 0) {
-			return invalid("NUL in a JID")
+		ids = append(ids, string(j))
+	}
+	for _, id := range ids {
+		if strings.ContainsRune(id, 0) || !utf8.ValidString(id) {
+			return invalid("NUL or invalid UTF-8 in a key, JID or message ID")
 		}
 	}
 	p := a.Payload
@@ -101,4 +108,6 @@ func validate(a Action) error {
 	return nil
 }
 
-func noNUL(s string) string { return strings.ReplaceAll(s, "\x00", "") }
+// noNUL drops NUL characters and replaces invalid UTF-8 the way JSON encoding would, so a text
+// reads back the same from every store.
+func noNUL(s string) string { return strings.ToValidUTF8(strings.ReplaceAll(s, "\x00", ""), "\uFFFD") }

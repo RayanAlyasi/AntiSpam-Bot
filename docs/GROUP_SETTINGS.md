@@ -129,4 +129,5 @@ defaults of the group's preset.
 Every message that wasn't clean is recorded in `detections`. The record holds the score, the tier
 reached, the signals and content-rule violations, the confidence source, the route, the rule
 version, the planned actions, and the mode (`enforce`, or `shadow` when nothing was done). Message
-text is never stored there.
+text is never stored there. Each message version (the original and each edit) is recorded
+once per mode, even when WhatsApp delivers the same event again after a reconnect.

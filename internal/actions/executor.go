@@ -80,6 +80,7 @@ type Executor struct {
 	killed       bool
 	breakerOpen  bool
 	breakerAt    time.Time
+	locked       bool        // Run took the executor lock at least once
 	lockLost     bool        // the store no longer holds this executor's lock
 	warnings     []time.Time // warning signs within Config.BreakerWindow
 	lastWarning  time.Time
@@ -87,20 +88,22 @@ type Executor struct {
 	lastWrite    time.Time
 
 	// Owned by the Run goroutine.
-	unlock    func() // releases the executor lock
-	cands     []Action
-	chatOut   map[wa.JID]*window // writes per chat
-	posts     map[wa.JID]*window // posts per protected, non-silent group
-	reserves  map[Purpose]*bucket
-	rr        map[Priority]wa.JID // last chat served per priority (round robin)
-	postings  map[wa.JID]postingEntry
-	lastText  string
-	lastChat  wa.JID
-	sentAny   bool
-	day       time.Time
-	dayWrites int
-	dayAlert  bool
-	polledAt  time.Time
+	unlock     func() // releases the executor lock
+	relockAt   time.Time
+	relockWait time.Duration
+	cands      []Action
+	chatOut    map[wa.JID]*window // writes per chat
+	posts      map[wa.JID]*window // posts per protected, non-silent group
+	reserves   map[Purpose]*bucket
+	rr         map[Priority]wa.JID // last chat served per priority (round robin)
+	postings   map[wa.JID]postingEntry
+	lastText   string
+	lastChat   wa.JID
+	sentAny    bool
+	day        time.Time
+	dayWrites  int
+	dayAlert   bool
+	polledAt   time.Time
 }
 
 type postingEntry struct {
@@ -167,6 +170,9 @@ func (e *Executor) Run(ctx context.Context) error {
 		return err
 	}
 	e.unlock = unlock
+	e.mu.Lock()
+	e.locked = true
+	e.mu.Unlock()
 	defer func() {
 		if e.unlock != nil {
 			e.unlock()
@@ -188,7 +194,9 @@ func (e *Executor) Run(ctx context.Context) error {
 			// the only owner of the bot's running actions, so it puts them back.
 			e.log.Error().Err(err).Msg("action executor step failed")
 			e.sleep(ctx, e.cfg.PollInterval)
-			if e.ownsLock() {
+			// The cached flag can be stale after an outage: ask the store before touching rows
+			// another executor may now own.
+			if e.ownsLock() && e.checkLock(ctx) {
 				if err := e.recoverRunning(ctx); err != nil {
 					e.log.Error().Err(err).Msg("recover running actions after a store error")
 				}
@@ -221,6 +229,9 @@ func (e *Executor) ownsLock() bool {
 // connection died) stops every call at once, since another process may take over the bot.
 func (e *Executor) checkLock(ctx context.Context) bool {
 	if err := e.d.Store.HoldsLock(ctx, e.d.Bot); err != nil {
+		if ctx.Err() != nil {
+			return false // shutting down: the check failed because ctx did
+		}
 		e.loseLock(err)
 		return false
 	}
@@ -244,13 +255,22 @@ func (e *Executor) relock(ctx context.Context) error {
 		e.unlock() // release the dead connection
 		e.unlock = nil
 	}
-	unlock, err := e.d.Store.Lock(ctx, e.d.Bot)
-	if errors.Is(err, ErrExecutorRunning) {
-		return nil // standing by
+	now := e.clk.Now()
+	if now.Before(e.relockAt) {
+		return nil
 	}
+	unlock, err := e.d.Store.Lock(ctx, e.d.Bot)
 	if err != nil {
+		// Standing by (another executor holds the bot) or the database is away: try again later,
+		// backing off up to a minute.
+		e.relockWait = min(max(2*e.relockWait, e.cfg.PollInterval), time.Minute)
+		e.relockAt = now.Add(e.relockWait)
+		if errors.Is(err, ErrExecutorRunning) {
+			return nil
+		}
 		return fmt.Errorf("take the executor lock again: %w", err)
 	}
+	e.relockWait, e.relockAt = 0, time.Time{}
 	e.unlock = unlock
 	if err := e.recoverRunning(ctx); err != nil {
 		return err

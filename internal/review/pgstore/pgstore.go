@@ -439,3 +439,36 @@ func (a Audit) Record(ctx context.Context, e review.AuditEntry) error {
 	_, err = store.WriteAudit(ctx, a.DB, store.AuditEntry{Actor: actor, GroupJID: string(e.Group), Action: e.Action, Diff: diff})
 	return err
 }
+
+// BlacklistBans records which local ban the blacklist placed, by ban ID (queue.BlacklistBans).
+type BlacklistBans struct {
+	DB db.DBTX
+}
+
+// Mark records the blacklist's ban.
+func (b BlacklistBans) Mark(ctx context.Context, group wa.JID, personID, banID int64) error {
+	if err := db.New(b.DB).MarkBlacklistBan(ctx, db.MarkBlacklistBanParams{GroupJid: string(group), PersonID: personID, BanID: banID}); err != nil {
+		return fmt.Errorf("mark blacklist ban: %w", err)
+	}
+	return nil
+}
+
+// BanID returns the ban the blacklist placed for the person in group, if any.
+func (b BlacklistBans) BanID(ctx context.Context, group wa.JID, personID int64) (int64, bool, error) {
+	id, err := db.New(b.DB).GetBlacklistBan(ctx, db.GetBlacklistBanParams{GroupJid: string(group), PersonID: personID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, fmt.Errorf("blacklist ban lookup: %w", err)
+	}
+	return id, true, nil
+}
+
+// Forget drops the record once the ban is lifted.
+func (b BlacklistBans) Forget(ctx context.Context, group wa.JID, personID int64) error {
+	if err := db.New(b.DB).ForgetBlacklistBan(ctx, db.ForgetBlacklistBanParams{GroupJid: string(group), PersonID: personID}); err != nil {
+		return fmt.Errorf("forget blacklist ban: %w", err)
+	}
+	return nil
+}

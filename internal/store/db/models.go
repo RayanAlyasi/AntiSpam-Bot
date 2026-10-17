@@ -30,6 +30,7 @@ type AppAction struct {
 	Called            bool
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+	ClaimedBy         string
 }
 
 type AppActionControl struct {
@@ -64,6 +65,13 @@ type AppAuditLog struct {
 	At       time.Time
 }
 
+type AppBlacklistBan struct {
+	GroupJid string
+	PersonID int64
+	BanID    int64
+	At       time.Time
+}
+
 type AppBot struct {
 	ID          int64
 	Jid         string
@@ -93,6 +101,7 @@ type AppDetection struct {
 	NetworkBanID     pgtype.Int8
 	EvidenceRef      pgtype.Text
 	CreatedAt        time.Time
+	EditSeq          int32
 }
 
 type AppDmThread struct {

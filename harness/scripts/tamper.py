@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import hooklib as h  # noqa: E402
 
 root = h.repo_root(os.getcwd())
-base = h.run(["git", "merge-base", "HEAD", "main"], root).stdout.strip() or "HEAD"
+base = h.run(["git", "merge-base", "HEAD", h.base_branch(root)], root).stdout.strip() or "HEAD"
 problems = []
 
 

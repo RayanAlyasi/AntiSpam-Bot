@@ -31,7 +31,8 @@ You ─▶ /next-feature F-xxx
           │                                 members, pacing), backing claims with failing tests
           │ PASS → a hook stamps the diff hash
           ▼
-   commit (Claude hook + git pre-commit both verify stamp) ─▶ push feat/F-xxx ─▶ gh pr create ─▶ CI ─▶ YOU merge
+   commit (Claude hook + git pre-commit both verify stamp) ─▶ push feat/F-xxx ─▶ PR into staging ─▶ CI ─▶ YOU merge
+          (releases: a human opens and merges a PR from staging into main)
           │
           ▼
    Scorer (script) ─▶ scorecard ─▶ trend report         Retro (Sonnet 5.5) ─▶ incidents, dead ends, proposals
@@ -421,3 +422,9 @@ Implemented on branch `harness/agent-env`. Differences from the plan above:
   - `format-go.sh`;
   - mutation score and coverage in the scorecard (left `null` until core packages exist).
 - **Known limit:** Bash parsing is a guardrail, not a wall. For example, `python3 -c` writing a file isn't caught. For unattended runs, the sandbox or container (§5.3) is the real boundary.
+
+### Branches and history (2026-10-17)
+
+- **Flow:** `feat/*` → PR into `staging` → release PR into `main`.
+- **GitHub enforcement:** a ruleset on `main` and `staging` requires a PR, blocks direct and force pushes and deletion, and allows no bypass for anyone. The harness guard also refuses agent pushes to either branch, and any `gh pr create` that doesn't target `staging`.
+- **History:** commits and PRs carry no AI attribution (`attribution` is empty in `.claude/settings.json`). They follow the engineer-style rules in CLAUDE.md and `.github/pull_request_template.md`.

@@ -135,8 +135,8 @@ def check_git(toks):
         if any(a in ("--force", "-f", "--mirror", "--all", "--delete", "-d") for a in args):
             block("force, mirror, all-branch and delete pushes are disabled (use --force-with-lease on a feat/* branch if needed).")
         refs = [a for a in args if not a.startswith("-")][1:]  # after the remote name
-        if any(re.search(r"(^|:)(refs/heads/)?(main|master)$", r) for r in refs):
-            block("pushing to main is disabled; merging is done by a human.")
+        if any(re.search(r"(^|:)(refs/heads/)?(main|master|staging)$", r) for r in refs):
+            block("main and staging only change through pull requests, which a human merges.")
         if (not refs or "HEAD" in refs) and not h.branch(repo_dir).startswith("feat/"):
             block("only feat/* branches are pushed. Switch to the feature branch first.")
         if refs and not all(r in ("HEAD",) or "feat/" in r for r in refs):
@@ -220,6 +220,11 @@ def check_bash(cmd):
         block("that path holds a real WhatsApp session or personal data and is off-limits.")
     if re.search(r"\bgh\s+pr\s+merge\b", cmd):
         block("merging is done by a human.")
+    m = re.search(r"\bgh\s+pr\s+create\b(.*)", cmd, re.S)
+    if m:
+        base = re.search(r"(?:--base|-B)[=\s]+['\"]?([\w./-]+)", m.group(1))
+        if not base or base.group(1) != "staging":
+            block("feature PRs target staging: use `gh pr create --base staging`. Release PRs from staging to main are opened by a human.")
     if re.search(r"(^|[\s/])(bash|sh|zsh)\s+-c\s", cmd):
         for m in re.finditer(r"-c\s+(['\"])(.*?)\1", cmd, re.S):
             check_bash(m.group(2))

@@ -9,7 +9,7 @@ Build one feature, then stop. Work through the checklist in order. Copy it into 
 ## Checklist
 
 - [ ] **1. Orient.** Read `git log --oneline -15`, the last 30 lines of `harness/progress.md`, all of `harness/dead-ends.md`, and any open `harness/test-change-requests/`. Run `make check-fast`. If it's red before you've changed anything, fix that first, or write BLOCKED.
-- [ ] **2. Pick.** Requested feature: $ARGUMENTS. If none was given, use the first feature in `harness/features.json` with `passes: false` whose `depends_on` features all pass. Create the branch: `git switch -c feat/<ID>-<short-slug>` from an up-to-date `main`.
+- [ ] **2. Pick.** Requested feature: $ARGUMENTS. If none was given, use the first feature in `harness/features.json` with `passes: false` whose `depends_on` features all pass. Create the branch from an up-to-date `staging`: `git switch staging && git pull --ff-only && git switch -c feat/<ID>-<short-slug>`.
 - [ ] **3. Contract.** Delegate to the **architect** agent with the feature ID. It writes `.agent/contracts/<ID>.md` and the acceptance tests, and commits them.
   - If the feature is `core: true`, or fewer than 10 features have `passes: true`, show the user the contract and wait for approval before building. During unattended runs (no user present) it proceeds without approval.
   - If the whole change fits in one sentence, the architect may write only the contract with no acceptance tests. Note that in the contract.
@@ -22,7 +22,7 @@ Build one feature, then stop. Work through the checklist in order. Copy it into 
   - **PASS:** a hook writes the stamp; continue.
   - **FAIL:** fix only the blocker and major findings, run `make check-fast`, `git add -A`, then ask for a re-review. At most 3 judge rounds; after that, write BLOCKED with the open findings.
   - **UNKNOWN:** write BLOCKED with the judge's reason.
-- [ ] **7. Commit and PR.** Commit exactly what's staged: `feat(<ID>): <summary>`. The stamp covers that diff, so any further change needs a re-review. Push with `git push -u origin HEAD`, then `gh pr create --base main` with the contract path, the acceptance test names and the judge's minor/nit findings in the body. If `gh` or the remote isn't available, say so and continue.
+- [ ] **7. Commit and PR.** Commit exactly what's staged. The stamp covers that diff, so any further change needs a re-review. The message follows CLAUDE.md's "Commits and pull requests": an imperative subject and a short why-focused body, with the feature ID in the body (`Feature: <ID>`), not as a prefix. Push with `git push -u origin HEAD`, then `gh pr create --base staging`. Give the title and body in the style of `.github/pull_request_template.md`, mentioning the contract, the acceptance tests and the judge's minor/nit findings. If `gh` or the remote isn't available, say so and continue.
 - [ ] **8. Score.** Run `harness/scripts/scorecard.py <ID>`.
-- [ ] **9. Retro.** Delegate to the **retro** agent with the feature ID. If it wrote files, commit them as `chore(<ID>): retro notes` (bookkeeping commits don't need a stamp) and push.
+- [ ] **9. Retro.** Delegate to the **retro** agent with the feature ID. If it wrote files, commit them as `Record retro notes for <ID>` (bookkeeping commits don't need a stamp) and push.
 - [ ] **10. Finish.** Delete `.agent/plan.md`. Report in under 10 lines: the feature, the PR link, the judge rounds, anything deferred. Merging is the user's job.

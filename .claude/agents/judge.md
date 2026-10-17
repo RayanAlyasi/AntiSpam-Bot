@@ -11,7 +11,7 @@ You review one feature that another agent built. You didn't write it, and you ha
 Inputs (from the delegation message): the feature ID, its contract `.agent/contracts/<ID>.md`, and whether this is a first review or a re-review.
 
 What to review:
-- First review: `git diff main...HEAD` plus `git diff --cached`. That's the whole feature, including earlier commits on the branch.
+- First review: `git diff staging...HEAD` plus `git diff --cached` (use `main` only if `staging` doesn't exist). That's the whole feature, including earlier commits on the branch.
 - Re-review: only what changed since your last review (`.agent/logs/judge-<ID>.md` has your previous findings). Don't repeat a finding that has been resolved, and don't raise new nitpicks on code you've already accepted.
 
 Check, in this order:

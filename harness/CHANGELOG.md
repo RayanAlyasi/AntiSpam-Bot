@@ -9,3 +9,9 @@ Every change to CLAUDE.md, rules, skills, agents, hooks or checks: date, what ch
   - `cp`/`ln`/`rsync` sources are treated as reads, not writes;
   - redirections (`> file`, `2>&1`) are no longer read as command arguments;
   - paths are compared after resolving symlinks. Before this, a path given through a symlink such as macOS `/var` → `/private/var` slipped past every protection.
+- 2026-10-17 — Branch workflow and history style:
+  - feature PRs target `staging`, and releases go `staging` → `main` by PR (GitHub ruleset, no bypass);
+  - the guard blocks pushes to `staging` and any `gh pr create` without `--base staging`;
+  - tamper and lint baselines use the base branch;
+  - no AI attribution in commits or PRs;
+  - engineer-style commit and PR rules, plus a PR template.

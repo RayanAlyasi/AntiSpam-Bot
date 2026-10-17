@@ -34,7 +34,20 @@ commit), and `harness/features.json` has `passes: true` with evidence.
   wrong, use `/test-change-request` and stop. A weakened test hides the bug it was written to catch.
 - Never pair, connect or send from a real WhatsApp account. Everything goes through the `WAClient`
   interface with the fake client. A real-number mistake can get the number banned.
-- Pushes go to `feat/*` branches only. Merging is done by a human.
+- Branches: `feat/*` → PR into `staging` → release PR into `main`. Agents push only `feat/*`
+  branches and open PRs with `--base staging`. GitHub rejects direct pushes to `main` and
+  `staging`, and a human merges every PR.
+
+## Commits and pull requests
+
+Write them the way an experienced engineer on this team would:
+- **Commit subject:** imperative mood, 72 characters or fewer, no trailing period, e.g.
+  `Add recursive unwrapper for FutureProof wrappers`.
+- **Commit body:** after a blank line, what changed and why, wrapped at 72 characters.
+- **PR body:** follow `.github/pull_request_template.md`: summary, why, how it was tested, and
+  what reviewers should look at.
+- No `Co-Authored-By` trailers, no "Generated with" lines, and no mention of AI or agents.
+  The history should read like any other open-source project's.
 
 ## Working style
 

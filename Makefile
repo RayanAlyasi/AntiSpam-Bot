@@ -1,5 +1,5 @@
 # Agents run these; they can't edit this file (see docs/AGENTIC_ENVIRONMENT.md).
-.PHONY: check check-fast fmt gen check-gen test test-int report setup-hooks
+.PHONY: check check-fast fmt gen check-gen test test-int report setup-hooks selftest
 
 check-fast:
 	@harness/scripts/check.sh fast
@@ -28,3 +28,7 @@ report:
 # One-time, per clone: route git hooks through .githooks (the judge-stamp pre-commit).
 setup-hooks:
 	@git config core.hooksPath .githooks && echo "git hooks: .githooks"
+
+# Proves the guardrails still block what they should (run after any hook or harness change).
+selftest:
+	@python3 harness/scripts/selftest.py

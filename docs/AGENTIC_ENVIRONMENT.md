@@ -347,7 +347,7 @@ acceptance/   testdata/fixtures/
 | Lint, SQL, GitHub CLI | `brew install golangci-lint sqlc gh` then `gh auth login` |
 | Architecture and mutation tools | `go install github.com/fe3dback/go-arch-lint@latest github.com/go-gremlins/gremlins/cmd/gremlins@latest` |
 | Docker Desktop **running** | for real-Postgres tests |
-| Go code intelligence | `/plugin install gopls-lsp@claude-plugins-official`. Use this plugin *instead of* the gopls MCP server, not both. |
+| Go code intelligence | `claude plugin install gopls-lsp@anthropic-plugin-directory --scope user`. Use this plugin *instead of* the gopls MCP server, not both. |
 
 ## 12. Rollout
 

@@ -57,17 +57,39 @@ def check_write(path):
 
 # ---- Bash ----------------------------------------------------------------------
 
-SEGMENT_SPLIT = re.compile(r"\|\||&&|;|\||\n|&")
-WRITE_CMDS = {"rm", "mv", "cp", "tee", "truncate", "chmod", "chown", "ln", "dd", "install", "touch", "rsync"}
-SEARCH_CMDS = {"grep", "egrep", "fgrep", "rg", "ag", "ack", "find", "fd", "locate", "tree"}
+SEGMENT_SPLIT = re.compile(r"(\|\||&&|;|\||\n|&)")
+# Commands whose every path argument is written or removed.
+WRITE_ALL_ARGS = {"rm", "mv", "tee", "truncate", "chmod", "chown", "touch"}
+# Commands that write only their last path argument (the destination); sources are only read.
+WRITE_LAST_ARG = {"cp", "ln", "install", "rsync"}
+GREP_CMDS = {"grep", "egrep", "fgrep"}
+RECURSIVE_SEARCH_CMDS = {"rg", "ag", "ack"}
+TREE_CMDS = {"find", "fd", "tree"}
 GIT_GLOBAL_WITH_ARG = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
 
 
 def tokens(segment):
+    """Split a command segment into arguments, dropping redirections (`> file`, `2>&1`, `<in`).
+
+    Redirection targets are checked separately; leaving them in would make them look like
+    command arguments (for example a git revision).
+    """
     try:
-        return shlex.split(segment, posix=True)
+        raw = shlex.split(segment, posix=True)
     except ValueError:
-        return segment.split()
+        raw = segment.split()
+    out, skip = [], False
+    for t in raw:
+        if skip:
+            skip = False
+            continue
+        if re.fullmatch(r"\d*(>>?|<)", t) or t in ("&>", "&>>"):
+            skip = True  # the next token is the redirection target
+            continue
+        if re.match(r"^\d*(>>?|<)|^&>", t):
+            continue  # redirection with its target attached, e.g. >out.txt or 2>&1
+        out.append(t)
+    return out
 
 
 def git_subcommand(toks):
@@ -120,7 +142,12 @@ def check_git(toks):
         if refs and not all(r in ("HEAD",) or "feat/" in r for r in refs):
             block("only feat/* branches are pushed.")
     elif sub == "config" and any("hookspath" in a.lower() for a in args):
-        block("the git hooks path is part of the harness and can't be changed.")
+        # Reading the setting is fine; setting, adding, unsetting or editing it is not.
+        writes = {"--unset", "--unset-all", "--replace-all", "--add", "--edit", "-e",
+                  "--rename-section", "--remove-section"}
+        values = [a for a in args if not a.startswith("-")]
+        if len(values) >= 2 or writes.intersection(args):
+            block("the git hooks path is part of the harness and can't be changed.")
     elif sub == "update-index" and any(a in ("--assume-unchanged", "--skip-worktree") for a in args):
         block("hiding changes from git is disabled.")
     elif sub in ("checkout", "restore", "rm", "mv", "reset", "stash", "clean"):
@@ -144,6 +171,41 @@ def check_git(toks):
                     block("diffs against other revisions can reveal hidden acceptance tests. Use `git diff`, `git diff --cached`, or add a pathspec: `git diff main -- internal/`.")
 
 
+def covers_hidden(path):
+    """True if searching `path` recursively would include acceptance/ (the repo root or acceptance itself)."""
+    r = h.rel(path, root, cwd)
+    return r in (".", "") or r == "acceptance" or r.startswith("acceptance/")
+
+
+def check_search(prog, toks, from_pipe):
+    """Block only searches that would sweep the repo (and so the hidden tests); allow targeted ones."""
+    args = toks[1:]
+    opts = [a for a in args if a.startswith("-")]
+    plain = [a for a in args if not a.startswith("-")]
+    hint = f"`{prog}` over the whole repo would include hidden tests; give it a directory such as internal/, or use the Grep tool with a path."
+    if prog in GREP_CMDS:
+        recursive = any(o in ("--recursive", "--dereference-recursive") or
+                        (not o.startswith("--") and re.search(r"[rR]", o[1:])) for o in opts)
+        if recursive:
+            paths = plain[1:] if not any(o in ("-e", "-f") for o in opts) else plain
+            if any(covers_hidden(p) for p in (paths or ["."])):
+                block(hint)
+    elif prog in RECURSIVE_SEARCH_CMDS:
+        paths = plain[1:] or ([] if from_pipe else ["."])
+        if any(covers_hidden(p) for p in paths):
+            block(hint)
+    elif prog in TREE_CMDS:
+        paths = []
+        for a in args:  # leading path operands, before the first option/expression
+            if a.startswith("-") or a in ("(", "!"):
+                break
+            paths.append(a)
+        if prog == "fd":
+            paths = plain[1:]
+        if any(covers_hidden(p) for p in (paths or ["."])):
+            block(hint)
+
+
 def expand(cmd):
     """Expand $VAR / ${VAR} using assignments made earlier in the command and the environment."""
     env = dict(os.environ)
@@ -161,8 +223,10 @@ def check_bash(cmd):
     if re.search(r"(^|[\s/])(bash|sh|zsh)\s+-c\s", cmd):
         for m in re.finditer(r"-c\s+(['\"])(.*?)\1", cmd, re.S):
             check_bash(m.group(2))
-    for seg in SEGMENT_SPLIT.split(cmd):
-        seg = seg.strip()
+    parts = SEGMENT_SPLIT.split(cmd)
+    for idx in range(0, len(parts), 2):
+        seg = parts[idx].strip()
+        from_pipe = idx > 0 and parts[idx - 1] == "|"  # reads stdin, not files
         if not seg:
             continue
         toks = tokens(seg)
@@ -179,18 +243,21 @@ def check_bash(cmd):
             is_runner = prog == "make" or (prog == "go" and len(toks) > 1 and toks[1] in ("test", "vet", "build", "list"))
             if "acceptance" in seg and not is_runner:
                 block("acceptance/ is hidden from you. `make check-fast` and `go test ./acceptance/...` show results.")
-            if prog in SEARCH_CMDS:
-                block(f"use the Grep or Glob tool with a specific path (e.g. internal/) instead of `{prog}`; repo-wide shell searches would include hidden tests.")
+            if prog in GREP_CMDS | RECURSIVE_SEARCH_CMDS | TREE_CMDS:
+                check_search(prog, toks, from_pipe)
         # writes to protected paths through the shell
         redirect_targets = re.findall(r">>?\s*([^\s;&|]+)", seg)
         for t in redirect_targets:
             if t not in ("/dev/null", "&1", "&2"):
                 check_write(t)
-        writes = prog in WRITE_CMDS or (prog in ("sed", "perl") and any(a.startswith("-i") for a in toks[1:]))
-        if writes:
-            for a in toks[1:]:
-                if not a.startswith("-"):
-                    check_write(a)
+        operands = [a for a in toks[1:] if not a.startswith("-")]
+        if prog in WRITE_ALL_ARGS or (prog in ("sed", "perl") and any(a.startswith("-i") for a in toks[1:])):
+            for a in operands:
+                check_write(a)
+        elif prog in WRITE_LAST_ARG and operands:
+            check_write(operands[-1])
+            for a in operands[:-1]:
+                check_read(a)
 
 
 if tool in WRITE_TOOLS:

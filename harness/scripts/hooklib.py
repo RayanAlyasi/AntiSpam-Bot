@@ -75,8 +75,10 @@ def rel(path, root, cwd=None):
         return ""
     if not os.path.isabs(path):
         path = os.path.join(cwd or root, path)
-    path = os.path.normpath(path)
-    root = os.path.normpath(root)
+    # Resolve symlinks on both sides (e.g. macOS /var -> /private/var), or a path given through
+    # a symlink wouldn't match the repo root and would slip past every protection.
+    path = os.path.realpath(path)
+    root = os.path.realpath(root)
     if path == root:
         return "."
     if path.startswith(root + os.sep):

@@ -1840,8 +1840,15 @@
         "F-078"
       ],
       "description": "DMs are routed to handlers by intent, every inbound DM marks an open thread with that person, and outbound DMs are refused to anyone without an open thread except the documented one-reply-per-day command exception.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/api/chat TestGate",
+        "TestOnboarding",
+        "TestDMContext",
+        "TestProtectedGroupIsSilent",
+        "internal/review/pgstore TestEvidenceThreadsAudit (integration: app.dm_threads)",
+        "internal/review/queue TestIdentityAdapters (one thread per person via identity.Canonical)"
+      ]
     },
     {
       "id": "F-080",

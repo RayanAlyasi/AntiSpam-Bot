@@ -79,6 +79,7 @@ func (s *chatSink) Handle(ctx context.Context, it inbox.Item, info wa.MessageInf
 		s.metrics.Failed("chat")
 		log.Error().Err(err).Msg("handling a command or DM failed permanently")
 	default:
+		s.metrics.Failed("chat") // per failed attempt, like the fast lane
 		log.Warn().Err(err).Msg("handling a command or DM failed; the inbox will retry it")
 	}
 	return err

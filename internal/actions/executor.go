@@ -544,10 +544,12 @@ func (e *Executor) pick(ctx context.Context, now time.Time) (*Action, time.Durat
 			continue
 		}
 		if a.Kind.Posts() && a.Chat.IsGroup() {
-			if p := e.posting(ctx, a.Chat, now); p.err == nil && p.p.Protected && !p.p.Silent {
-				if d := e.postWindow(a.Chat).wait(now); d > 0 {
-					later(d)
-					continue
+			if p := e.posting(ctx, a.Chat, now); p.err == nil {
+				if refusal, paced := p.p.rule(*a); refusal == "" && paced {
+					if d := e.postWindow(a.Chat).wait(now); d > 0 {
+						later(d)
+						continue
+					}
 				}
 			}
 		}

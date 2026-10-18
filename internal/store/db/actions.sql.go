@@ -376,17 +376,25 @@ func (q *Queries) GetActionControl(ctx context.Context, scope string) (json.RawM
 }
 
 const groupPosting = `-- name: GroupPosting :one
-SELECT COALESCE((doc->>'silent')::boolean, true)::boolean AS silent
+SELECT COALESCE((doc->>'silent')::boolean, true)::boolean AS silent,
+       (COALESCE(doc->>'mode', '') = 'shadow'
+        AND COALESCE(doc->'shadow'->'reactions' = 'true'::jsonb, false))::boolean AS shadow_reactions
 FROM app.group_settings WHERE group_jid = $1
 `
 
+type GroupPostingRow struct {
+	Silent          bool
+	ShadowReactions bool
+}
+
 // Whether the bot may post in a group (actions.Groups): a group with a settings document is
-// protected; a missing "silent" key counts as silent.
-func (q *Queries) GroupPosting(ctx context.Context, groupJid string) (bool, error) {
+// protected; a missing "silent" key counts as silent. Shadow reactions are allowed only in
+// shadow mode with "shadow.reactions" on; a missing key counts as off (policy.Defaults).
+func (q *Queries) GroupPosting(ctx context.Context, groupJid string) (GroupPostingRow, error) {
 	row := q.db.QueryRow(ctx, groupPosting, groupJid)
-	var silent bool
-	err := row.Scan(&silent)
-	return silent, err
+	var i GroupPostingRow
+	err := row.Scan(&i.Silent, &i.ShadowReactions)
+	return i, err
 }
 
 const insertAction = `-- name: InsertAction :one

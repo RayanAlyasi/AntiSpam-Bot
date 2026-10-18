@@ -9,8 +9,25 @@ commands and the audit log use these keys. Most groups only ever pick a preset.
 | Value | What happens |
 |---|---|
 | `enforce` (default) | The bot acts: deletes, bans and asks admins as described below. |
-| `shadow` | Everything runs and every would-be action is recorded for review, but nothing is deleted, banned or sent. |
+| `shadow` | Everything runs and every would-be action is recorded for review, but nothing is deleted, banned or sent, except the reactions below when `shadow.reactions` is on. |
 | `paused` | The bot does nothing in the group. |
+
+### Shadow reactions (`shadow.reactions`)
+
+Off by default. When it's on and the group is in `shadow` mode, the bot reacts to each message it
+caught, so admins can see its judgement live in the group:
+
+| Reaction | Meaning (the detection's route) |
+|---|---|
+| ❌ | it would act without asking: `auto_ban`, `delete_only` or `policy` |
+| ❓ | it would ask the admins: `ask` |
+
+Messages it would allow (`allow`, `none`, clean) get no reaction. Each message gets at most one
+reaction: an edit never adds a second one. Reactions are the only thing shadow mode posts, and they
+are allowed even while `silent` is on. They go through the paced queue at the lowest priority, at
+most one per group per minute, and a reaction that can't go out within 10 minutes is dropped. If the
+group leaves shadow mode or turns the setting off first, pending reactions are dropped too.
+Turn it on with `.set shadow.reactions true`, off with `.set shadow.reactions false`.
 
 ## Presets (`preset`)
 

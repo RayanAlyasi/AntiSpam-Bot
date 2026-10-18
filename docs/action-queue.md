@@ -32,7 +32,7 @@ They can run ahead of P1 and P2 work during a raid, so they're never starved.
 | Burst | 10 writes | Allowed back to back at the start of a wave. |
 | Spacing | 1 s + 0–1.5 s random | The pause after every write. |
 | Per group | 10 writes/min | No group gets more than half the bot's ceiling. |
-| Posts in a non-silent group | 1/min | Only when `silent` is off; silent groups get no posts at all. |
+| Posts in a non-silent group | 1/min | Only when `silent` is off; silent groups get no posts, except shadow-mode reactions (below), which are capped the same way. |
 | Kick batch | 8 members per call | Kicks in one group within 2.5 s are merged; at most 4 calls in a row before other groups get a turn. |
 | Reads (lookups) | 20/min, burst 5 | A separate budget: lookups never slow down deletes. |
 
@@ -95,7 +95,11 @@ the operator controls are audited.
 
 Before every message, edit or reaction in a group, the queue checks the group's settings:
 
-- a group the bot protects gets nothing posted while `silent` is on (the default);
+- a group the bot protects gets nothing posted while `silent` is on (the default), with one
+  exception: shadow mode's ❌/❓ reactions while the group is in `shadow` mode with
+  `shadow.reactions` on ([group settings](GROUP_SETTINGS.md)). They run at the lowest priority, at
+  most 1 per minute, and are dropped after 10 minutes, or as soon as the group leaves shadow mode
+  or turns the setting off;
 - with `silent` off it gets at most 1 post per minute;
 - a group named as a review group isn't protected, so review items can be posted there;
 - a group the bot can't place gets no posts at all.

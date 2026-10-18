@@ -286,7 +286,7 @@ func (g *groups) isProtected(ctx context.Context, chat wa.JID) (bool, error) {
 }
 
 // posting derives the executor's posting rules: nothing is posted in a protected group whose
-// silent setting is on (DESIGN.md §9.7).
+// silent setting is on (DESIGN.md §9.7), except shadow reactions while they're on (§8.4).
 type posting struct{ g *groups }
 
 func (p posting) Posting(ctx context.Context, chat wa.JID) (actions.Posting, error) {
@@ -294,7 +294,7 @@ func (p posting) Posting(ctx context.Context, chat wa.JID) (actions.Posting, err
 	if err != nil || !ok {
 		return actions.Posting{}, err
 	}
-	return actions.Posting{Protected: true, Silent: s.Silent}, nil
+	return actions.Posting{Protected: true, Silent: s.Silent, ShadowReactions: s.Mode == policy.ModeShadow && s.Shadow.Reactions}, nil
 }
 
 func (posting) NotAdmin(context.Context, wa.JID, wa.JID) error { return nil }

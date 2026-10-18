@@ -70,6 +70,7 @@ var commandTexts = Catalog{
 			"{prefix}mode enforce – act on spam\n" +
 			"{prefix}mode shadow – watch only: I note what I would do\n" +
 			"{prefix}mode pause – stop acting until you switch back\n" +
+			"{prefix}set shadow.reactions true – in shadow mode, react ❌ to spam I'd act on and ❓ to messages I'd ask you about (off by default)\n" +
 			"\n" +
 			"*Asking the admins*\n" +
 			"{prefix}askadmins before – keep the message up and ask; if nobody decides in 15 minutes (by default), I delete it, no ban\n" +
@@ -300,6 +301,7 @@ var commandTexts = Catalog{
 			"{prefix}وضع enforce – التصرف مع السبام\n" +
 			"{prefix}وضع shadow – المراقبة فقط: أسجّل ما كنت سأفعله\n" +
 			"{prefix}وضع pause – التوقف حتى تعيد التشغيل\n" +
+			"{prefix}ضبط shadow.reactions true – في وضع shadow أتفاعل بـ ❌ مع السبام الذي كنت سأتصرف معه وبـ ❓ مع ما كنت سأسألكم عنه (معطّل افتراضياً)\n" +
 			"\n" +
 			"*سؤال المشرفين*\n" +
 			"{prefix}اسأل_المشرفين before – إبقاء الرسالة وسؤال المشرفين؛ إن لم يقرر أحد خلال ١٥ دقيقة (افتراضياً) أحذفها بلا حظر\n" +

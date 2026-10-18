@@ -20,6 +20,28 @@ type Groups interface {
 type Posting struct {
 	Protected bool // the bot protects this group
 	Silent    bool // nothing is posted in the group (the default for protected groups)
+	// ShadowReactions: the group is in shadow mode with shadow.reactions on, so shadow-mode
+	// reactions (PurposeShadow) may be posted even while it is silent (DESIGN.md §8.4).
+	ShadowReactions bool
+}
+
+// shadowReact reports whether a is a shadow-mode reaction.
+func (a Action) shadowReact() bool { return a.Kind == KindReact && a.Payload.Purpose == PurposeShadow }
+
+// rule says whether a post may go out in a chat with these posting rules: refusal is non-empty
+// when it may not, and paced is true when the per-group post cap applies.
+func (p Posting) rule(a Action) (refusal string, paced bool) {
+	switch {
+	case a.shadowReact() && !p.ShadowReactions:
+		// Stale: the group left shadow mode or turned shadow.reactions off since it was queued.
+		return "shadow reactions are off in this group", false
+	case a.shadowReact() && p.Protected:
+		return "", true
+	case p.Protected && p.Silent:
+		return "silent: the bot never posts in a silent protected group", false
+	default:
+		return "", p.Protected
+	}
 }
 
 // AlertKind names an operator alert raised by the queue.

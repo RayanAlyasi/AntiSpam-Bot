@@ -192,6 +192,18 @@ func (p *Pipeline) Process(ctx context.Context, e *envelope.Envelope, at time.Ti
 				return fmt.Errorf("enqueue %s: %w", a.Kind, err)
 			}
 		}
+		if emoji := shadowReaction(s, d); emoji != "" {
+			// Shadow mode changes nothing but shows its judgement (DESIGN.md §8.4): one reaction
+			// per message, so an edit (same ID) never gets a second one.
+			if err := tx.Enqueue(ctx, actions.Action{
+				Bot: p.c.Bot, Chat: e.Group, Kind: actions.KindReact, Priority: actions.P4,
+				Payload:   actions.Payload{Target: wa.MessageRef{Sender: senderJID(e), ID: e.MsgID}, Emoji: emoji, Purpose: actions.PurposeShadow},
+				DedupeKey: actions.ShadowReactKey(e.Group, e.MsgID), ReasonDetectionID: detID,
+			}); err != nil {
+				return fmt.Errorf("enqueue shadow reaction: %w", err)
+			}
+			enqueued = true
+		}
 		for _, n := range reviews {
 			if err := tx.OpenReview(ctx, n); err != nil {
 				return fmt.Errorf("open review: %w", err)
@@ -298,6 +310,30 @@ func version(e *envelope.Envelope) string {
 		_, _ = fmt.Fprintf(h, "%v\x00", c.WAIDs)
 	}
 	return hex.EncodeToString(h.Sum(nil))[:16]
+}
+
+// Shadow-mode reactions (DESIGN.md §8.4).
+const (
+	ShadowCertain = "❌" // the bot would act without asking: auto_ban, delete_only, policy
+	ShadowAsk     = "❓" // the bot would ask the admins
+)
+
+// shadowReaction is the reaction shadow mode shows on a message, or "" for none: only in a group
+// in shadow mode with shadow.reactions on (not an enforce group the safety rails demoted to
+// shadow), and never for routes allow or none (a clean message). It goes by the route alone: a
+// still-uncertain message has verdict clean but route ask.
+func shadowReaction(s policy.Settings, d Decision) string {
+	if s.Mode != policy.ModeShadow || d.Plan.Mode != policy.DetectionShadow || !s.Shadow.Reactions {
+		return ""
+	}
+	switch d.Decision.Route {
+	case policy.RouteAutoBan, policy.RouteDeleteOnly, policy.RoutePolicy:
+		return ShadowCertain
+	case policy.RouteAsk:
+		return ShadowAsk
+	default:
+		return ""
+	}
 }
 
 func tierReached(d Decision) string {

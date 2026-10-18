@@ -84,6 +84,15 @@ type AppBot struct {
 	CreatedAt   time.Time
 }
 
+type AppCorpusAllow struct {
+	ID        int64
+	GroupJid  string
+	Simhash   int64
+	Minhash   []byte
+	Tokens    int32
+	CreatedAt time.Time
+}
+
 type AppCorpusConfirmation struct {
 	PatternKey    string
 	GroupJid      string
@@ -123,6 +132,13 @@ type AppCorpusEntry struct {
 	LastHitAt       pgtype.Timestamptz
 	CreatedAt       time.Time
 	ExpiresAt       time.Time
+}
+
+type AppCorpusMessage struct {
+	GroupJid  string
+	MsgID     string
+	EntryID   int64
+	CreatedAt time.Time
 }
 
 type AppCorpusSource struct {

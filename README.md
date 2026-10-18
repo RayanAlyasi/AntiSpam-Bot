@@ -32,10 +32,12 @@ The full design is in [docs/DESIGN.md](docs/DESIGN.md). How block and allow list
 blacklist and the confirmed-spam corpus match messages is in
 [docs/DETECTION-RULES.md](docs/DETECTION-RULES.md).
 
-**Status:** v0.1, the first release, is being built. This README describes v0.1 as it will
-ship; some parts below only work once they have landed (until then the binary only loads its
-configuration and exits, so `docker compose` restarts it and it never turns healthy). Until
-`v0.1.0` is tagged, run it only in shadow mode.
+**Status:** v0.1, the first release, is being built. It runs end to end: the bot receives
+messages, detects known spam (confirmed copies, word and phrase rules, blocklisted links and
+numbers, blacklisted numbers in contact cards), and deletes, bans or asks the admins. Until
+`v0.1.0` is tagged, run it only in shadow mode. Not in this build yet: the `.blacklist` commands
+(numbers added to the blacklist table still match), the website, and learning beyond
+admin-confirmed spam.
 
 ## Requirements
 
@@ -51,10 +53,14 @@ cd AntiSpam-Bot
 cp env.example .env
 ```
 
-Edit `.env` (git ignores it; never commit it): set `POSTGRES_PASSWORD` to a long, URL-safe
-random value (`openssl rand -hex 24`) and `OPERATOR_PHONES` to your own number. Every variable
-is documented in
-[`env.example`](env.example). Then start the bot and its database:
+Edit `.env` (git ignores it; never commit it). Set:
+- `POSTGRES_PASSWORD` to a long, URL-safe random value (`openssl rand -hex 24`);
+- `HASH_KEY` to another random secret (`openssl rand -hex 32`). It keys the hashes the bot
+  matches phone numbers by. Keep it safe and never change it, or blacklisted numbers stop
+  matching. The bot won't start without it;
+- `OPERATOR_PHONES` to your own number.
+
+Every variable is documented in [`env.example`](env.example). Then start the bot and its database:
 
 ```bash
 docker compose up -d
@@ -106,14 +112,19 @@ touches nothing. Switch to enforcing only once you've checked what it would have
 6. **Let it run for a while.** About a week of normal traffic is a good test; the project's own
    bar is at least a week with at least 99% of would-be deletions correct.
 7. **Review what it would have done.** Every would-be action is recorded with mode `shadow`:
-   which message, the reason ("link to a blocklisted domain", "92% similar to confirmed spam"),
-   and whether it would have deleted, banned or asked the admins. `.status` gives the daily
-   counts. To list them, run:
+   which message, which signals fired, and whether it would have deleted, banned or asked the
+   admins. To list them, run:
    ```bash
-   docker compose exec bot /antispam replay --shadow --since 7d
+   docker compose exec bot /antispam replay -shadow -since 7d
    ```
-   Look for anything it would have deleted or banned that wasn't spam. If something is wrong,
-   fix it before enforcing: allow a domain (`.domain allow example.com`), drop a word rule
+   Each line shows the time, group, message ID, the route (`auto_ban`, `ask`, `delete_only`,
+   …), what it would have done (`would=delete+ban`) and why (`why=corpus.near_duplicate`), and
+   the last line totals them ("would have deleted 6 messages, banned 2 people and asked admins
+   3 times"). Add `-group <group JID>` for one group. No message text is stored, so look the
+   message up in the group by its time. To see what today's rules would decide for the last
+   day's messages, run `docker compose exec bot /antispam replay -inbox -since 24h`. Look for
+   anything it would have deleted or banned that wasn't spam. If something is wrong, fix it
+   before enforcing: allow a domain (`.domain allow example.com`), drop a word rule
    (`.word unblock <phrase>`), or allow-list a member (`.allow @member`).
 8. **Switch to enforce:**
    ```
@@ -148,7 +159,7 @@ protected group, where the command message is deleted and the reply comes by DM.
 |---|---|
 | reply `.spam` to a message | delete it, ban the sender and remember it as confirmed spam |
 | reply `.notspam` | undo a mistake: restore the member's trust and forget the pattern |
-| `.blacklist add <number>` | ban that number here and treat it as spam wherever it appears |
+| `.blacklist add <number>` | ban that number here and treat it as spam wherever it appears (not in this build yet) |
 | `.mode shadow\|enforce\|pause` | switch mode |
 | `.preset relaxed\|standard\|strict\|ask` | switch preset |
 | `.status` | preset, mode, review destination and today's counts |
@@ -179,6 +190,12 @@ admins.
   the release notes first: they lead with breaking changes.
 - **Health:** `/healthz`, `/readyz` and `/metrics` (Prometheus, including `wa_connected` per
   bot) are served on port 8080.
+- **Tracing a problem:** every log line the detection and command paths write about one message
+  carries the same `request_id` (and its `detection_id` once one is recorded), so `grep` for it
+  shows the message's path;
+  warnings and errors name the file and line they came from. `panics_total` and `errors_total`
+  on `/metrics` count recovered panics and failures by component. Logs never contain message
+  text or unmasked phone numbers.
 - **Alerts:** temporary bans, logouts, a replaced session and a bot offline for more than two
   minutes are alerted to a webhook, Telegram or email (`ALERT_*` in [`env.example`](env.example));
   without one they are only logged. Writes stop on a ban while the bot keeps reading.

@@ -35,10 +35,8 @@ blacklist and the confirmed-spam corpus match messages is in
 **Status:** v0.1, the first release, is being built. It runs end to end: the bot receives
 messages, detects known spam (confirmed copies, word and phrase rules, blocklisted links and
 numbers, blacklisted numbers in contact cards), and deletes, bans or asks the admins. Until
-`v0.1.0` is tagged, run it only in shadow mode. Not in this build yet: removing blacklisted
-people automatically when they join, ask to join or post (members on the list when it's added
-are banned, and their numbers in messages are caught), the website, and learning beyond
-admin-confirmed spam.
+`v0.1.0` is tagged, run it only in shadow mode. Not in this build yet: the website and learning
+beyond admin-confirmed spam.
 
 ## Requirements
 

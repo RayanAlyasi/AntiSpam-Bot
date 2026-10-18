@@ -20,9 +20,12 @@ minors on PR #65. Contract: `.agent/contracts/contact-phone-shapes.md`.
 ## Follow-ups
 
 - "0800 0930 1100" (24-hour times as 4-digit groups) reads as a phone, as on PR #65.
-
 - A number written in pairs ("05 51 23 45 67", "+33 6 12 34 56 78") is now a miss (accepted,
   DET-002).
 - An Arabic word glued to a country code without + ("رقم966551234567") is still a miss.
 - The operator's corpus-import dry run (hold-out recall and the ham check) needs re-running on
   this branch; the dataset is private.
+- Judge round 2 minors: "SA 44 2000 0001 2345 6789 2012" (IBAN spaced after the country code,
+  year-like last group) and "حساب 0108 0952 3456 0789 1234 56" (two 0-led parts) still read as
+  phones. Possible fix: a 4-digit year only beside 1–2-digit date groups, or reject a split whose
+  parts are all 4-digit groups.

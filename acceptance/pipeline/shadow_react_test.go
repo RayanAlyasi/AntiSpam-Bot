@@ -131,19 +131,20 @@ func TestShadowReactionFollowsRoute(t *testing.T) {
 		text      string
 		route     pipeline.Route // "": not checked
 		emoji     string         // "": no reaction
+		prio      actions.Priority
 		why       string
 	}{
-		{"auto ban", policy.PresetStandard, policy.ModeShadow, true, nil, srNewcomer, envelope.KindText, "buy spam now", pipeline.RouteAutoBan, srWouldAct, "auto_ban acts without asking"},
-		{"delete only", policy.PresetRelaxed, policy.ModeShadow, true, nil, srNewcomer, envelope.KindText, "buy spam now", pipeline.RouteDeleteOnly, srWouldAct, "delete_only acts without asking"},
-		{"policy violation", policy.PresetStandard, policy.ModeShadow, true, blockPolls, srNewcomer, envelope.KindPoll, "lunch on friday?", pipeline.RoutePolicy, srWouldAct, "a content-rule delete acts without asking"},
-		{"established member asks", policy.PresetStandard, policy.ModeShadow, true, nil, srEstablished, envelope.KindText, "buy spam now", pipeline.RouteAsk, srWouldAsk, "the ban of an established member goes to admins"},
-		{"ask admins preset", policy.PresetAskAdmins, policy.ModeShadow, true, nil, srNewcomer, envelope.KindText, "buy spam now", pipeline.RouteAsk, srWouldAsk, "ask-admins mode asks"},
-		{"uncertain asks", policy.PresetStandard, policy.ModeShadow, true, nil, srNewcomer, envelope.KindText, "maybe this", pipeline.RouteAsk, srWouldAsk, "still uncertain goes to admins"},
-		{"clean message", policy.PresetStandard, policy.ModeShadow, true, nil, srNewcomer, envelope.KindText, "see you at five", "", "", "a clean message wasn't caught"},
-		{"admin sender", policy.PresetStandard, policy.ModeShadow, true, nil, srAdmin, envelope.KindText, "buy spam now", "", "", "admins are never acted on, so nothing was caught"},
-		{"reactions off", policy.PresetStandard, policy.ModeShadow, false, nil, srNewcomer, envelope.KindText, "buy spam now", pipeline.RouteAutoBan, "", "shadow.reactions is opt-in"},
-		{"enforce mode", policy.PresetStandard, policy.ModeEnforce, true, nil, srNewcomer, envelope.KindText, "buy spam now", pipeline.RouteAutoBan, "", "only shadow mode reacts"},
-		{"paused mode", policy.PresetStandard, policy.ModePaused, true, nil, srNewcomer, envelope.KindText, "buy spam now", "", "", "paused acts on nothing"},
+		{"auto ban", policy.PresetStandard, policy.ModeShadow, true, nil, srNewcomer, envelope.KindText, "buy spam now", pipeline.RouteAutoBan, srWouldAct, actions.P1, "auto_ban acts without asking"},
+		{"delete only", policy.PresetRelaxed, policy.ModeShadow, true, nil, srNewcomer, envelope.KindText, "buy spam now", pipeline.RouteDeleteOnly, srWouldAct, actions.P1, "delete_only acts without asking"},
+		{"policy violation", policy.PresetStandard, policy.ModeShadow, true, blockPolls, srNewcomer, envelope.KindPoll, "lunch on friday?", pipeline.RoutePolicy, srWouldAct, actions.P1, "a content-rule delete acts without asking"},
+		{"established member asks", policy.PresetStandard, policy.ModeShadow, true, nil, srEstablished, envelope.KindText, "buy spam now", pipeline.RouteAsk, srWouldAsk, actions.P1, "the ban of an established member goes to admins"},
+		{"ask admins preset", policy.PresetAskAdmins, policy.ModeShadow, true, nil, srNewcomer, envelope.KindText, "buy spam now", pipeline.RouteAsk, srWouldAsk, actions.P1, "ask-admins mode asks"},
+		{"uncertain asks", policy.PresetStandard, policy.ModeShadow, true, nil, srNewcomer, envelope.KindText, "maybe this", pipeline.RouteAsk, srWouldAsk, actions.P3, "still uncertain goes to admins"},
+		{"clean message", policy.PresetStandard, policy.ModeShadow, true, nil, srNewcomer, envelope.KindText, "see you at five", "", "", 0, "a clean message wasn't caught"},
+		{"admin sender", policy.PresetStandard, policy.ModeShadow, true, nil, srAdmin, envelope.KindText, "buy spam now", "", "", 0, "admins are never acted on, so nothing was caught"},
+		{"reactions off", policy.PresetStandard, policy.ModeShadow, false, nil, srNewcomer, envelope.KindText, "buy spam now", pipeline.RouteAutoBan, "", 0, "shadow.reactions is opt-in"},
+		{"enforce mode", policy.PresetStandard, policy.ModeEnforce, true, nil, srNewcomer, envelope.KindText, "buy spam now", pipeline.RouteAutoBan, "", 0, "only shadow mode reacts"},
+		{"paused mode", policy.PresetStandard, policy.ModePaused, true, nil, srNewcomer, envelope.KindText, "buy spam now", "", "", 0, "paused acts on nothing"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -181,8 +182,8 @@ func TestShadowReactionFollowsRoute(t *testing.T) {
 			if a.Payload.Purpose != actions.PurposeShadow {
 				t.Errorf("got purpose %q, want %q (only shadow reactions may post in a silent group, DESIGN §9.7)", a.Payload.Purpose, actions.PurposeShadow)
 			}
-			if a.Priority != actions.P4 {
-				t.Errorf("got priority %s, want P4 (a shadow reaction is the least urgent write, DESIGN §10.2)", a.Priority)
+			if a.Priority != tt.prio {
+				t.Errorf("got priority %s, want %s (a shadow reaction takes the priority of the action it stands in for: P1 for a delete, P3 when only a review would run, DESIGN §8.4)", a.Priority, tt.prio)
 			}
 			if want := (wa.MessageRef{Sender: tt.sender, ID: id}); a.Payload.Target != want {
 				t.Errorf("got target %+v, want %+v (the reaction goes on the caught message)", a.Payload.Target, want)

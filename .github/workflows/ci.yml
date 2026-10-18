@@ -15,15 +15,12 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  check:
-    name: make check (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm]
-    runs-on: ${{ matrix.os }}
-    env:
-      TZ: UTC
+  # The gate runs as parallel jobs. "make check (ubuntu-24.04)" waits for the amd64 jobs and is
+  # what the branch rules require, together with "make check (ubuntu-24.04-arm)" and
+  # "multi-arch image", so the required check names didn't change when the gate was split.
+  static:
+    name: static checks
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -41,18 +38,70 @@ jobs:
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v2.15.0/install.sh | sh -s -- -b "$(go env GOPATH)/bin" v2.15.0
           go install github.com/fe3dback/go-arch-lint@v1.19.0
-      - name: make check
-        run: make check
-      - name: Upload gate logs
-        if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - run: go build ./...
+      - run: go vet ./...
+      - name: lint
+        run: if [ -f .golangci.yml ]; then golangci-lint run ./...; else echo "no .golangci.yml, skipped"; fi
+      - name: architecture
+        run: if [ -f .go-arch-lint.yml ]; then go-arch-lint check; else echo "no .go-arch-lint.yml, skipped"; fi
+      - name: sqlc drift
+        run: go tool -modfile=tools/go.mod sqlc diff
+      - name: tamper audit
+        run: python3 harness/scripts/tamper.py
+
+  unit:
+    name: unit tests (amd64)
+    runs-on: ubuntu-24.04
+    env:
+      TZ: UTC
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          name: check-logs-${{ matrix.os }}
-          path: .agent/logs/
+          go-version-file: go.mod
+      - run: go test -race -shuffle=on ./...
+
+  unit-arm:
+    name: make check (ubuntu-24.04-arm)
+    runs-on: ubuntu-24.04-arm
+    env:
+      TZ: UTC
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+      - run: go test -race -shuffle=on ./...
+
+  # Only the packages with integration-tagged tests, against real Postgres (testcontainers).
+  integration:
+    name: integration tests
+    runs-on: ubuntu-24.04
+    env:
+      TZ: UTC
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+      - name: go test -tags integration
+        run: |
+          pkgs=$(grep -rl --include='*_test.go' '^//go:build integration' . | xargs -n1 dirname | sort -u)
+          go test -race -count=1 -tags integration $pkgs
+
+  gate:
+    name: make check (ubuntu-24.04)
+    needs: [static, unit, integration]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: All amd64 jobs passed
+        run: |
+          echo "static=${{ needs.static.result }} unit=${{ needs.unit.result }} integration=${{ needs.integration.result }}"
+          [ "${{ needs.static.result }}" = success ] && [ "${{ needs.unit.result }}" = success ] && [ "${{ needs.integration.result }}" = success ]
 
   image:
     name: multi-arch image
-    needs: check
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -71,7 +120,7 @@ jobs:
   # :edge and :sha-<7> for testing. Never latest or a version tag; those come from releases.
   edge:
     name: edge image
-    needs: image
+    needs: [gate, unit-arm, image]
     if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     runs-on: ubuntu-24.04
     permissions:

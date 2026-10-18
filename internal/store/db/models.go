@@ -134,6 +134,13 @@ type AppCorpusEntry struct {
 	ExpiresAt       time.Time
 }
 
+type AppCorpusMessage struct {
+	GroupJid  string
+	MsgID     string
+	EntryID   int64
+	CreatedAt time.Time
+}
+
 type AppCorpusSource struct {
 	GroupJid      string
 	MsgID         string

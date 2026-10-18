@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/logging"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/wa"
 )
 
@@ -22,7 +23,7 @@ func (l liveClient) c() (wa.WAClient, error) {
 	if c, ok := l.get(l.bot); ok {
 		return c, nil
 	}
-	return nil, fmt.Errorf("%w: bot %s is not connected", wa.ErrTimeout, l.bot)
+	return nil, fmt.Errorf("%w: bot %s is not connected", wa.ErrTimeout, logging.MaskJID(string(l.bot)))
 }
 
 func (l liveClient) Send(ctx context.Context, chat wa.JID, msg wa.OutgoingMessage) (wa.SendResult, error) {

@@ -70,12 +70,16 @@ func (s *chatSink) Handle(ctx context.Context, it inbox.Item, info wa.MessageInf
 	ctx, log := logging.WithRequestID(ctx, s.log, logging.NewID())
 	log = log.With().Int64("inbox", it.ID).Str("chat", logging.MaskJID(string(it.Chat))).Str("route", string(d.Route)).Logger()
 	err := fastlane.Recovered(log, s.metrics, "chat", func() error { return s.handle(ctx, it, info) })
-	if err != nil {
+	switch {
+	case err == nil:
+	case errors.Is(err, fastlane.ErrPanic):
 		s.metrics.Failed("chat")
-		log.Error().Err(err).Msg("handling a command or DM failed")
-		if errors.Is(err, fastlane.ErrPanic) {
-			return fmt.Errorf("%w: %w", inbox.ErrPermanent, err)
-		}
+		return fmt.Errorf("%w: %w", inbox.ErrPermanent, err) // Recovered logged it
+	case errors.Is(err, inbox.ErrPermanent):
+		s.metrics.Failed("chat")
+		log.Error().Err(err).Msg("handling a command or DM failed permanently")
+	default:
+		log.Warn().Err(err).Msg("handling a command or DM failed; the inbox will retry it")
 	}
 	return err
 }

@@ -66,12 +66,17 @@ func (l *Lanes) Handle(ctx context.Context, it inbox.Item, info wa.MessageInfo, 
 	ctx, log := logging.WithRequestID(ctx, l.log, logging.NewID())
 	log = log.With().Int64("inbox", it.ID).Str("group", logging.MaskJID(string(it.Chat))).Str("msg", string(it.MsgID)).Logger()
 	err := Recovered(log, l.base.Metrics, "fastlane", func() error { return l.handle(ctx, log, it, info) })
-	if err != nil {
+	switch {
+	case err == nil:
+	case errors.Is(err, ErrPanic):
 		l.base.Metrics.failed("fastlane")
-		log.Error().Err(err).Msg("moderating a message failed")
-		if errors.Is(err, ErrPanic) {
-			return fmt.Errorf("%w: %w", inbox.ErrPermanent, err) // it would panic again
-		}
+		return fmt.Errorf("%w: %w", inbox.ErrPermanent, err) // it would panic again; Recovered logged it
+	case errors.Is(err, inbox.ErrPermanent):
+		l.base.Metrics.failed("fastlane")
+		log.Error().Err(err).Msg("moderating a message failed permanently")
+	default:
+		// The inbox retries it and logs the final failure; a retry isn't an error yet.
+		log.Warn().Err(err).Msg("moderating a message failed; the inbox will retry it")
 	}
 	return err
 }
@@ -123,7 +128,7 @@ func (l *Lanes) lane(ctx context.Context, bot wa.JID) (*Lane, error) {
 		return nil, errors.New("fastlane: shutting down")
 	}
 	if _, ok := l.client(bot); !ok {
-		return nil, fmt.Errorf("%w: %s", ErrNotConnected, bot)
+		return nil, fmt.Errorf("%w: %s", ErrNotConnected, logging.MaskJID(string(bot)))
 	}
 	d := l.base
 	// The lane resolves the bot's connection per call: the connector replaces it on reconnects.
@@ -135,7 +140,7 @@ func (l *Lanes) lane(ctx context.Context, bot wa.JID) (*Lane, error) {
 	l.lanes[bot] = lane
 	l.wg.Go(func() {
 		if err := lane.Run(l.ctx); err != nil {
-			l.log.Error().Err(err).Str("bot", string(bot)).Msg("fast lane stopped")
+			l.log.Error().Err(err).Str("bot", logging.MaskJID(string(bot))).Msg("fast lane stopped")
 		}
 	})
 	return lane, nil

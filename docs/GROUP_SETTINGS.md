@@ -24,8 +24,10 @@ caught, so admins can see its judgement live in the group:
 
 Messages it would allow (`allow`, `none`, clean) get no reaction. Each message gets at most one
 reaction: an edit never adds a second one. Reactions are the only thing shadow mode posts, and they
-are allowed even while `silent` is on. They go through the paced queue at the lowest priority, at
-most one per group per minute, and a reaction that can't go out within 10 minutes is dropped. If the
+are allowed even while `silent` is on. Each reaction stands in for what the bot would have done, so it
+arrives with the same timing: at the priority of the delete (or of the review, when only a review would run) and paced like
+deletes (up to 10 writes per group per minute, within the bot's overall limit), not like a post.
+A reaction that can't go out within 10 minutes is dropped. If the
 group leaves shadow mode or turns the setting off first, pending reactions are dropped too.
 Turn it on with `.set shadow.reactions true`, off with `.set shadow.reactions false`.
 

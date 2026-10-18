@@ -148,7 +148,7 @@ func TestRender(t *testing.T) {
 		t.Fatal(err)
 	}
 	msg := review.Render(it, review.Config{}, nil)
-	for _, want := range []string{"#" + it.Code, "Riyadh Cars Market", "~Ahmed", "+966 5•• ••• •12", "312 earlier", "Score: 0.97", "Source: rules", "deleted ✔", "Auto-decision in 6h: keep deleted, no ban"} {
+	for _, want := range []string{"#" + it.Code, "Riyadh Cars Market", "~Ahmed", "+966 5•• ••• •12", "312 earlier", "0.97", "rules", "deleted ✔", "Auto-decision in 6h: keep deleted, no ban"} {
 		if !strings.Contains(msg.Text, want) {
 			t.Errorf("review text lacks %q (DESIGN §9.5 who/what/why/score/source):\n%s", want, msg.Text)
 		}

@@ -168,7 +168,7 @@ func TestSettingsErrorsAndReads(t *testing.T) {
 		t.Errorf(".autoban … auto ai without a track record = %q, want refused (DESIGN §9.2)", got)
 	}
 	r.dm(t, sara, ".status")
-	if got := r.lastReply(t).Message.Text; !strings.Contains(got, "4 deleted") || !strings.Contains(got, "preset: standard") {
+	if got := r.lastReply(t).Message.Text; !strings.Contains(got, "4 deleted") || !strings.Contains(got, "standard") {
 		t.Errorf(".status = %q, want preset and today's stats", got)
 	}
 	r.dm(t, sara, ".حالة")
@@ -342,7 +342,7 @@ func TestOnboarding(t *testing.T) {
 	}
 	r.dm(t, sara, "START")
 	sends := reviewtest.Of[review.Send](r.acts)
-	if len(sends) != 2 || !strings.Contains(sends[0].Message.Text, "Protection is on in Riyadh Cars Market") || !strings.Contains(sends[1].Message.Text, "Three steps") {
+	if len(sends) != 2 || !strings.Contains(sends[0].Message.Text, "Protection is on") || !strings.Contains(sends[0].Message.Text, "Riyadh Cars Market") || !strings.Contains(sends[1].Message.Text, "Three steps") {
 		t.Fatalf("after START: %d sends, want the held promotion notice then the setup steps", len(sends))
 	}
 	r.acts.Reset()

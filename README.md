@@ -177,6 +177,47 @@ touches nothing. Switch to enforcing only once you've checked what it would have
 Use `.mode pause` at any time to stop all actions in a group, and `.mode shadow` to go back to
 watching only.
 
+## Importing a spam dataset
+
+A new bot starts with an empty corpus. If you already have examples of the spam your groups get
+(an export of a spam-only group, a spreadsheet), import them so near-copies are caught from day
+one. The format is JSONL (one record per line) or CSV with a header; only `text` is required.
+[docs/CORPUS_FORMAT.md](docs/CORPUS_FORMAT.md) describes every field, with examples. Preparing
+the file is your job, and it never belongs in this repository.
+
+The image has no shell, so feed the file through stdin with `-`. Try it with `--dry-run` first,
+which writes nothing:
+
+```bash
+docker compose exec -T bot /antispam corpus import - --scope instance --dry-run < spam.jsonl
+```
+
+On Coolify, or anywhere without Compose, use the container's name (`docker ps` shows it):
+
+```bash
+docker exec -i <bot container> /antispam corpus import - --scope instance < spam.jsonl
+```
+
+- `--scope instance` makes the entries apply in every group; `--scope group:<group JID>` limits
+  them to one group.
+- `--holdout 0.2` (the default) keeps 20% of the campaigns out of the corpus (by `cluster_id`, or
+  groups of related messages when it's missing), and runs them through the detection
+  pipeline to report recall: how many would have been deleted, sent to admins or missed. Nothing
+  is sent. `--holdout-clusters FILE` holds out exactly the `cluster_id`s listed in the file.
+- Records labelled `ham` are never stored; they're only used to report how many normal messages
+  would have been caught. `--allow-ham` (group scope only) also adds their fingerprints, never
+  their text, to the group's allow-list.
+
+The report lists the import batch ID, the entries imported, duplicates merged (within the file
+and already in the corpus), clusters, the hold-out and its recall, rejected lines with their
+line numbers, and categories or languages with too few examples to help. Stored text is redacted
+like any confirmed spam, and phone numbers are kept only as keyed hashes, so set `HASH_KEY`
+first. A running bot picks the new entries up within 30 seconds. To undo an import:
+
+```bash
+docker exec <bot container> /antispam corpus remove --import <batch ID>
+```
+
 ## Presets and modes
 
 | Preset | Bans | Good for |

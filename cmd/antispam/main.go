@@ -48,6 +48,11 @@ func main() {
 		stop()
 		os.Exit(code)
 	}
+	if len(os.Args) > 1 && os.Args[1] == "corpus" {
+		code := corpusCmd(ctx, os.Args[2:], os.Getenv, os.Stdin, os.Stdout, os.Stderr)
+		stop()
+		os.Exit(code)
+	}
 	if len(os.Args) > 1 && os.Args[1] == "replay" {
 		code := replayCmd(ctx, os.Args[2:], os.Getenv, os.Stdout, os.Stderr)
 		stop()
@@ -189,8 +194,10 @@ func serve(ctx context.Context, opts options, getenv func(string) string, logOut
 				return nil
 			}
 			jobsLog := logs.For("jobs").Hook(fastlane.CallerHook{})
-			jc, err := jobs.New(pool, jobs.Options{Work: true, Logger: jobsLog, Register: register,
-				ErrorHandler: fastlane.JobErrors{Log: jobsLog, Metrics: metrics}})
+			jc, err := jobs.New(pool, jobs.Options{
+				Work: true, Logger: jobsLog, Register: register,
+				ErrorHandler: fastlane.JobErrors{Log: jobsLog, Metrics: metrics},
+			})
 			if err != nil {
 				log.Error().Err(err).Msg("job client")
 				return 1

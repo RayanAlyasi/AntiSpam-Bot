@@ -40,8 +40,16 @@ func TestCatalogFormatting(t *testing.T) {
 					t.Errorf("%s %s line %q has an unbalanced *, want *bold* pairs", lang, key, line)
 				}
 			}
-			if strings.Contains(s, "{url}") && !strings.HasSuffix(key, "_web") && key != "cmd.login" {
+			if strings.HasSuffix(key, "_web") || key == "cmd.login" {
+				continue
+			}
+			if strings.Contains(s, "{url}") {
 				t.Errorf("%s %s links {url}, want links only in _web variants (no website in v0.1)", lang, key)
+			}
+			for _, w := range []string{"website", "dashboard", " yet", " later", "for now", "الموقع", "لاحقاً", "حالياً", "بعد."} {
+				if strings.Contains(strings.ToLower(s), w) {
+					t.Errorf("%s %s = %q says %q, want no mention of features this version lacks", lang, key, s, w)
+				}
 			}
 		}
 	}

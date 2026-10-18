@@ -17,7 +17,23 @@ Branch `feat/clear-bot-replies`, PR into `staging`.
 - Unused duplicate messages removed from `locales/*.yaml`.
 - New tests: `internal/api/chat/replies_test.go`, `internal/review/catalog_format_test.go`.
 
+## Second pass (coordinator's requirements)
+
+- Nothing unshipped: help, onboarding, usage lines and docs/COMMANDS.md list only commands that
+  work with the production wiring. `.undo`, `.allow @member`, `.domain`, `.word` and invite-link
+  joins answer a short "isn't available in this version" naming the command. `.login`,
+  `.review dm` and `.review dashboard` say plainly what this version does instead. No text says
+  "yet", "later" or "for now" (checked by `TestCatalogFormatting`).
+- `.status` without the stats port shows the cases waiting (from the review service) instead of
+  "–" counts.
+- Usage hints are one example per line with what it does, not `a|b|c`.
+- New test: `internal/api/chat/unshipped_test.go`, with the production wiring.
+
 ## Follow-ups
+
+- The Arabic "not available" reply names the canonical English command (`.undo` for `.تراجع`).
+- `cmd.autoban_ai_refused` mentions a track record, but production has no track-record source,
+  so `ai` is always refused for now; reword when F-112's store is wired.
 
 - Move the built-in catalogue into `locales/` (DESIGN §22.2) once the test-change request
   `harness/test-change-requests/replies-pinned-texts.md` is decided.

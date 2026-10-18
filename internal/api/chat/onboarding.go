@@ -182,7 +182,7 @@ func (h *Handler) joinFromLink(ctx context.Context, m Message, person wa.JID) er
 		c.lang = "ar"
 	}
 	if h.d.Joiner == nil {
-		return h.unavailable(ctx, c)
+		return h.reply(ctx, c, "onboard.join_unavailable", nil)
 	}
 	code := inviteLink.FindStringSubmatch(m.Text)[1]
 	now := h.now()

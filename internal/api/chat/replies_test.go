@@ -24,7 +24,7 @@ func newRigNoSite(t *testing.T) *rig {
 }
 
 // noSiteWords must never appear in a reply when no website is configured.
-var noSiteWords = []string{"website", "dashboard", "http", "log in here", "{", "}", "الموقع", "**"}
+var noSiteWords = []string{"website", "dashboard", "http", "log in here", "{", "}", "الموقع", "**", " yet", "later", "for now", "بعد.", "لاحقاً", "حالياً"}
 
 // TestRepliesWithoutWebsite: with no public URL, onboarding and the commands that used to link the
 // website describe where uncertain cases really go (.pending, .reviewgroup here) and never
@@ -52,7 +52,7 @@ func TestRepliesWithoutWebsite(t *testing.T) {
 	}
 
 	for _, tt := range []struct{ cmd, want string }{
-		{".login", "no website yet"},
+		{".login", "isn't part of this version"},
 		{".settings", "review.destination: no review group (cases wait for .pending)"},
 		{".status", "review.destination: no review group"},
 		{".حالة", "تنتظر .معلق"},
@@ -61,7 +61,7 @@ func TestRepliesWithoutWebsite(t *testing.T) {
 		{".reviewgroup off", ".pending"},
 		{".help", "*Reviews*"},
 		{".help reviews", ".pending"},
-		{".دخول", "لا يوجد موقع"},
+		{".دخول", "ليس جزءاً من هذا الإصدار"},
 		{".مراجعة dashboard", ".معلق"},
 	} {
 		r.dm(t, sara, tt.cmd)
@@ -78,8 +78,7 @@ func TestRepliesWithoutWebsite(t *testing.T) {
 
 func checkNoSite(t *testing.T, what, text string) {
 	t.Helper()
-	// Saying plainly that there is no website is fine.
-	lower := strings.NewReplacer("no website yet", "", "لا يوجد موقع بعد", "").Replace(strings.ToLower(text))
+	lower := strings.ToLower(text)
 	for _, w := range noSiteWords {
 		if strings.Contains(lower, w) {
 			t.Errorf("%s = %q mentions %q, want no website, link or unfilled placeholder when none is configured", what, text, w)

@@ -15,10 +15,11 @@ var commandTexts = Catalog{
 			"{prefix}ok – not spam, trust the sender again\n" +
 			"{prefix}ban – ban someone (reply or @mention)\n" +
 			"{prefix}kick – remove someone; they can rejoin\n" +
-			"{prefix}unban <number> – lift a ban\n\n" +
+			"{prefix}unban +966551234567 – lift a ban\n\n" +
 			"*Reviews*\n" +
 			"{prefix}pending – cases waiting for your decision\n" +
-			"{prefix}review <code> ban – decide a case\n" +
+			"{prefix}review K7Q2 ban – ban the sender of case #K7Q2\n" +
+			"{prefix}review K7Q2 ok – case #K7Q2 isn't spam\n" +
 			"{prefix}reviewgroup here – get cases in an admins-only group\n\n" +
 			"*Settings*\n" +
 			"{prefix}status – how this group is set up\n" +
@@ -26,7 +27,7 @@ var commandTexts = Catalog{
 			"{prefix}mode shadow – watch only, change nothing\n" +
 			"{prefix}settings – see the main settings\n\n" +
 			"*Blacklist*\n" +
-			"{prefix}blacklist add <number> – block a phone number\n" +
+			"{prefix}blacklist add +966551234567 – block a phone number\n" +
 			"{prefix}blacklist list – see the list\n\n" +
 			"In a DM, pick a group first with {prefix}use <group name>.\n" +
 			"More help: {prefix}help moderation, {prefix}help reviews, {prefix}help settings or {prefix}help blacklist",
@@ -57,7 +58,7 @@ var commandTexts = Catalog{
 			"{prefix}preset standard – how strict I am: relaxed, standard, strict or ask\n" +
 			"{prefix}mode enforce – act on spam\n" +
 			"{prefix}mode shadow – watch only: I note what I would do\n" +
-			"{prefix}mode pause – stop for now\n" +
+			"{prefix}mode pause – stop acting until you switch back\n" +
 			"{prefix}block links – delete a type of message (also invites, images, videos…)\n" +
 			"{prefix}allow stickers – allow a type again\n\n" +
 			"Any setting by name: {prefix}get review.timeout, {prefix}set review.timeout 12h",
@@ -73,8 +74,8 @@ var commandTexts = Catalog{
 		"cmd.pick_group":    "*Which group?* Send {prefix}use <group name>.\n{groups}",
 		"cmd.using":         "Now working on *{group}* for the next hour.",
 		"cmd.login":         "Log in here: {url}",
-		"cmd.login_no_site": "There's no website yet. Everything works here in WhatsApp: send {prefix}help to see how.",
-		"cmd.unavailable":   "{cmd} isn't available on this bot yet.",
+		"cmd.login_no_site": "Logging in isn't part of this version. Send {prefix}help to see the commands.",
+		"cmd.unavailable":   "{cmd} isn't available in this version.",
 
 		"cmd.saved":               "✔ Saved for *{group}*\n{changes}",
 		"cmd.value":               "{key} = {value}",
@@ -84,9 +85,11 @@ var commandTexts = Catalog{
 		"cmd.settings":            "*{group}*\n{summary}\n\nChange one with .set <key> <value>. More: .help settings",
 		"cmd.settings_web":        "*{group}*\n{summary}\n\nAll settings: {url}",
 		"cmd.status":              "*{group}*\n{summary}\n\n*Today:* {deleted} deleted · {banned} banned · {pending} waiting for review",
+		"cmd.status_pending":      "*{group}*\n{summary}\n\n*Waiting for review:* {pending}",
+		"cmd.status_brief":        "*{group}*\n{summary}",
 		"cmd.preset":              "*{group}* now uses the *{preset}* preset. The auto-ban table was reset to match.",
 		"cmd.autoban_grid":        "*Auto-ban table*\n{grid}",
-		"cmd.autoban_ai_refused":  "AI evidence can't auto-ban here yet: it needs a track record first. Use known evidence, or ask.",
+		"cmd.autoban_ai_refused":  "AI evidence can't auto-ban here until it has a track record. Use known evidence, or ask.",
 
 		"cmd.never_admin":     "I never act on group admins or on myself.",
 		"cmd.ban_ask_reason":  "Banned. Reason? Reply spam or other (no answer counts as other).",
@@ -103,9 +106,9 @@ var commandTexts = Catalog{
 		"cmd.word_dry_run":    "\"{phrase}\" would have matched {n} recent messages. Send the same command again within 10 minutes to save it.",
 
 		"cmd.set_review_group":           "Set the review group by sending {prefix}reviewgroup here inside that group.",
-		"cmd.review_dm_later":            "Reviews by DM aren't available yet. Send {prefix}pending to see open cases, or {prefix}reviewgroup here in a separate admins-only group to get them as they come in.",
-		"cmd.review_group_missing":       "There's no review group yet: send .reviewgroup here in a separate admins-only group.",
-		"cmd.review_dashboard_no_site":   "✔ Saved for *{group}*: cases no longer go to a review group.\nThere's no website yet, so they wait for you here: send .pending to see them.",
+		"cmd.review_dm_later":            "Reviews by DM aren't part of this version.\nSend {prefix}pending to see open cases, or {prefix}reviewgroup here in a separate admins-only group to get them as they come in.",
+		"cmd.review_group_missing":       "No review group is set. Send .reviewgroup here in a separate admins-only group.",
+		"cmd.review_dashboard_no_site":   "✔ Saved for *{group}*: cases no longer go to a review group.\nThey wait for you: send .pending to see them.",
 		"cmd.review_timeout_ban_refused": "A timeout can't ban in ask-admins mode: choose keep, delete or dismiss.",
 		"cmd.review_not_found":           "No review #{code}.",
 		"cmd.review_decided":             "✔ #{code}: {decision}.",
@@ -128,33 +131,35 @@ var commandTexts = Catalog{
 		"cmd.blacklist_check_no":       "{number} isn't blacklisted here.\n*Member now:* {member}",
 		"blacklist.admin_skipped":      "{number} is blacklisted but is an admin of {group}, so I didn't act on them.",
 
-		"cmd.usage.set":            "Send .set <key> <value>, for example .set review.timeout 12h",
-		"cmd.usage.get":            "Send .get <key>, for example .get review.timeout",
-		"cmd.usage.mode":           "Send .mode enforce (act on spam), .mode shadow (watch only) or .mode pause.",
-		"cmd.usage.preset":         "Send .preset relaxed, .preset standard, .preset strict or .preset ask.",
+		"cmd.usage.set":            "Send a setting and its value:\n.set review.timeout 12h – wait 12 hours for a decision",
+		"cmd.usage.get":            "Send a setting's name:\n.get review.timeout – show how long I wait for a decision",
+		"cmd.usage.mode":           "Choose a mode:\n.mode enforce – act on spam\n.mode shadow – watch only, change nothing\n.mode pause – stop acting until you switch back",
+		"cmd.usage.preset":         "Choose how strict I am:\n.preset relaxed – act only on clear spam\n.preset standard – the default\n.preset strict – act sooner\n.preset ask – ask admins before banning",
 		"cmd.usage.toggle":         "Add on or off, for example .silent on",
-		"cmd.usage.policy":         "Send .policy delete, .policy ask or .policy ban.",
-		"cmd.usage.content":        "Name a type, for example .block links or .allow stickers.\n*Types:* links, invites, channels, contacts, images, videos, stickers, documents, audio, polls, locations, events, view_once",
-		"cmd.usage.autoban":        "Send .autoban to see the table, or .autoban <type> auto, ask, delete or allow.\n_Example:_ .autoban links auto",
-		"cmd.usage.askadmins":      "Send .askadmins off, .askadmins delete (delete first, then ask) or .askadmins before (ask before doing anything).",
-		"cmd.usage.ban":            "Reply to the message or @mention the person: .ban spam or .ban other",
-		"cmd.usage.kick":           "Reply to the message or @mention the person: .kick (you can add spam or other)",
-		"cmd.usage.unban":          "Send .unban <number>, or reply .unban to their message.",
-		"cmd.usage.allow":          "Reply to the message or @mention the person: .allow or .unallow",
+		"cmd.usage.policy":         "Choose what happens to messages that break the group's rules:\n.policy delete – delete them\n.policy ask – ask the admins\n.policy ban – delete and ban",
+		"cmd.usage.content":        "Name a type of message:\n.block links – delete links\n.allow stickers – allow stickers again\n*Types:* links, invites, channels, contacts, images, videos, stickers, documents, audio, polls, locations, events, view_once",
+		"cmd.usage.autoban":        ".autoban – show the auto-ban table\n.autoban links auto – ban known link spam without asking\n.autoban links ask – ask the admins first\nOther actions: delete, allow",
+		"cmd.usage.askadmins":      "Choose when I ask the admins:\n.askadmins off – act on my own\n.askadmins delete – delete first, then ask about the ban\n.askadmins before – ask before doing anything",
+		"cmd.usage.ban":            "Reply to the message (or @mention the person) with:\n.ban spam – ban and remember it as spam\n.ban other – ban for another reason",
+		"cmd.usage.kick":           "Reply to the message (or @mention the person) with:\n.kick – remove them; they can rejoin",
+		"cmd.usage.unban":          "Send the number, or reply to their message:\n.unban +966551234567 – lift the ban",
+		"cmd.usage.allow":          "Reply to the message (or @mention the person) with:\n.allow – never flag this member\n.unallow – undo that",
 		"cmd.usage.spam":           "Reply .spam to the spam message.",
-		"cmd.usage.notspam":        "Reply .notspam (or .ok) to the message.",
-		"cmd.usage.domain":         "Send .domain allow example.com or .domain block example.com",
-		"cmd.usage.word":           "Send .word block <phrase> or .word unblock <phrase>",
-		"cmd.usage.review":         "*Reviews*\n.pending – see open cases\n.review <code> ban – decide one (or ok, or delete only)\n.review timeout 6h keep – what happens if nobody decides\nMore: .help reviews",
-		"cmd.usage.review_timeout": "Send .review timeout <time> <action>, for example .review timeout 6h keep\n*Actions:* keep (keep it deleted, no ban), delete (delete, no ban), ban, dismiss (not spam)",
-		"cmd.usage.reviewgroup":    "Send .reviewgroup here inside a separate admins-only group, or .reviewgroup off to stop.",
-		"cmd.usage.blacklist":      "*Blacklist*\n.blacklist add <number> [reason]\n.blacklist remove <number>\n.blacklist list\n.blacklist check <number>",
+		"cmd.usage.notspam":        "Reply .ok to the message that isn't spam.",
+		"cmd.usage.domain":         "Send a domain:\n.domain block example.com – delete links to it\n.domain allow example.com – always allow it",
+		"cmd.usage.word":           "Send a phrase:\n.word block free money – delete messages with it\n.word unblock free money – stop that",
+		"cmd.usage.review":         "*Reviews*\n.pending – see open cases\n.review K7Q2 ban – ban the sender of case #K7Q2\n.review K7Q2 ok – not spam\n.review K7Q2 delete only – delete, no ban",
+		"cmd.usage.review_timeout": "Say how long to wait and what to do then:\n.review timeout 6h keep – keep it deleted, no ban\n.review timeout 6h delete – delete it, no ban\n.review timeout 6h ban – ban\n.review timeout 6h dismiss – treat it as not spam",
+		"cmd.usage.reviewgroup":    "In a separate admins-only group, send:\n.reviewgroup here – get this group's cases here\n.reviewgroup off – stop",
+		"cmd.usage.blacklist":      "*Blacklist*\n.blacklist add +966551234567 scam – ban this number\n.blacklist remove +966551234567 – take it off\n.blacklist list – see the list\n.blacklist check +966551234567 – is it listed?",
 
 		"onboard.start": "Hi! 👋 I keep WhatsApp groups free of spam, and I never post in them.\n\n" +
 			"*Three steps to start*\n" +
 			"1. Add me to your group.\n" +
 			"2. Make me an admin there.\n" +
-			"3. Choose where uncertain cases go: send .pending here to see them and .review <code> ban or ok to decide, or send .reviewgroup here in a separate admins-only group to get them as they come in.\n\n" +
+			"3. Choose where uncertain cases go:\n" +
+			"- send .pending here to see them with their codes, then decide one: .review K7Q2 ban or .review K7Q2 ok\n" +
+			"- or send .reviewgroup here in a separate admins-only group to get them as they come in\n\n" +
 			"Send .help for all commands.",
 		"onboard.start_web": "Hi! 👋 I keep WhatsApp groups free of spam, and I never post in them.\n\n" +
 			"*Three steps to start*\n" +
@@ -162,18 +167,21 @@ var commandTexts = Catalog{
 			"2. Make me an admin there.\n" +
 			"3. Choose where uncertain cases go: the website, or send .reviewgroup here in a separate admins-only group to get them as they come in.\n\n" +
 			"Send .help for all commands. Website: {url}",
-		"onboard.promoted": "✅ Protection is on in {group}. I stay silent there.\n\n" +
-			"When I'm not sure about a message, I keep it as a case for you. Send .pending here to see them and .review <code> ban or ok to decide, or send .reviewgroup here in a separate admins-only group to get them as they come in.\n" +
+		"onboard.promoted": "🛡️ Protection is on in {group}. I stay silent there.\n\n" +
+			"When I'm not sure about a message, I keep it as a case for you:\n" +
+			"- send .pending here to see them with their codes, then decide one: .review K7Q2 ban or .review K7Q2 ok\n" +
+			"- or send .reviewgroup here in a separate admins-only group to get them as they come in\n\n" +
 			"_By default, if nobody decides in time, nobody is banned._",
-		"onboard.promoted_web": "✅ Protection is on in {group}. I stay silent there.\n\n" +
+		"onboard.promoted_web": "🛡️ Protection is on in {group}. I stay silent there.\n\n" +
 			"When I'm not sure about a message, I keep it as a case for you on the website: {url}\n" +
 			"To get cases in WhatsApp, send .pending here, or .reviewgroup here in a separate admins-only group.\n" +
 			"_By default, if nobody decides in time, nobody is banned._",
-		"onboard.not_admin":      "⚠️ I'm in {group} but not an admin yet, so I can't protect it. Make me an admin there and I'll start.",
-		"onboard.joined":         "✔ Joined {group}. Make me an admin there to turn protection on.",
-		"onboard.join_not_admin": "You need to be an admin of {group} for me to join it.",
-		"onboard.join_bad_link":  "That invite link doesn't work.",
-		"onboard.join_limit":     "I've joined enough groups for today. Please try again tomorrow.",
+		"onboard.not_admin":        "⚠️ I'm in {group} but I'm not an admin there, so I can't protect it. Make me an admin and I'll start.",
+		"onboard.joined":           "✔ Joined {group}. Make me an admin there to turn protection on.",
+		"onboard.join_not_admin":   "You need to be an admin of {group} for me to join it.",
+		"onboard.join_bad_link":    "That invite link doesn't work.",
+		"onboard.join_unavailable": "I can't join groups from invite links in this version.\nAdd me to the group yourself, then make me an admin there.",
+		"onboard.join_limit":       "I've joined enough groups for today. Please try again tomorrow.",
 	},
 	"ar": {
 		"cmd.yes": "نعم",
@@ -185,10 +193,11 @@ var commandTexts = Catalog{
 			"{prefix}سليم – ليست سبام، واستعادة الثقة بالمرسل\n" +
 			"{prefix}حظر – حظر شخص (بالرد أو الإشارة)\n" +
 			"{prefix}طرد – إزالة شخص مع السماح بعودته\n" +
-			"{prefix}فك_الحظر <الرقم> – رفع الحظر\n\n" +
+			"{prefix}فك_الحظر \u200e+966551234567 – رفع الحظر\n\n" +
 			"*المراجعات*\n" +
 			"{prefix}معلق – الحالات التي تنتظر قرارك\n" +
-			"{prefix}مراجعة <الرمز> ban – البتّ في حالة\n" +
+			"{prefix}مراجعة K7Q2 ban – حظر مرسل الحالة \u200e#K7Q2\n" +
+			"{prefix}مراجعة K7Q2 ok – الحالة \u200e#K7Q2 ليست سبام\n" +
 			"{prefix}مجموعة_المراجعة here – استلام الحالات في مجموعة للمشرفين فقط\n\n" +
 			"*الإعدادات*\n" +
 			"{prefix}حالة – إعداد هذه المجموعة\n" +
@@ -196,7 +205,7 @@ var commandTexts = Catalog{
 			"{prefix}وضع shadow – المراقبة فقط دون أي إجراء\n" +
 			"{prefix}اعدادات – أهم الإعدادات\n\n" +
 			"*القائمة السوداء*\n" +
-			"{prefix}القائمة_السوداء add <رقم> – منع رقم هاتف\n" +
+			"{prefix}القائمة_السوداء add \u200e+966551234567 – منع رقم هاتف\n" +
 			"{prefix}القائمة_السوداء list – عرض القائمة\n\n" +
 			"في الخاص، اختر المجموعة أولاً بـ {prefix}استخدم <اسم المجموعة>.\n" +
 			"للمزيد: {prefix}مساعدة الإشراف، {prefix}مساعدة المراجعات، {prefix}مساعدة الإعدادات أو {prefix}مساعدة القائمة_السوداء",
@@ -227,7 +236,7 @@ var commandTexts = Catalog{
 			"{prefix}نمط standard – درجة الصرامة: relaxed أو standard أو strict أو ask\n" +
 			"{prefix}وضع enforce – التصرف مع السبام\n" +
 			"{prefix}وضع shadow – المراقبة فقط: أسجّل ما كنت سأفعله\n" +
-			"{prefix}وضع pause – الإيقاف مؤقتاً\n" +
+			"{prefix}وضع pause – التوقف حتى تعيد التشغيل\n" +
 			"{prefix}منع links – حذف نوع من الرسائل (وأيضاً invites وimages وvideos…)\n" +
 			"{prefix}سماح stickers – السماح بنوع من جديد\n\n" +
 			"أي إعداد باسمه: {prefix}عرض review.timeout، {prefix}ضبط review.timeout 12h",
@@ -243,8 +252,8 @@ var commandTexts = Catalog{
 		"cmd.pick_group":    "*أي مجموعة؟* أرسل {prefix}استخدم <اسم المجموعة>.\n{groups}",
 		"cmd.using":         "أعمل الآن على *{group}* لمدة ساعة.",
 		"cmd.login":         "سجّل الدخول من هنا: {url}",
-		"cmd.login_no_site": "لا يوجد موقع بعد. كل شيء يعمل هنا في واتساب: أرسل {prefix}مساعدة لتعرف كيف.",
-		"cmd.unavailable":   "الأمر {cmd} غير متاح بعد.",
+		"cmd.login_no_site": "تسجيل الدخول ليس جزءاً من هذا الإصدار. أرسل {prefix}مساعدة لعرض الأوامر.",
+		"cmd.unavailable":   "الأمر {cmd} غير متاح في هذا الإصدار.",
 
 		"cmd.saved":               "✔ تم الحفظ لـ *{group}*\n{changes}",
 		"cmd.value":               "{key} = {value}",
@@ -254,9 +263,11 @@ var commandTexts = Catalog{
 		"cmd.settings":            "*{group}*\n{summary}\n\nلتغيير إعداد: \u200e.set <key> <value>. للمزيد: .مساعدة الإعدادات",
 		"cmd.settings_web":        "*{group}*\n{summary}\n\nكل الإعدادات: {url}",
 		"cmd.status":              "*{group}*\n{summary}\n\n*اليوم:* {deleted} حذف · {banned} حظر · {pending} بانتظار المراجعة",
+		"cmd.status_pending":      "*{group}*\n{summary}\n\n*بانتظار المراجعة:* {pending}",
+		"cmd.status_brief":        "*{group}*\n{summary}",
 		"cmd.preset":              "تستخدم *{group}* الآن النمط *{preset}*، وأُعيد ضبط جدول الحظر التلقائي ليطابقه.",
 		"cmd.autoban_grid":        "*جدول الحظر التلقائي*\n{grid}",
-		"cmd.autoban_ai_refused":  "لا يمكن لأدلة الذكاء الاصطناعي الحظر تلقائياً بعد: تحتاج سجلاً موثوقاً أولاً.",
+		"cmd.autoban_ai_refused":  "لا يمكن لأدلة الذكاء الاصطناعي الحظر تلقائياً هنا قبل أن يكون لها سجل موثوق. استخدم الأدلة المعروفة أو اختر السؤال.",
 
 		"cmd.never_admin":     "لا أتخذ أي إجراء ضد المشرفين أو ضد نفسي.",
 		"cmd.ban_ask_reason":  "تم الحظر. ما السبب؟ رُدّ بـ سبام أو أخرى (عدم الرد يُعد أخرى).",
@@ -273,9 +284,9 @@ var commandTexts = Catalog{
 		"cmd.word_dry_run":    "\"{phrase}\" كانت ستطابق {n} رسالة حديثة. أرسل الأمر نفسه مرة أخرى خلال 10 دقائق للحفظ.",
 
 		"cmd.set_review_group":           "اضبط مجموعة المراجعة بإرسال \u200e{prefix}reviewgroup here داخل تلك المجموعة.",
-		"cmd.review_dm_later":            "المراجعة عبر الخاص غير متاحة بعد. أرسل {prefix}معلق لعرض الحالات المفتوحة، أو \u200e{prefix}reviewgroup here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول.",
-		"cmd.review_group_missing":       "لا توجد مجموعة مراجعة بعد: أرسل \u200e.reviewgroup here في مجموعة منفصلة للمشرفين فقط.",
-		"cmd.review_dashboard_no_site":   "✔ تم الحفظ لـ *{group}*: لم تعد الحالات تذهب إلى مجموعة مراجعة.\nلا يوجد موقع بعد، لذا تنتظرك هنا: أرسل .معلق لعرضها.",
+		"cmd.review_dm_later":            "المراجعة عبر الخاص ليست جزءاً من هذا الإصدار.\nأرسل {prefix}معلق لعرض الحالات المفتوحة، أو {prefix}مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول.",
+		"cmd.review_group_missing":       "لم تُضبط مجموعة مراجعة. أرسل .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط.",
+		"cmd.review_dashboard_no_site":   "✔ تم الحفظ لـ *{group}*: لم تعد الحالات تذهب إلى مجموعة مراجعة.\nتنتظرك الآن: أرسل .معلق لعرضها.",
 		"cmd.review_timeout_ban_refused": "لا يمكن أن تنتهي المهلة بالحظر في وضع سؤال المشرفين: اختر keep أو delete أو dismiss.",
 		"cmd.review_not_found":           "لا توجد مراجعة #{code}.",
 		"cmd.review_decided":             "✔ #{code}: {decision}.",
@@ -298,33 +309,35 @@ var commandTexts = Catalog{
 		"cmd.blacklist_check_no":       "{number} ليس في القائمة السوداء هنا.\n*عضو الآن:* {member}",
 		"blacklist.admin_skipped":      "{number} في القائمة السوداء لكنه مشرف في {group}، لذلك لم أتخذ أي إجراء.",
 
-		"cmd.usage.set":            "أرسل \u200e.set <key> <value>، مثلاً \u200e.set review.timeout 12h",
-		"cmd.usage.get":            "أرسل \u200e.get <key>، مثلاً \u200e.get review.timeout",
-		"cmd.usage.mode":           "أرسل .وضع enforce (التصرف مع السبام) أو .وضع shadow (المراقبة فقط) أو .وضع pause.",
-		"cmd.usage.preset":         "أرسل .نمط relaxed أو standard أو strict أو ask.",
+		"cmd.usage.set":            "أرسل الإعداد وقيمته:\n\u200e.set review.timeout 12h – انتظار القرار ١٢ ساعة",
+		"cmd.usage.get":            "أرسل اسم الإعداد:\n\u200e.get review.timeout – عرض مدة انتظار القرار",
+		"cmd.usage.mode":           "اختر الوضع:\n.وضع enforce – التصرف مع السبام\n.وضع shadow – المراقبة فقط دون أي تغيير\n.وضع pause – التوقف حتى تعيد التشغيل",
+		"cmd.usage.preset":         "اختر درجة الصرامة:\n.نمط relaxed – التصرف مع السبام الواضح فقط\n.نمط standard – الإعداد الافتراضي\n.نمط strict – التصرف أسرع\n.نمط ask – سؤال المشرفين قبل الحظر",
 		"cmd.usage.toggle":         "أضف on أو off، مثلاً .صامت on",
-		"cmd.usage.policy":         "أرسل .سياسة delete أو ask أو ban.",
-		"cmd.usage.content":        "اذكر نوعاً، مثلاً .منع links أو .سماح stickers.\n*الأنواع:* links, invites, channels, contacts, images, videos, stickers, documents, audio, polls, locations, events, view_once",
-		"cmd.usage.autoban":        "أرسل .حظر_تلقائي لعرض الجدول، أو .حظر_تلقائي <النوع> auto أو ask أو delete أو allow.\n_مثال:_ .حظر_تلقائي links auto",
-		"cmd.usage.askadmins":      "أرسل .اسأل_المشرفين off أو delete (الحذف ثم السؤال) أو before (السؤال قبل أي إجراء).",
-		"cmd.usage.ban":            "رُدّ على الرسالة أو أشر إلى الشخص: .حظر سبام أو .حظر أخرى",
-		"cmd.usage.kick":           "رُدّ على الرسالة أو أشر إلى الشخص: .طرد (ويمكنك إضافة سبام أو أخرى)",
-		"cmd.usage.unban":          "أرسل .فك_الحظر <الرقم>، أو رُدّ بـ .فك_الحظر على رسالته.",
-		"cmd.usage.allow":          "رُدّ على الرسالة أو أشر إلى الشخص: .سماح أو .الغاء_السماح",
+		"cmd.usage.policy":         "اختر ما يحدث للرسائل المخالفة لقواعد المجموعة:\n.سياسة delete – حذفها\n.سياسة ask – سؤال المشرفين\n.سياسة ban – الحذف والحظر",
+		"cmd.usage.content":        "اذكر نوعاً من الرسائل:\n.منع links – حذف الروابط\n.سماح stickers – السماح بالملصقات من جديد\n*الأنواع:* links, invites, channels, contacts, images, videos, stickers, documents, audio, polls, locations, events, view_once",
+		"cmd.usage.autoban":        ".حظر_تلقائي – عرض جدول الحظر التلقائي\n.حظر_تلقائي links auto – حظر سبام الروابط المعروف دون سؤال\n.حظر_تلقائي links ask – سؤال المشرفين أولاً\nإجراءات أخرى: delete و allow",
+		"cmd.usage.askadmins":      "اختر متى أسأل المشرفين:\n.اسأل_المشرفين off – أتصرف بنفسي\n.اسأل_المشرفين delete – أحذف أولاً ثم أسأل عن الحظر\n.اسأل_المشرفين before – أسأل قبل أي إجراء",
+		"cmd.usage.ban":            "رُدّ على الرسالة (أو أشر إلى الشخص) بـ:\n.حظر سبام – الحظر وحفظها كسبام\n.حظر أخرى – الحظر لسبب آخر",
+		"cmd.usage.kick":           "رُدّ على الرسالة (أو أشر إلى الشخص) بـ:\n.طرد – إزالته مع السماح بعودته",
+		"cmd.usage.unban":          "أرسل الرقم، أو رُدّ على رسالته:\n.فك_الحظر \u200e+966551234567 – رفع الحظر",
+		"cmd.usage.allow":          "رُدّ على الرسالة (أو أشر إلى الشخص) بـ:\n.سماح – عدم الاشتباه بهذا العضو\n.الغاء_السماح – التراجع عن ذلك",
 		"cmd.usage.spam":           "رُدّ بـ .سبام على رسالة السبام.",
-		"cmd.usage.notspam":        "رُدّ بـ .ليس_سبام (أو .سليم) على الرسالة.",
-		"cmd.usage.domain":         "أرسل .نطاق allow example.com أو .نطاق block example.com",
-		"cmd.usage.word":           "أرسل .كلمة block <عبارة> أو .كلمة unblock <عبارة>",
-		"cmd.usage.review":         "*المراجعات*\n.معلق – عرض الحالات المفتوحة\n.مراجعة <الرمز> ban – البتّ في حالة (أو ok أو delete only)\n.مراجعة timeout 6h keep – ما يحدث إن لم يقرر أحد\nللمزيد: .مساعدة المراجعات",
-		"cmd.usage.review_timeout": "أرسل .مراجعة timeout <المدة> <الإجراء>، مثلاً .مراجعة timeout 6h keep\n*الإجراءات:* keep (تبقى محذوفة بلا حظر)، delete (حذف بلا حظر)، ban، dismiss (ليست سبام)",
-		"cmd.usage.reviewgroup":    "أرسل .مجموعة_المراجعة here داخل مجموعة منفصلة للمشرفين فقط، أو .مجموعة_المراجعة off للتوقف.",
-		"cmd.usage.blacklist":      "*القائمة السوداء*\n.القائمة_السوداء add <رقم> [سبب]\n.القائمة_السوداء remove <رقم>\n.القائمة_السوداء list\n.القائمة_السوداء check <رقم>",
+		"cmd.usage.notspam":        "رُدّ بـ .سليم على الرسالة السليمة.",
+		"cmd.usage.domain":         "أرسل نطاقاً:\n.نطاق block example.com – حذف روابطه\n.نطاق allow example.com – السماح به دائماً",
+		"cmd.usage.word":           "أرسل عبارة:\n.كلمة block ربح سريع – حذف الرسائل التي تحويها\n.كلمة unblock ربح سريع – إيقاف ذلك",
+		"cmd.usage.review":         "*المراجعات*\n.معلق – عرض الحالات المفتوحة\n.مراجعة K7Q2 ban – حظر مرسل الحالة \u200e#K7Q2\n.مراجعة K7Q2 ok – ليست سبام\n.مراجعة K7Q2 delete only – حذف بلا حظر",
+		"cmd.usage.review_timeout": "حدّد مدة الانتظار وما يحدث بعدها:\n.مراجعة timeout 6h keep – تبقى محذوفة بلا حظر\n.مراجعة timeout 6h delete – حذف بلا حظر\n.مراجعة timeout 6h ban – حظر\n.مراجعة timeout 6h dismiss – اعتبارها ليست سبام",
+		"cmd.usage.reviewgroup":    "في مجموعة منفصلة للمشرفين فقط، أرسل:\n.مجموعة_المراجعة here – استلام الحالات هنا\n.مجموعة_المراجعة off – التوقف",
+		"cmd.usage.blacklist":      "*القائمة السوداء*\n.القائمة_السوداء add \u200e+966551234567 احتيال – حظر الرقم\n.القائمة_السوداء remove \u200e+966551234567 – إزالته\n.القائمة_السوداء list – عرض القائمة\n.القائمة_السوداء check \u200e+966551234567 – هل هو مدرج؟",
 
 		"onboard.start": "أهلاً! 👋 أحمي مجموعات واتساب من السبام، ولا أنشر فيها أي شيء.\n\n" +
 			"*ثلاث خطوات للبدء*\n" +
 			"1. أضفني إلى مجموعتك.\n" +
 			"2. اجعلني مشرفاً فيها.\n" +
-			"3. اختر أين تذهب الحالات غير المؤكدة: أرسل .معلق هنا لعرضها و.مراجعة <الرمز> ban أو ok للبتّ فيها، أو أرسل .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول.\n\n" +
+			"3. اختر أين تذهب الحالات غير المؤكدة:\n" +
+			"- أرسل .معلق هنا لعرضها مع رموزها، ثم قرّر: .مراجعة K7Q2 ban أو .مراجعة K7Q2 ok\n" +
+			"- أو أرسل .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول\n\n" +
 			"أرسل .مساعدة لكل الأوامر.",
 		"onboard.start_web": "أهلاً! 👋 أحمي مجموعات واتساب من السبام، ولا أنشر فيها أي شيء.\n\n" +
 			"*ثلاث خطوات للبدء*\n" +
@@ -332,18 +345,21 @@ var commandTexts = Catalog{
 			"2. اجعلني مشرفاً فيها.\n" +
 			"3. اختر أين تذهب الحالات غير المؤكدة: الموقع، أو أرسل .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول.\n\n" +
 			"أرسل .مساعدة لكل الأوامر. الموقع: {url}",
-		"onboard.promoted": "✅ الحماية مفعّلة في {group}، وأبقى صامتاً هناك.\n\n" +
-			"عندما لا أكون متأكداً من رسالة، أحتفظ بها كحالة لك. أرسل .معلق هنا لعرضها و.مراجعة <الرمز> ban أو ok للبتّ فيها، أو أرسل .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول.\n" +
+		"onboard.promoted": "🛡️ الحماية مفعّلة في {group}، وأبقى صامتاً هناك.\n\n" +
+			"عندما لا أكون متأكداً من رسالة، أحتفظ بها كحالة لك:\n" +
+			"- أرسل .معلق هنا لعرضها مع رموزها، ثم قرّر: .مراجعة K7Q2 ban أو .مراجعة K7Q2 ok\n" +
+			"- أو أرسل .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول\n\n" +
 			"_افتراضياً، إن لم يقرر أحد في الوقت المحدد، لا يُحظر أحد._",
-		"onboard.promoted_web": "✅ الحماية مفعّلة في {group}، وأبقى صامتاً هناك.\n\n" +
+		"onboard.promoted_web": "🛡️ الحماية مفعّلة في {group}، وأبقى صامتاً هناك.\n\n" +
 			"عندما لا أكون متأكداً من رسالة، أحتفظ بها كحالة لك على الموقع: {url}\n" +
 			"لاستلام الحالات في واتساب، أرسل .معلق هنا، أو .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط.\n" +
 			"_افتراضياً، إن لم يقرر أحد في الوقت المحدد، لا يُحظر أحد._",
-		"onboard.not_admin":      "⚠️ أنا في {group} لكنني لست مشرفاً بعد، فلا أستطيع حمايتها. اجعلني مشرفاً هناك وسأبدأ.",
-		"onboard.joined":         "✔ انضممت إلى {group}. اجعلني مشرفاً لتفعيل الحماية.",
-		"onboard.join_not_admin": "يجب أن تكون مشرفاً في {group} لكي أنضم إليها.",
-		"onboard.join_bad_link":  "رابط الدعوة هذا لا يعمل.",
-		"onboard.join_limit":     "انضممت إلى ما يكفي من المجموعات اليوم. حاول غداً.",
+		"onboard.not_admin":        "⚠️ أنا في {group} لكنني لست مشرفاً فيها، فلا أستطيع حمايتها. اجعلني مشرفاً وسأبدأ.",
+		"onboard.joined":           "✔ انضممت إلى {group}. اجعلني مشرفاً لتفعيل الحماية.",
+		"onboard.join_not_admin":   "يجب أن تكون مشرفاً في {group} لكي أنضم إليها.",
+		"onboard.join_bad_link":    "رابط الدعوة هذا لا يعمل.",
+		"onboard.join_unavailable": "لا أستطيع الانضمام عبر روابط الدعوة في هذا الإصدار.\nأضفني إلى المجموعة بنفسك، ثم اجعلني مشرفاً فيها.",
+		"onboard.join_limit":       "انضممت إلى ما يكفي من المجموعات اليوم. حاول غداً.",
 	},
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/review"
@@ -130,7 +131,7 @@ func (h *Handler) groupName(ctx context.Context, g wa.JID) string {
 
 // unavailable answers a command whose collaborator isn't wired.
 func (h *Handler) unavailable(ctx context.Context, c *call) error {
-	return h.reply(ctx, c, "cmd.unavailable", map[string]string{"cmd": c.cmd.Name})
+	return h.reply(ctx, c, "cmd.unavailable", map[string]string{"cmd": h.d.Prefix + c.cmd.Name})
 }
 
 func (h *Handler) cmdGroups(ctx context.Context, c *call) error {
@@ -269,13 +270,21 @@ func (h *Handler) cmdStatus(ctx context.Context, c *call) error {
 	if h.d.Settings == nil {
 		return h.unavailable(ctx, c)
 	}
-	vars := map[string]string{"group": h.groupName(ctx, c.group), "summary": h.summary(ctx, c), "deleted": "–", "banned": "–", "pending": "–"}
+	vars := map[string]string{"group": h.groupName(ctx, c.group), "summary": h.summary(ctx, c)}
 	if h.d.Stats != nil {
 		if s, err := h.d.Stats.Today(ctx, c.group); err == nil {
 			vars["deleted"], vars["banned"], vars["pending"] = fmt.Sprint(s.Deleted), fmt.Sprint(s.Banned), fmt.Sprint(s.Pending)
+			return h.reply(ctx, c, "cmd.status", vars)
 		}
 	}
-	return h.reply(ctx, c, "cmd.status", vars)
+	// Without today's counts, show only what is known: the cases waiting for a decision.
+	if h.d.Reviews != nil {
+		if items, err := h.d.Reviews.Pending(ctx, c.group); err == nil {
+			vars["pending"] = strconv.Itoa(len(items))
+			return h.reply(ctx, c, "cmd.status_pending", vars)
+		}
+	}
+	return h.reply(ctx, c, "cmd.status_brief", vars)
 }
 
 // choice maps a single argument through m, or replies with the usage.
@@ -370,6 +379,10 @@ func (h *Handler) cmdAllow(ctx context.Context, c *call) error {
 		if _, isType := contentTypes[strings.ToLower(c.cmd.Args[0])]; isType {
 			return content("allow")(h, ctx, c)
 		}
+	}
+	if h.d.Members == nil {
+		// Without the member allow-list, .allow only takes a message type: show how.
+		return h.reply(ctx, c, "cmd.usage.content", nil)
 	}
 	return h.memberAllow(ctx, c, true)
 }

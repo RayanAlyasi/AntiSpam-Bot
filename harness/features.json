@@ -1993,7 +1993,8 @@
       "description": "A START DM gets the three setup steps; when the bot is promoted it DMs the promoting admin only if they have an open thread, otherwise waits; a not-admin group gets at most one reminder per day in an existing thread; a group invite link sent by an admin is joined only after checking they admin it.",
       "passes": true,
       "evidence": [
-        "internal/api/chat TestOnboarding"
+        "internal/api/chat TestOnboarding",
+        "cmd/antispam TestOnboardingHooks"
       ]
     },
     {
@@ -2937,8 +2938,21 @@
         "F-060"
       ],
       "description": "A blacklisted member is banned silently (admins never acted on, the adder told instead), a blacklisted joiner is kicked, their join requests rejected and messages deleted at P1; in ask-admins groups instance-wide entries become review items.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/wpk TestF126_AddBansListedMemberSilently",
+        "TestF126_NeverActsOnAdmins",
+        "TestF126_JoinsRequestsAndMessages",
+        "TestF126_ScopeAndAskMode",
+        "internal/review/blacklist TestInactiveGroupsAreLeftAlone",
+        "cmd/antispam TestJoinHookBansListedJoiners",
+        "TestBlacklistSinkDeletesListedSenders",
+        "TestBlacklistSinkReturnsErrors",
+        "TestJoinRequestPollRejectsListed",
+        "TestRejoinHookKicksBannedJoiners",
+        "TestListedRejoinersKeepTheLocalBlock",
+        "TestPersonFromPairs"
+      ]
     },
     {
       "id": "F-127",

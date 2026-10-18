@@ -161,6 +161,16 @@ func serve(ctx context.Context, opts options, getenv func(string) string, logOut
 			return 1
 		}
 		wa.moderate, wa.chat = fl.lanes, fl.chat
+		if bl := fl.chat.deps.Blacklist; bl != nil {
+			wa.moderate = blacklistSink{next: fl.lanes, bl: bl}
+		}
+		wa.hooks = &groupHooks{
+			bl: fl.chat.deps.Blacklist, onboard: chatOnboarding{sink: fl.chat},
+			bans: fl.reviews.Queue.Bans, persons: fl.reviews.Queue.Persons, admins: fl.chat.deps.Admins,
+			groups: groupModes{groups: wa.groups, settings: fl.settings},
+			reads:  &intervalBudget{clock: wa.clk, every: blacklistReadInterval},
+			events: make(chan any, hookBacklog), log: logs.For("groups"),
+		}
 	}
 	var roles []role
 	for _, name := range opts.roles {

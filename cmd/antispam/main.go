@@ -16,14 +16,17 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/riverqueue/river"
 	"github.com/rs/zerolog"
 
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/api"
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/app/fastlane"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/config"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/logging"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/store"
@@ -42,6 +45,11 @@ func main() {
 	defer stop()
 	if len(os.Args) > 1 && os.Args[1] == "pair" {
 		code := pairCmd(ctx, os.Args[2:], os.Getenv, os.Stderr)
+		stop()
+		os.Exit(code)
+	}
+	if len(os.Args) > 1 && os.Args[1] == "replay" {
+		code := replayCmd(ctx, os.Args[2:], os.Getenv, os.Stdout, os.Stderr)
 		stop()
 		os.Exit(code)
 	}
@@ -118,7 +126,7 @@ func serve(ctx context.Context, opts options, getenv func(string) string, logOut
 	log := logs.Base()
 	log.Info().Strs("roles", opts.roles).Int("operators", len(cfg.OperatorPhones)).Bool("ai", cfg.AI.Enabled()).Msg("config loaded")
 
-	pool, err := store.Open(ctx, cfg.DatabaseURL)
+	pool, err := store.Open(ctx, withPoolFloor(cfg.DatabaseURL, minPoolConns))
 	if err != nil {
 		log.Error().Err(err).Msg("connect to database")
 		return 1
@@ -137,18 +145,50 @@ func serve(ctx context.Context, opts options, getenv func(string) string, logOut
 	reg := api.NewRegistry()
 	wa, lids := newWAStack(pool, getenv, logs, &connectedBots)
 	wa.pacing = cfg.Pacing
+	metrics, err := fastlane.NewMetrics(reg)
+	if err != nil {
+		log.Error().Err(err).Msg("metrics")
+		return 1
+	}
+	key, ok := checkHashKey(ctx, cfg, pool, log)
+	if !ok {
+		return 1
+	}
+	var fl *fastlaneStack
+	if key != nil && slices.Contains(opts.roles, roleWorkers) {
+		if fl, err = newFastlane(cfg, key, pool, getenv, logs, wa, lids, reg, metrics); err != nil {
+			log.Error().Err(err).Msg("detection fast lane")
+			return 1
+		}
+		wa.moderate, wa.chat = fl.lanes, fl.chat
+	}
 	var roles []role
 	for _, name := range opts.roles {
 		switch name {
 		case roleConnector:
 			roles = append(roles, wa.connectorRole(cfg.DatabaseURL, reg, lids))
 		case roleWorkers:
-			jc, err := jobs.New(pool, jobs.Options{Work: true, Logger: logs.For("jobs"), Register: registerWAJobs(pool, logs.For("inbox"))})
+			registerWA := registerWAJobs(pool, logs.For("inbox"))
+			register := func(w *river.Workers, p *[]*river.PeriodicJob) error {
+				if err := registerWA(w, p); err != nil {
+					return err
+				}
+				if fl != nil {
+					return fl.registerJobs(w, p)
+				}
+				return nil
+			}
+			jobsLog := logs.For("jobs").Hook(fastlane.CallerHook{})
+			jc, err := jobs.New(pool, jobs.Options{Work: true, Logger: jobsLog, Register: register,
+				ErrorHandler: fastlane.JobErrors{Log: jobsLog, Metrics: metrics}})
 			if err != nil {
 				log.Error().Err(err).Msg("job client")
 				return 1
 			}
 			roles = append(roles, workersRole(jc, opts.shutdownTimeout), wa.inboxRole())
+			if fl != nil {
+				roles = append(roles, fl.role())
+			}
 		case roleAPI:
 			h := api.OpsHandler(reg, api.Readiness{
 				PingDB:        pool.Ping,

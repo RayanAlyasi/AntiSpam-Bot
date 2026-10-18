@@ -2073,8 +2073,13 @@
         "F-075"
       ],
       "description": "An inbox message flows through envelope, normalization, T0/T1 analyzers, scoring and routing into detections and enqueued actions in one transaction; end-to-end tests with the fake client show known spam from a max-trust member is deleted and sent to admins, and from a new member deleted and banned under Standard.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "hidden pipeline suite (integration): TestKnownSpamFromNewMemberDeletedAndBanned, TestShadowModeRecordsButNeverActs, TestKnownSpamFromEstablishedMemberDeletedAndReviewed, TestNormalMessageUntouched, TestAskDeleteFirstDeletesAndAsksBan, TestAskBeforeActionOnlyReviews, TestPresetRoutesKnownTextSpamFromNewMember, TestBlacklistedVCardFromNewMemberDeletedAndBanned, TestAdminsAndBotNeverActedOn, TestPausedModeDoesNothing, TestDuplicateDeliveryIsIdempotent",
+        "internal/pipeline: TestEngineRoutes, TestPipelineWritesDetectionBanAndActionsTogether, TestPipelineRollsBackOnFailedCommit, TestPipelineWithoutPersonAsksInsteadOfBanning, TestPipelineRailsCountOncePerMessage; fastlane: TestLiveClientFollowsReconnects; pgstore: TestStoreWritesOneTransaction",
+        "internal/app/fastlane (integration): TestLaneSeesSettingsChangesFromElsewhere, TestConfirmedSpamWithContactsAndOverturnedVariant, TestLaneShadowGroupRecordsAndNeverActs, TestLaneReloadsBlacklistOnNotify, TestLaneMatchesStoredCorpus, TestCorpusLearningConfirmAndOverturn, TestLanesHandleInboxRow; inboxenv: TestDecodeMatchesLiveBuild, TestDecodeChat",
+        "cmd/antispam (integration): TestServeRefusesPairedBotWithoutHashKey, TestChatSinkSwitchesGroupToShadow, and wp-c's serve tests still green"
+      ]
     },
     {
       "id": "F-089",
@@ -2091,8 +2096,12 @@
         "F-088"
       ],
       "description": "A replay command and test helper feed stored inbox rows or fixture events through the full pipeline with the fake client and report verdicts, so rule changes can be compared; CI runs the replay tests.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/replay: TestLoadAndRun, TestLoadRejectsBadRecords, TestRunStopsAtFirstError, TestDiff, TestSimReplaysV01Fixture, FuzzLoad",
+        "cmd/antispam: TestReplayCommandLine, TestReplayFixturesAndCompare, TestParseSince; integration: TestReplayShadowReport, TestReplayInbox",
+        "internal/pipeline/pipelinetest (integration): TestReplayFixtureEndToEnd (Postgres harness agrees with the simulator)"
+      ]
     },
     {
       "id": "F-090",
@@ -2686,8 +2695,12 @@
         "F-088"
       ],
       "description": "After the fingerprint allow-list check, SimHash ≤ 3 bits or MinHash ≥ 0.9 to a confirmed entry is CERTAIN known evidence and looser closeness is a rules signal that only sends the message to the AI.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "hidden neardup suite: TestDefaultThresholdsMatchDesign, TestThresholdsValidateRejectsUnsafe, TestMatchThresholdBoundaries, TestMatchPrefersCertainEntry, TestAllowListCheckedFirst, TestRemoveRetractsEntry, TestEmptyFingerprintNeverMatches, TestComputeOnRealText, TestIndexConcurrentUse",
+        "hidden pipeline suite (integration): TestObfuscatedConfirmedSpamIsCertainKnown, TestTrivialEditOfConfirmedTemplateIsCertainKnown, TestLooseNearDuplicateGoesToAdminsMessageStays, TestOverturnedFingerprintNeverMatches",
+        "internal/detect/neardup: TestShortEntriesOnlyMatchLoosely, TestComputeSeparatesEditsFromRewrites, TestFingerprintTextSeesThroughObfuscation, TestMatchProperties (rapid), FuzzCompute, TestAnalyzer"
+      ]
     },
     {
       "id": "F-118",

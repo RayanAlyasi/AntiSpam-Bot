@@ -191,6 +191,19 @@ func (r *Runner) Wake(bot wa.JID) {
 	}
 }
 
+// WakeAll tells every executor running here that actions were enqueued.
+func (r *Runner) WakeAll() {
+	r.mu.Lock()
+	runs := make([]*running, 0, len(r.execs))
+	for _, run := range r.execs {
+		runs = append(runs, run)
+	}
+	r.mu.Unlock()
+	for _, run := range runs {
+		run.ex.Wake()
+	}
+}
+
 // Trip opens bot's circuit breaker after an account problem (a temporary ban, a logout or a
 // replaced stream; DESIGN.md §10.5). It implements the alert package's Breaker. The breaker
 // stays open until an operator closes it, whatever until says (it is only logged), and it is

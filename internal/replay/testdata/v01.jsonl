@@ -1,0 +1,21 @@
+# Synthetic v0.1 replay fixture: no real message data (DESIGN.md §22.2). One enforced group,
+# one shadow group, an admin-confirmed crypto template, and ordinary chat.
+{"kind":"group","group":"120363000000000001@g.us","admins":[{"lid":"200000000000001@lid"}],"members":[{"lid":"200000000000002@lid"},{"lid":"200000000000003@lid"}],"review_group":"120363000000000009@g.us"}
+{"kind":"group","group":"120363000000000002@g.us","mode":"shadow","members":[{"lid":"200000000000002@lid"}]}
+{"kind":"confirm_spam","group":"120363000000000001@g.us","text":"Congratulations you have been selected for our exclusive crypto investment program earn five hundred dollars every single day from home with no experience needed just message our manager on whatsapp today"}
+{"kind":"confirm_spam","group":"120363000000000002@g.us","text":"Congratulations you have been selected for our exclusive crypto investment program earn five hundred dollars every single day from home with no experience needed just message our manager on whatsapp today"}
+{"kind":"join","group":"120363000000000001@g.us","member":{"lid":"300000000000001@lid","pn":"966500000001@s.whatsapp.net"}}
+{"kind":"join","group":"120363000000000002@g.us","member":{"lid":"300000000000002@lid"}}
+{"kind":"blacklist","group":"120363000000000001@g.us","number":"+966551230077"}
+{"kind":"join","group":"120363000000000001@g.us","member":{"lid":"300000000000003@lid"}}
+{"kind":"advance","duration":"2m"}
+{"id":"S1","group":"120363000000000001@g.us","sender":"300000000000001@lid","text":"Congratulations you have been selected for our exclusive crypto investment program earn five hundred dollars every single day from home with no experience needed just message our manager on whatsapp today","expect":"spam"}
+{"id":"S2","group":"120363000000000001@g.us","sender":"200000000000002@lid","text":"CONGRATULATIONS you have been selected for our exclusive crypto investment program earn six hundred dollars every single day from home with no experience needed just message our manager on whatsapp today","expect":"spam"}
+{"id":"S3","group":"120363000000000001@g.us","sender":"200000000000003@lid","text":"Congratulаtions yоu have been selected for our exclusive crypto investment program earn five hundred dollars every single day from home with no experience needed just message our manager on whatsapp today","expect":"spam"}
+{"id":"S4","group":"120363000000000002@g.us","sender":"300000000000002@lid","text":"Congratulations you have been selected for our exclusive crypto investment program earn five hundred dollars every single day from home with no experience needed just message our manager on whatsapp today","expect":"spam"}
+{"id":"H1","group":"120363000000000001@g.us","sender":"200000000000002@lid","text":"Good morning everyone, the parents meeting moved to Thursday at five","expect":"ham"}
+{"id":"H2","group":"120363000000000001@g.us","sender":"300000000000001@lid","text":"Is the selected crypto investment session from the bank still on today?","expect":"ham"}
+{"id":"H3","group":"120363000000000001@g.us","sender":"200000000000003@lid","text":"صباح الخير، هل الاجتماع ما زال يوم الخميس؟","expect":"ham"}
+{"id":"H4","group":"120363000000000001@g.us","sender":"200000000000001@lid","text":"Reminder from the admins: no selling in this group please","expect":"ham"}
+{"id":"S5","group":"120363000000000001@g.us","sender":"300000000000003@lid","vcards":["BEGIN:VCARD\nVERSION:3.0\nFN:Cheap Deals\nTEL;type=CELL;waid=966551230077:+966 55 123 0077\nEND:VCARD"],"expect":"spam"}
+{"id":"H5","group":"120363000000000001@g.us","sender":"200000000000003@lid","vcards":["BEGIN:VCARD\nVERSION:3.0\nFN:Dentist\nTEL;type=CELL;waid=966551239900:+966 55 123 9900\nEND:VCARD"],"expect":"ham"}

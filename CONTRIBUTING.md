@@ -58,6 +58,24 @@ deployment, update the user-facing docs (README, `docs/`) in the same pull reque
 - **No real message data in the repo.** Fixtures are synthetic, or redacted with consent.
   When you report a new spam pattern, attach redacted examples only.
 
+## Comparing rule changes with replays
+
+`antispam replay` runs recorded or synthetic traffic through the whole pipeline in memory, with
+no WhatsApp and no database, and prints one verdict per message plus a summary:
+
+```bash
+go run ./cmd/antispam replay -fixtures internal/replay/testdata/v01.jsonl
+go run ./cmd/antispam replay -fixtures my.jsonl -weights old.yaml -compare new.yaml
+```
+
+A fixture is JSONL: `group`, `join`, `confirm_spam`, `blacklist` and `advance` records set the
+scene, and every other line is a message (`group`, `sender`, `id`, `text` or `vcards`, and an
+optional `expect` of `spam` or `ham`). With `-compare` it lists every message whose verdict
+changed between the two weight files. Fixtures must be synthetic or redacted. Against a running
+instance, `antispam replay -inbox -since 24h` re-runs the stored inbox (72 h) read-only. In tests,
+`pipelinetest.Harness.Replay` runs the same records against Postgres, the action queue and the
+fake client.
+
 ## Branches, commits and pull requests
 
 - Branch from `staging` as `feat/<short-name>` and open the pull request into `staging`.

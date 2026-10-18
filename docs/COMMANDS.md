@@ -90,11 +90,16 @@ When the bot isn't allowed or isn't sure enough to ban, it opens a review with a
 | `.blacklist list` | Shows this group's entries, masked except the last two digits. |
 | `.blacklist check <number>` | Says whether the number is listed here or instance-wide, and whether it's a member. |
 
-The operator can add instance-wide entries with `--instance`. Listed members are banned silently
-through the paced queue, joiners are removed, join requests are rejected and their messages
-deleted. The bot never acts on group admins; it tells whoever added the number instead. In
-ask-admins groups, instance-wide entries become review items, while the group's own entries
-apply directly.
+The operator can add instance-wide entries with `--instance`. Listed members who are in the group
+when the number is added are banned silently through the paced queue, and a listed number in a
+message (text, contact card, `wa.me` link) counts as known spam. The bot never acts on group
+admins; it tells whoever added the number instead. Nothing happens in groups in shadow or paused
+mode. In ask-admins groups, instance-wide entries become review items, while the group's own
+entries apply directly.
+
+Not in this build yet: removing a listed person automatically when they join later, rejecting
+their join requests, and deleting their own messages. Until then, `.blacklist add` again (or
+`.ban`) removes someone who came back.
 
 ## Getting started by DM
 

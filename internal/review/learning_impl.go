@@ -7,11 +7,7 @@ import (
 )
 
 func (l *Learning) snapshot(ctx context.Context, s Snapshot) error {
-	if s.At.IsZero() {
-		s.At = l.d.Clock.Now()
-	}
-	s.ExpiresAt = s.At.Add(EvidenceRetention)
-	s.Text = redact(s.Text)
+	s = PrepareSnapshot(s, l.d.Clock.Now())
 	if err := l.d.Evidence.Save(ctx, s); err != nil {
 		return fmt.Errorf("save evidence for %s: %w", s.Message.ID, err)
 	}

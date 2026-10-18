@@ -185,12 +185,20 @@ func New(ctx context.Context, d Deps) (*Lane, error) {
 		}, reviews),
 		RuleVersion: d.Weights.Version,
 		Committed:   wake,
+		// Every deletion keeps a redacted evidence snapshot (text and thumbnail, 30 days, F-114),
+		// saved in the detection's transaction.
+		// The 30 days count from the deletion, not from when the message was sent.
+		Evidence: func(e *envelope.Envelope, detID int64, _ time.Time) (review.Snapshot, bool) {
+			return review.SnapshotOf(e, detID, "detection", d.Clock.Now()), true
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("fastlane: pipeline: %w", err)
 	}
-	return &Lane{Rules: holder, Pipeline: pipe, pool: d.Pool, clock: d.Clock, log: d.Log, Reviews: reviews, ownReviews: ownReviews,
-		Executor: exec, Settings: settings, Queue: queue, metrics: d.Metrics, wake: wake}, nil
+	return &Lane{
+		Rules: holder, Pipeline: pipe, pool: d.Pool, clock: d.Clock, log: d.Log, Reviews: reviews, ownReviews: ownReviews,
+		Executor: exec, Settings: settings, Queue: queue, metrics: d.Metrics, wake: wake,
+	}, nil
 }
 
 // Run keeps the rules snapshot current (LISTEN rules_changed; a (re)connect reloads everything)

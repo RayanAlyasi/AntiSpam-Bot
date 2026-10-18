@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/clock"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/review"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/store"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/store/db"
@@ -73,15 +74,25 @@ func (r Reviews) q() *db.Queries { return db.New(r.DB) }
 // Create stores a new review. Evidence text is redacted before it's written.
 func (r Reviews) Create(ctx context.Context, it review.Item) (review.Item, error) {
 	sd := subjectDoc(it.Subject)
-	sd.Name = review.Redact(sd.Name)
+	sd.Name = review.Redact(review.Sanitize(sd.Name))
 	subj, err := json.Marshal(sd)
 	if err != nil {
 		return review.Item{}, fmt.Errorf("encode subject: %w", err)
 	}
 	ev := it.Evidence
+	// Sanitized: a NUL or invalid UTF-8 byte must never make the insert, and with it the
+	// detection's transaction, fail.
+	links := make([]string, len(ev.Links))
+	for i, l := range ev.Links {
+		links[i] = review.Sanitize(l)
+	}
+	why := make([]review.Reason, len(ev.Why))
+	for i, r := range ev.Why {
+		why[i] = review.Reason{Text: review.Sanitize(r.Text), Weight: r.Weight}
+	}
 	evDoc := evidenceDoc{
-		Text: review.Redact(ev.Text), Links: ev.Links, Why: ev.Why, Score: ev.Score, Source: ev.Source,
-		MessageDeleted: ev.MessageDeleted, WhyAsking: ev.WhyAsking,
+		Text: review.Redact(review.Sanitize(ev.Text)), Links: links, Why: why, Score: ev.Score, Source: review.Sanitize(ev.Source),
+		MessageDeleted: ev.MessageDeleted, WhyAsking: review.Sanitize(ev.WhyAsking),
 	}
 	evJSON, err := json.Marshal(evDoc)
 	if err != nil {
@@ -96,7 +107,8 @@ func (r Reviews) Create(ctx context.Context, it review.Item) (review.Item, error
 	if it.Message != nil {
 		p.MessageSender, p.MessageID = text(string(it.Message.Sender)), text(string(it.Message.ID))
 	}
-	p.EvidenceRaw = text(ev.Text)
+	p.EvidenceRaw = text(review.Sanitize(ev.Text))
+	p.GroupName = review.Sanitize(p.GroupName)
 	if ev.Thumbnail != nil && len(ev.Thumbnail.Data) > 0 {
 		p.Thumbnail, p.ThumbnailMime = ev.Thumbnail.Data, text(ev.Thumbnail.Mimetype)
 	}
@@ -306,13 +318,16 @@ func (r Reviews) Due(ctx context.Context, now time.Time) ([]review.Item, error) 
 
 // Evidence is a review.EvidenceStore on Postgres.
 type Evidence struct {
-	DB db.DBTX
+	DB    db.DBTX
+	Clock clock.Clock // stamps snapshots saved without a time; clock.Real when nil
 }
 
 var _ review.EvidenceStore = Evidence{}
 
-// Save stores or replaces a snapshot.
+// Save stores or replaces a snapshot. It redacts the text and sets the 30-day expiry itself
+// (both are idempotent), so no caller can store unredacted evidence (§17).
 func (e Evidence) Save(ctx context.Context, s review.Snapshot) error {
+	s = review.PrepareSnapshot(s, nowOf(e.Clock))
 	p := db.UpsertEvidenceSnapshotParams{
 		GroupJid: string(s.Group), MsgID: string(s.Message.ID), Sender: string(s.Message.Sender), Text: s.Text,
 		DetectionID: pgtype.Int8{Int64: s.DetectionID, Valid: s.DetectionID != 0}, Reason: s.Reason,

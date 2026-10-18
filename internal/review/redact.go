@@ -10,8 +10,10 @@ import (
 const bullet = '•'
 
 // phoneRun matches a run that looks like a phone number: an optional + or 00, then digits
-// (ASCII, Arabic-Indic or Persian) with spaces, dots, dashes or parentheses between them.
-var phoneRun = regexp.MustCompile(`\+?[0-9٠-٩۰-۹][0-9٠-٩۰-۹ \-.()+]{5,}[0-9٠-٩۰-۹]`)
+// (ASCII, Arabic-Indic or Persian) with spaces, dots, dashes or parentheses between them. An
+// international number (starting with +) may also continue on the next line; other digit runs
+// stop at a line break, so prices and dates on separate lines stay readable as evidence.
+var phoneRun = regexp.MustCompile(`\+[0-9٠-٩۰-۹][0-9٠-٩۰-۹ \-.()]*\r?\n[0-9٠-٩۰-۹ \-.()]*[0-9٠-٩۰-۹]|\+?[0-9٠-٩۰-۹][0-9٠-٩۰-۹ \-.()+]{5,}[0-9٠-٩۰-۹]`)
 
 // emailRun matches an email address.
 var emailRun = regexp.MustCompile(`[\p{L}\p{N}._%+\-]+@[\p{L}\p{N}.\-]+\.[\p{L}]{2,}`)

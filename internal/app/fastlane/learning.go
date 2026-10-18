@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/envelope"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/pipeline"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/review"
+	reviewpg "github.com/RayanAlyasi/AntiSpam-Bot/internal/review/pgstore"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/store"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/store/db"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/wa"
@@ -23,52 +23,32 @@ import (
 
 // CorpusLearning is review.Corpus on Postgres (F-113/F-114, DESIGN.md §20 v0.1 "where known spam
 // comes from"): a message an admin confirms as spam becomes a group-scoped, active corpus entry
-// (redacted text, fingerprints, hashed numbers), and an overturn retracts it. The near-duplicate
-// index reloads right after each change, so the next copy is caught at once.
+// (redacted text, fingerprints, hashed numbers), and an overturn retracts it. Storage is wp-k's
+// review/pgstore.Corpus (the one implementation and its corpus_sources message → entry table,
+// pattern confirmations for promotion, exact SimHash and media allow-list fingerprints); this
+// adds the near-duplicate allow-list entry and reloads the index right after each change, so
+// the next copy is caught, or let through, at once.
 type CorpusLearning struct {
-	Pool   *pgxpool.Pool
-	Clock  clock.Clock
-	Hasher blacklist.Hasher
-	Key    []byte  // the deployment's number-hash key
-	Index  *Corpus // reloaded after a change; nil: it picks the change up on its next refresh
-	Log    zerolog.Logger
+	Pool    *pgxpool.Pool
+	Clock   clock.Clock
+	Hasher  blacklist.Hasher
+	Key     []byte             // the deployment's number-hash key
+	Index   *Corpus            // reloaded after a change; nil: it picks the change up on its next refresh
+	Persons reviewpg.PersonMap // records the deciding admin on entries; nil: not recorded
+	Log     zerolog.Logger
 }
 
 var _ review.Corpus = (*CorpusLearning)(nil)
 
+func (c *CorpusLearning) store() reviewpg.Corpus {
+	return reviewpg.Corpus{Pool: c.Pool, HashKey: c.Key, Persons: c.Persons, Clock: c.Clock}
+}
+
 // Confirm implements review.Corpus.
 func (c *CorpusLearning) Confirm(ctx context.Context, conf review.Confirmation) (int64, error) {
-	e := &envelope.Envelope{Group: conf.Group, MsgID: conf.Message.ID, Sender: envelope.Identity{LID: conf.Message.Sender}}
-	if conf.Text != "" {
-		e.Texts = []envelope.TextSurface{{Source: "body", Raw: conf.Text}}
-	}
-	pipeline.NormalizeTexts(e)
-	src := corpus.SourceReview
-	if conf.Source == "command" {
-		src = corpus.SourceCommand
-	}
-	at := conf.At
-	if at.IsZero() {
-		at = c.Clock.Now()
-	}
-	ent := corpus.FromMessage(e, corpus.Options{
-		Scope: corpus.ScopeGroup, GroupJID: string(conf.Group), Status: corpus.StatusActive, Source: src,
-		Hasher: c.Hasher, HashKey: c.Key, Confidence: 1, Now: at,
-	})
-	if conf.ReviewID != 0 {
-		id := conf.ReviewID
-		ent.SourceReviewID = &id
-	}
-	var id int64
-	err := store.InTx(ctx, c.Pool, func(tx pgx.Tx) error {
-		var err error
-		if id, err = store.InsertCorpusEntry(ctx, tx, ent); err != nil {
-			return err
-		}
-		return db.New(tx).PutCorpusMessage(ctx, db.PutCorpusMessageParams{GroupJid: string(conf.Group), MsgID: string(conf.Message.ID), EntryID: id})
-	})
+	id, err := c.store().Confirm(ctx, conf)
 	if err != nil {
-		return 0, fmt.Errorf("confirm spam %s/%s: %w", conf.Group, conf.Message.ID, err)
+		return 0, err
 	}
 	c.reload(ctx)
 	return id, nil
@@ -76,34 +56,29 @@ func (c *CorpusLearning) Confirm(ctx context.Context, conf review.Confirmation) 
 
 // EntryFor implements review.Corpus.
 func (c *CorpusLearning) EntryFor(ctx context.Context, group wa.JID, msg wa.MessageID) (int64, bool, error) {
-	id, err := db.New(c.Pool).GetCorpusMessage(ctx, db.GetCorpusMessageParams{GroupJid: string(group), MsgID: string(msg)})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return 0, false, nil
-	}
-	if err != nil {
-		return 0, false, fmt.Errorf("corpus entry for %s/%s: %w", group, msg, err)
-	}
-	return id, true, nil
+	return c.store().EntryFor(ctx, group, msg)
 }
 
 // Retract implements review.Corpus: the entry stops matching at once.
 func (c *CorpusLearning) Retract(ctx context.Context, entryID int64) error {
-	if _, err := store.RetractCorpusEntry(ctx, c.Pool, entryID); err != nil {
-		return fmt.Errorf("retract corpus entry %d: %w", entryID, err)
+	if err := c.store().Retract(ctx, entryID); err != nil {
+		return err
 	}
 	c.reload(ctx)
 	return nil
 }
 
-// AllowFingerprint implements review.Corpus: the overturned message's fingerprint, never its text,
-// joins the group's allow-list, so neither it nor a near-copy matches again, whatever entry it
-// would have matched (DESIGN.md §7.5 "Overturns remove what was learned").
+// AllowFingerprint implements review.Corpus: the overturned message's fingerprints, never its
+// text, join the group's allow-lists, so neither it nor a near-copy matches again, whatever entry
+// it would have matched (DESIGN.md §7.5 "Overturns remove what was learned"): the exact SimHash
+// and media hashes (rules fingerprints) and the near-duplicate fingerprint (corpus_allow).
 func (c *CorpusLearning) AllowFingerprint(ctx context.Context, f review.FingerprintAllow) error {
+	exactErr := c.store().AllowFingerprint(ctx, f)
 	var text string
 	if f.EntryID != 0 {
 		e, err := store.GetCorpusEntry(ctx, c.Pool, f.EntryID)
 		if err != nil {
-			return fmt.Errorf("allow fingerprint of entry %d: %w", f.EntryID, err)
+			return errors.Join(exactErr, fmt.Errorf("allow fingerprint of entry %d: %w", f.EntryID, err))
 		}
 		text = e.TextNorm
 	}
@@ -114,15 +89,16 @@ func (c *CorpusLearning) AllowFingerprint(ctx context.Context, f review.Fingerpr
 	}
 	fp := neardup.Compute(neardup.Key(text))
 	if fp.Empty() {
-		return nil
+		c.reload(ctx)
+		return exactErr
 	}
 	if err := db.New(c.Pool).InsertCorpusAllow(ctx, db.InsertCorpusAllowParams{
 		GroupJid: string(f.Group), Simhash: int64(fp.SimHash), Minhash: fp.MinHashBytes(), Tokens: int32(fp.Tokens),
 	}); err != nil {
-		return fmt.Errorf("allow fingerprint in %s: %w", f.Group, err)
+		return errors.Join(exactErr, fmt.Errorf("allow fingerprint in %s: %w", f.Group, err))
 	}
 	c.reload(ctx)
-	return nil
+	return exactErr
 }
 
 // CorpusText returns the whole text of a message the way corpus.FromMessage stores an entry's:

@@ -35,8 +35,9 @@ blacklist and the confirmed-spam corpus match messages is in
 **Status:** v0.1, the first release, is being built. It runs end to end: the bot receives
 messages, detects known spam (confirmed copies, word and phrase rules, blocklisted links and
 numbers, blacklisted numbers in contact cards), and deletes, bans or asks the admins. Until
-`v0.1.0` is tagged, run it only in shadow mode. Not in this build yet: the `.blacklist` commands
-(numbers added to the blacklist table still match), the website, and learning beyond
+`v0.1.0` is tagged, run it only in shadow mode. Not in this build yet: removing blacklisted
+people automatically when they join, ask to join or post (members on the list when it's added
+are banned, and their numbers in messages are caught), the website, and learning beyond
 admin-confirmed spam.
 
 ## Requirements
@@ -159,7 +160,7 @@ protected group, where the command message is deleted and the reply comes by DM.
 |---|---|
 | reply `.spam` to a message | delete it, ban the sender and remember it as confirmed spam |
 | reply `.notspam` | undo a mistake: restore the member's trust and forget the pattern |
-| `.blacklist add <number>` | ban that number here and treat it as spam wherever it appears (not in this build yet) |
+| `.blacklist add <number>` | ban that number if they're in the group now, and treat the number as spam wherever it appears |
 | `.mode shadow\|enforce\|pause` | switch mode |
 | `.preset relaxed\|standard\|strict\|ask` | switch preset |
 | `.status` | preset, mode, review destination and today's counts |

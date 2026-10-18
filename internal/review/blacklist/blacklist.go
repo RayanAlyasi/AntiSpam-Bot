@@ -85,7 +85,10 @@ type Groups interface {
 
 // GroupSettings is the part of a group's settings the blacklist needs.
 type GroupSettings struct {
-	UseInstance    bool // blacklist.use_instance (default true)
+	UseInstance bool // blacklist.use_instance (default true)
+	// Inactive is set for groups in shadow or paused mode: the blacklist acts on nothing there
+	// (no bans, kicks, rejections, deletions or reviews), like the rest of moderation (§8.4).
+	Inactive       bool
 	Mode           review.EnforcementMode
 	DefaultCountry string // ISO region for local numbers, e.g. "SA"
 }

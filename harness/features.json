@@ -2628,8 +2628,18 @@
         "F-113"
       ],
       "description": "Every deletion keeps a redacted evidence snapshot (text + thumbnail) for 30 days, and spam an admin confirms (.spam, review ✅) is stored as a corpus entry so exact and near-duplicate matching can catch it next time.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "internal/app/fastlane TestDeletionKeepsEvidence (integration: a fast-lane deletion saves a redacted snapshot in the detection's transaction; shadow mode saves none)",
+        "internal/review TestSnapshotOf",
+        "TestSnapshotEdges",
+        "TestSnapshotRedactsAndExpires",
+        "TestConfirmSpamCapturesCorpusEntry",
+        "internal/review/pgstore TestEvidenceThreadsAudit",
+        "TestCorpusConfirmAndOverturn",
+        "TestOverturnOfMediaSpamAllowListsItsHash (integration)",
+        "internal/app/fastlane TestCorpusLearningConfirmAndOverturn (integration)"
+      ]
     },
     {
       "id": "F-115",
@@ -2927,13 +2937,8 @@
         "F-060"
       ],
       "description": "A blacklisted member is banned silently (admins never acted on, the adder told instead), a blacklisted joiner is kicked, their join requests rejected and messages deleted at P1; in ask-admins groups instance-wide entries become review items.",
-      "passes": true,
-      "evidence": [
-        "acceptance/wpk TestF126_AddBansListedMemberSilently",
-        "TestF126_NeverActsOnAdmins",
-        "TestF126_JoinsRequestsAndMessages",
-        "TestF126_ScopeAndAskMode"
-      ]
+      "passes": false,
+      "evidence": []
     },
     {
       "id": "F-127",

@@ -1607,8 +1607,13 @@
         "F-017"
       ],
       "description": "A 429, unusual errors, slow acks or a disconnect after writes cut the rate to a quarter (min 2/min); it recovers +1/min per 15 calm minutes and never above the ceiling; a manual ceiling raise is audited; a 7,500 writes/day alert fires.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestSlowDownOnWarningSigns, TestRecoveryIsSlowAndCapped, TestSetCeiling, TestDailyWritesAlert, TestPGSetCeilingPersistsAndIsAudited (integration)",
+        "internal/actions: TestSlowDownOnlyAndRecovery, TestCeilingRaiseIsAuditedAndSlow, TestDailyWritesAlert, TestRunnerTripAndDisconnect, TestOneOutageIsOneWarning",
+        "cmd/antispam: TestActionsAlerterMapsKinds",
+        "judge review: .agent/logs/judge-F-064.md"
+      ]
     },
     {
       "id": "F-070",
@@ -1705,8 +1710,13 @@
         "F-017"
       ],
       "description": "A temporary ban, logout or repeated 429s open the breaker so only P0 lockdowns run (configurable), the operator is alerted, detections continue for later cleanup, and a global pause stops all actions.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/actions: TestBreakerOpens, TestKillSwitch, TestPGKillSwitchAcrossStores (integration)",
+        "internal/actions: TestBreakerAndKillSwitch, TestRepeatedWarningsOpenBreaker, TestRunnerTripAndDisconnect, TestRunnerFollowsConnectedBots, TestRunnerOneExecutorPerBotAcrossRunners, TestRunnerTakesOverWhenTheOwnerStops, TestDocumentedBreakerCloseSQL (integration)",
+        "cmd/antispam: TestAccountProblemOpensTheBreaker, TestMarkNotAdminStopsModeration",
+        "judge review: .agent/logs/judge-F-064.md"
+      ]
     },
     {
       "id": "F-075",

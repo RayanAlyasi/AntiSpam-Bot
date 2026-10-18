@@ -121,15 +121,13 @@ func newFastlane(cfg config.Config, key []byte, pool *pgxpool.Pool, getenv func(
 		BotFor:  func(ctx context.Context, chat wa.JID) (wa.JID, error) { return botFor(ctx, ws, lids, chat) },
 		Persons: identityPersons{ws.ids}, Admins: identityAdmins{ws.ids}, Learner: learning,
 		Protected: protected,
-		Wake: func() {
-			if lanes != nil {
-				lanes.WakeAll()
-			}
-		},
+		Wake:      ws.wakeActions,
 	})
 	if err != nil {
 		return nil, err
 	}
+	hook := reviews.Queue.OnFinished
+	ws.finished.Store(&hook)
 	lanes = fastlane.NewLanes(fastlane.Deps{
 		Pool: pool, Clock: clk, HashKey: key, Log: log, AI: verifier, Corpus: corpus.Indexes, Reviews: reviews, Protected: protected,
 		Settings: settings,
@@ -145,6 +143,9 @@ func newFastlane(cfg config.Config, key []byte, pool *pgxpool.Pool, getenv func(
 			return ws.groups.UpsertGroup(ctx, g)
 		}},
 		Members: fastlane.IdentityMembers{IDs: ws.ids}, Admins: identityAdmins{ws.ids},
+		// The connector role's actions.Runner runs one executor per connected bot (WP-H).
+		ExternalExecutor: true,
+		Wake:             ws.wakeActions,
 	}, func(bot wa.JID) (wa.WAClient, bool) {
 		m := lids.m.Load() // the connector role's manager, when this process runs it
 		if m == nil {

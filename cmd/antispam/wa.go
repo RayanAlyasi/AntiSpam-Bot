@@ -19,8 +19,10 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/rs/zerolog"
 
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/actions"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/alert"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/clock"
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/config"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/identity"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/inbox"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/logging"
@@ -101,8 +103,11 @@ type waStack struct {
 	groups    identity.GroupStore
 	manager   *connector.Manager // nil without the connector role
 	connected *atomic.Int64
-	moderate  inbox.Sink // the detection fast lane (F-088); nil: moderated rows are only marked processed
-	chat      inbox.Sink // commands, DMs and review votes (wp-k's chat handler); nil: not handled
+	pacing    config.Pacing                                               // the action executors' pacing (config.yaml "pacing")
+	moderate  inbox.Sink                                                  // the detection fast lane (F-088); nil: moderated rows are only marked processed
+	chat      inbox.Sink                                                  // commands, DMs and review votes (wp-k's chat handler); nil: not handled
+	runner    atomic.Pointer[actions.Runner]                              // the action executors, while the connector role runs
+	finished  atomic.Pointer[func(context.Context, actions.Action) error] // the review queue's completion hook
 }
 
 // lidSwitch lets the identity service use the connector's LID resolver once it exists, and
@@ -146,7 +151,22 @@ func (s *waStack) connectorRole(databaseURL string, reg prometheus.Registerer, l
 			return err
 		}
 		defer func() { _ = sqlDB.Close() }()
-		health, err := alert.NewHealth(s.notifier, nil, reg, s.clk)
+		// The action runner keeps one executor per connected bot (DESIGN.md §10.1); account
+		// problems trip its breaker and disconnects slow it down.
+		var mgrRef atomic.Pointer[connector.Manager]
+		runner, err := actions.NewRunner(actions.ConfigFromPacing(s.pacing), actions.RunnerDeps{
+			Connector:  managerConnector{&mgrRef},
+			Store:      actions.NewPGStore(s.pool, s.clk),
+			Groups:     actions.PGGroups{DB: s.pool, OnNotAdmin: markNotAdmin(s.groups), Log: s.logs.For("actions")},
+			Alerts:     actionsAlerter{s.notifier},
+			OnFinished: s.actionFinished,
+			Clock:      s.clk,
+			Log:        s.logs.For("actions"),
+		})
+		if err != nil {
+			return err
+		}
+		health, err := alert.NewHealth(s.notifier, runner, reg, s.clk)
 		if err != nil {
 			return err
 		}
@@ -170,7 +190,7 @@ func (s *waStack) connectorRole(databaseURL string, reg prometheus.Registerer, l
 			case *wa.ConnectionEvent, *wa.AccountEvent:
 				err := health.HandleEvent(ctx, evt)
 				s.connected.Store(int64(health.ConnectedBots()))
-				return err
+				return errors.Join(err, runner.HandleEvent(ctx, evt))
 			}
 			return nil // profile changes: the profile cache comes with enrichment
 		})
@@ -182,10 +202,14 @@ func (s *waStack) connectorRole(databaseURL string, reg prometheus.Registerer, l
 		s.manager = mgr
 		lids.m.Store(mgr)
 		defer lids.m.Store(nil)
+		mgrRef.Store(mgr)
+		s.runner.Store(runner)
+		defer s.runner.Store(nil)
 
 		var wg sync.WaitGroup
 		wg.Go(func() { _ = s.notifier.Run(ctx) })
 		wg.Go(func() { _ = health.Run(ctx) })
+		wg.Go(func() { _ = runner.Run(ctx) })
 		wg.Go(func() { s.syncGroups(ctx, mgr, tracker, log) })
 		err = mgr.Run(ctx)
 		wg.Wait()
@@ -338,3 +362,20 @@ func (p pairLease) Release(ctx context.Context, bot wa.JID, owner string) error 
 
 // errPairUsage is returned for a bad `antispam pair` command line.
 var errPairUsage = errors.New("usage: antispam pair [-phone +<international number>]")
+
+// wakeActions nudges the action executors after an enqueue commits; without the connector role
+// in this process they still pick the rows up within a poll interval.
+func (s *waStack) wakeActions() {
+	if r := s.runner.Load(); r != nil {
+		r.WakeAll()
+	}
+}
+
+// actionFinished passes a finished action to the review queue (when the fast lane runs in this
+// process), so a sent review post is linked to its review at once instead of at the next sweep.
+func (s *waStack) actionFinished(ctx context.Context, a actions.Action) error {
+	if f := s.finished.Load(); f != nil {
+		return (*f)(ctx, a)
+	}
+	return nil
+}

@@ -34,6 +34,12 @@ type Deps struct {
 	Groups Groups      // required: silent mode and admin state
 	Alerts Alerter     // operator alerts; logged only when nil
 	Log    zerolog.Logger
+	// OnFinished, when set, is told about every action the executor finishes (done, failed,
+	// refused or expired, including the ones failed because the bot lost admin), with its final
+	// status and Result (e.g. the sent message's ID). Actions cancelled through Store.Cancel aren't
+	// reported. It runs on the executor's goroutine between writes with a CallTimeout deadline,
+	// so it must be quick; its error is only logged.
+	OnFinished func(ctx context.Context, a Action) error
 }
 
 // State is a snapshot of an executor's pacing and control state.
@@ -219,6 +225,13 @@ func (e *Executor) recoverRunning(ctx context.Context) error {
 	return nil
 }
 
+// holdsLock reports whether Run took the bot's lock and still has it.
+func (e *Executor) holdsLock() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.locked && !e.lockLost
+}
+
 func (e *Executor) ownsLock() bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -398,6 +411,7 @@ func (e *Executor) poll(ctx context.Context) error {
 	for _, a := range expired {
 		e.log.Info().Int64("action", a.ID).Str("kind", string(a.Kind)).Stringer("priority", a.Priority).
 			Time("deadline", a.Deadline).Msg("action expired before it could run")
+		e.finished(context.WithoutCancel(ctx), a)
 	}
 	cands, err := e.d.Store.Candidates(ctx, e.d.Bot, e.cfg.Window)
 	if err != nil {

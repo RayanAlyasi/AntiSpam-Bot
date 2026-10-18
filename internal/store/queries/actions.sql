@@ -98,3 +98,8 @@ FROM app.group_settings WHERE group_jid = @group_jid;
 SELECT EXISTS (
     SELECT 1 FROM app.group_settings WHERE doc->'review'->>'review_group' = @chat::text
 )::boolean AS review_group;
+
+-- name: FailPendingActionsReturning :many
+UPDATE app.actions SET status = 'failed', last_error = @reason, updated_at = @now
+WHERE bot = @bot AND chat = @chat AND status = 'pending' AND kind = ANY(@kinds::text[])
+RETURNING *;

@@ -144,6 +144,7 @@ func serve(ctx context.Context, opts options, getenv func(string) string, logOut
 	var connectedBots atomic.Int64
 	reg := api.NewRegistry()
 	wa, lids := newWAStack(pool, getenv, logs, &connectedBots)
+	wa.pacing = cfg.Pacing
 	metrics, err := fastlane.NewMetrics(reg)
 	if err != nil {
 		log.Error().Err(err).Msg("metrics")

@@ -286,17 +286,24 @@ func (s *MemStore) ExpireDue(_ context.Context, bot wa.JID, now time.Time) ([]Ac
 }
 
 // FailPending implements Store.
-func (s *MemStore) FailPending(_ context.Context, bot, chat wa.JID, kinds []Kind, reason string) (int, error) {
+func (s *MemStore) FailPending(ctx context.Context, bot, chat wa.JID, kinds []Kind, reason string) (int, error) {
+	failed, err := s.FailChat(ctx, bot, chat, kinds, reason)
+	return len(failed), err
+}
+
+// FailChat implements Store.
+func (s *MemStore) FailChat(_ context.Context, bot, chat wa.JID, kinds []Kind, reason string) ([]Action, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	n := 0
+	var out []Action
 	for _, a := range s.actions {
 		if a.Bot == bot && a.Chat == chat && a.Status == StatusPending && slices.Contains(kinds, a.Kind) {
 			s.finish(a, StatusFailed, reason)
-			n++
+			out = append(out, clone(*a))
 		}
 	}
-	return n, nil
+	slices.SortFunc(out, func(a, b Action) int { return cmp.Compare(a.ID, b.ID) })
+	return out, nil
 }
 
 // WritesSince implements Store.

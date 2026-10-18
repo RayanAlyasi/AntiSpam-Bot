@@ -162,9 +162,10 @@ protected group, where the command message is deleted and the reply comes by DM.
 | `.mode shadow\|enforce\|pause` | switch mode |
 | `.preset relaxed\|standard\|strict\|ask` | switch preset |
 | `.status` | preset, mode, review destination and today's counts |
-| `.help` | short help |
+| `.pending` | uncertain cases waiting for a decision; decide one with `.review <code> ban` or `ok` |
+| `.help` | the command menu; `.help moderation`, `.help reviews`, `.help settings` and `.help blacklist` explain each part |
 
-The full list is in [DESIGN.md §13.7](docs/DESIGN.md#137-in-chat-commands-admins-only).
+The full list is in [docs/COMMANDS.md](docs/COMMANDS.md).
 
 ## Configuration
 

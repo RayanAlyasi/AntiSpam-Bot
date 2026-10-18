@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/review"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/wa"
 )
 
@@ -94,6 +95,15 @@ func (h *Handler) dispatch(ctx context.Context, c *call) error {
 
 func (h *Handler) operator(p wa.JID) bool { return h.d.Operator != nil && h.d.Operator(p) }
 
+// withSite returns the _web variant of a text key when a website URL is configured. Without one
+// (v0.1), the plain key's text never mentions a website or a link.
+func (h *Handler) withSite(key string) string {
+	if h.d.WebsiteURL != "" {
+		return key + "_web"
+	}
+	return key
+}
+
 func (h *Handler) pickGroup(ctx context.Context, c *call) error {
 	groups, err := h.d.Groups.AdminGroups(ctx, c.person)
 	if err != nil {
@@ -121,10 +131,6 @@ func (h *Handler) groupName(ctx context.Context, g wa.JID) string {
 // unavailable answers a command whose collaborator isn't wired.
 func (h *Handler) unavailable(ctx context.Context, c *call) error {
 	return h.reply(ctx, c, "cmd.unavailable", map[string]string{"cmd": c.cmd.Name})
-}
-
-func (h *Handler) cmdHelp(ctx context.Context, c *call) error {
-	return h.reply(ctx, c, "cmd.help", map[string]string{"prefix": h.d.Prefix})
 }
 
 func (h *Handler) cmdGroups(ctx context.Context, c *call) error {
@@ -161,7 +167,8 @@ func (h *Handler) cmdUse(ctx context.Context, c *call) error {
 
 func (h *Handler) cmdLogin(ctx context.Context, c *call) error {
 	if h.d.WebsiteURL == "" {
-		return h.unavailable(ctx, c)
+		// v0.1 has no website: say so plainly instead of sending an empty link.
+		return h.reply(ctx, c, "cmd.login_no_site", map[string]string{"prefix": h.d.Prefix})
 	}
 	if c.where == inReviewGroup {
 		// A login link is personal: never in a group.
@@ -239,6 +246,10 @@ func (h *Handler) summary(ctx context.Context, c *call) string {
 	var lines []string
 	for _, k := range summaryKeys {
 		if v, err := h.d.Settings.Get(ctx, c.group, k); err == nil {
+			if k == "review.destination" && v == string(review.DestinationDashboard) && h.d.WebsiteURL == "" {
+				// No website yet (v0.1): say where the cases really wait.
+				v = h.t(c, "cmd.destination_pending", nil)
+			}
 			lines = append(lines, k+": "+v)
 		}
 	}
@@ -249,7 +260,7 @@ func (h *Handler) cmdSettings(ctx context.Context, c *call) error {
 	if h.d.Settings == nil {
 		return h.unavailable(ctx, c)
 	}
-	return h.reply(ctx, c, "cmd.settings", map[string]string{
+	return h.reply(ctx, c, h.withSite("cmd.settings"), map[string]string{
 		"group": h.groupName(ctx, c.group), "summary": h.summary(ctx, c), "url": h.d.WebsiteURL,
 	})
 }

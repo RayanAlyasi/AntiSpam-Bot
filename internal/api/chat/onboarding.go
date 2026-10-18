@@ -157,10 +157,11 @@ func listOrDash(xs []string) string {
 
 // start answers a START DM with the three setup steps (§13.6 step 1).
 func (h *Handler) start(ctx context.Context, m Message) error {
-	text := h.d.Texts.T(h.d.Language, "onboard.start", map[string]string{"url": h.d.WebsiteURL, "prefix": h.d.Prefix})
+	lang := h.d.Language
 	if isArabic(m.Text) {
-		text = h.d.Texts.T("ar", "onboard.start", map[string]string{"url": h.d.WebsiteURL, "prefix": h.d.Prefix})
+		lang = "ar"
 	}
+	text := h.d.Texts.T(lang, h.withSite("onboard.start"), map[string]string{"url": h.d.WebsiteURL, "prefix": h.d.Prefix})
 	return h.d.Actions.Enqueue(ctx, review.Send{Chat: m.Chat, Message: wa.OutgoingMessage{Text: text}, Purpose: "onboarding"})
 }
 
@@ -242,7 +243,7 @@ func (h *Handler) OnPromoted(ctx context.Context, group, by wa.JID) error {
 	if by == "" {
 		return nil
 	}
-	return h.Notify(ctx, by, group, "onboard.promoted", map[string]string{"prefix": h.d.Prefix})
+	return h.Notify(ctx, by, group, h.withSite("onboard.promoted"), map[string]string{"prefix": h.d.Prefix, "url": h.d.WebsiteURL})
 }
 
 // OnNotAdmin handles the bot being in a group without admin rights (§13.6 step 4): at most one

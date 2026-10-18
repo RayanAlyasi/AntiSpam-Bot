@@ -21,6 +21,19 @@ The prefix is `.`. Arabic aliases work too, and the reply is then in Arabic: `.�
 `.مراجعة` (review), `.معلق` (pending), `.القائمة_السوداء` (blacklist), `.استخدم` (use),
 `.مجموعات` (groups), `.اعدادات` (settings).
 
+## Help
+
+`.help` (`.مساعدة`) sends a short menu grouped under Moderation, Reviews, Settings and Blacklist,
+one command per line. `.help moderation`, `.help reviews`, `.help settings` and `.help blacklist`
+(in Arabic `.مساعدة الإشراف`, `المراجعات`, `الإعدادات`, `القائمة_السوداء`) send a page with
+examples for that part. v0.1 has no website, so `.login` says so, and no reply mentions a
+website or a link.
+
+Replies use WhatsApp formatting: `*bold*` headings and labels, line breaks and numbered steps.
+All bot texts are in `internal/review/catalog.go` and `internal/review/catalog_cmd.go`, in
+English and Arabic. Texts that link the website have a `_web` variant, sent only when the chat
+handler is given a website URL (`chat.Deps.WebsiteURL`), which v0.1 doesn't do.
+
 ## Moderation
 
 | Command | Effect |
@@ -61,12 +74,15 @@ Every change is written to the audit log.
 When the bot isn't allowed or isn't sure enough to ban, it opens a review with a short code such as
 `#K7Q2`.
 
-- **Where they go.** By default reviews go to the website only. Send `.reviewgroup here` in a
-  separate admins' group (never the protected group itself) to receive them there. Add the
-  group's name when you admin several groups. The bot warns when that group contains people who
-  aren't admins of the protected group, because they'd see the evidence. `.reviewgroup off`
-  returns to the website. `.review group|dashboard` switches between them. Reviews by DM come
-  in a later release.
+- **Where they go.** By default the bot posts reviews nowhere: they wait until an admin sends
+  `.pending` (in a DM, after `.use <group>` if you admin several groups, or in the review group)
+  and decides with `.review <code> ban|ok|delete only`. The website that will also show them
+  isn't in v0.1. Send `.reviewgroup here` in a separate admins' group (never the protected group
+  itself) to receive each review there as it comes in. Add the group's name when you admin
+  several groups. The bot warns when that group contains people who aren't admins of the
+  protected group, because they'd see the evidence. `.reviewgroup off` stops posting there.
+  `.review group|dashboard` switches between posting to the review group and waiting for
+  `.pending`; without a website the bot says so. Reviews by DM come in a later release.
 - **Deciding.** React ✅ or 👍 to ban, ❌ or 👎 for not spam. Or reply `ban`, `kick`, `طرد` or
   `حظر` (all mean ban), `ok`, `not spam` or `ليس سبام`, `delete only`, or `clear` for a hacked
   account. `.review K7Q2 ban` and `.pending` work in a DM or the review group. Only current

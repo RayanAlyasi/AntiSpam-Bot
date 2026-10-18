@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -74,7 +73,7 @@ type infoJSON struct {
 func DecodeInfo(raw json.RawMessage) (wa.MessageInfo, error) {
 	var j infoJSON
 	if err := json.Unmarshal(raw, &j); err != nil {
-		return wa.MessageInfo{}, fmt.Errorf("%w: decode message info: %v", ErrPermanent, err)
+		return wa.MessageInfo{}, fmt.Errorf("%w: decode message info: %w", ErrPermanent, err)
 	}
 	jid := func(s string) wa.JID {
 		if s == "" {

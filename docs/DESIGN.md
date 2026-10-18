@@ -2243,6 +2243,7 @@ The moving **`0.1` tag is the stable channel.** The docs tell deployers to pin *
 ### 23.9 Supply chain
 
 - **Actions are pinned by commit SHA**, not by tag (the repository requires it).
+- **CI scans** every change for known vulnerabilities in reachable code (govulncheck) and for committed secrets (gitleaks); see §23.14.
 - **Dependabot** covers `gomod`, `github-actions`, `docker` and the compose file, with updates **grouped** to limit PR noise. It doesn't bump whatsmeow's pseudo-version, so that's left to the weekly workflow.
 - **`SECURITY.md`:** private vulnerability reporting through GitHub, the supported versions (the latest minor), and the response expectations.
 
@@ -2361,6 +2362,27 @@ This avoids an extra paid agent run on every merge, and the repository secrets a
 - Whether a ruleset-blocked `createRef` really returns **422** (the case the "tag exists" check guards against).
 - What **`require_extra_approval_for_unattributed_changes`** on the branch ruleset means for App-authored and back-merge PRs.
 - release-please on **`release/*`** (target branch) for hotfixes, and its **prerelease versioning** (`-rc.N`) for tagged release candidates.
+
+### 23.14 Continuous integration
+
+`ci.yml` runs on every PR and on pushes to `main` and `staging`, as parallel jobs, each with a timeout:
+
+| Job | Runs | Checks |
+|---|---|---|
+| `static checks` | always | `go mod tidy -diff` (root and `tools/`), `go build`, `go vet`, sqlc drift, the tamper audit |
+| `lint` | always | `golangci-lint run ./...` with `.golangci.yml`: the standard linters plus errorlint, bodyclose, misspell, unconvert, nilerr, copyloopvar, rowserrcheck, sqlclosecheck and gosec; gofumpt and goimports; and **depguard** for the architecture rules (only `internal/wa/adapter` imports whatsmeow; detect, scoring and policy don't import pgx or River) |
+| `security` | always | `govulncheck ./...`; **gitleaks** over the commits the PR or push adds, with `.gitleaks.toml` allowing only synthetic test values by path and value |
+| `unit tests (amd64)`, `make check (ubuntu-24.04-arm)` | always | `go test -race -shuffle=on ./...` |
+| `integration tests` | always | the `integration`-tagged packages against Postgres (testcontainers), amd64 |
+| `integration tests (arm64)` | pushes only | the same on arm64; the edge image waits for it |
+| `workflow lint` | always | actionlint, with shellcheck for the `run:` scripts |
+| `multi-arch image` | always | builds linux/amd64 and linux/arm64 without pushing |
+| `make check (ubuntu-24.04)` | always | passes only if every amd64 job above passed |
+
+- **Required checks** on the branch rules: `make check (ubuntu-24.04)`, `make check (ubuntu-24.04-arm)` and `multi-arch image`. Adding a job means adding it to the gate's `needs`, not to the rules.
+- The **edge image** (§23.4) is published only after every job, including the arm64 integration tests, passed on a push to `staging`.
+- **Tools** are pinned (golangci-lint, gitleaks and actionlint in `ci.yml`; sqlc and govulncheck in `tools/go.mod`) and installed with the Go toolchain, so `ci.yml` uses no third-party action beyond checkout, setup-go and the Docker actions.
+- **Hardening:** `permissions: {}` at the top of every workflow and least privilege per job; `persist-credentials: false` on every checkout that doesn't push; no `${{ }}` expressions inside `run:` (values go through `env:`); a `timeout-minutes` on every job.
 
 ---
 

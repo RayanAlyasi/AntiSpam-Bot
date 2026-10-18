@@ -182,8 +182,10 @@ func Decide(s Settings, f Finding, st Standing) Decision {
 			// A possibly hacked admin is never acted on: the other admins get an alert
 			// (DESIGN.md §8.7). compromised.admins: delete_known_spam isn't honoured yet; the
 			// exemption of admins wins (see harness/deviations/F-059.md).
-			return Decision{Verdict: verdict, Route: RouteNone, Reason: "possibly hacked admin: alert the other admins only",
-				Review: &ReviewRequest{Kind: ReviewAlert, Timeout: time.Duration(s.Review.Timeout), OnTimeout: TimeoutDismiss}}
+			return Decision{
+				Verdict: verdict, Route: RouteNone, Reason: "possibly hacked admin: alert the other admins only",
+				Review: &ReviewRequest{Kind: ReviewAlert, Timeout: time.Duration(s.Review.Timeout), OnTimeout: TimeoutDismiss},
+			}
 		}
 		return Decision{Verdict: verdict, Route: RouteNone, Reason: "admins are never acted on"}
 	}

@@ -49,11 +49,11 @@ func DecodeChat(kind string, raw []byte, infoJSON json.RawMessage, bot wa.JID) (
 	}
 	var info types.MessageInfo
 	if err := json.Unmarshal(infoJSON, &info); err != nil {
-		return Chat{}, fmt.Errorf("%w: message info: %v", ErrCorrupt, err)
+		return Chat{}, fmt.Errorf("%w: message info: %w", ErrCorrupt, err)
 	}
 	var msg waE2E.Message
 	if err := proto.Unmarshal(raw, &msg); err != nil {
-		return Chat{}, fmt.Errorf("%w: message %s: %v", ErrCorrupt, info.ID, err)
+		return Chat{}, fmt.Errorf("%w: message %s: %w", ErrCorrupt, info.ID, err)
 	}
 	evt := (&events.Message{Info: info, Message: &msg, RawMessage: &msg}).UnwrapRaw()
 	if r := evt.Message.GetReactionMessage(); r != nil {

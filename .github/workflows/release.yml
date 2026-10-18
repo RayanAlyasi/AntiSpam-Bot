@@ -23,6 +23,7 @@ jobs:
   rp:
     name: release-please
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     environment: release
     outputs:
       release_created: ${{ steps.rp.outputs.release_created }}
@@ -46,6 +47,7 @@ jobs:
     needs: rp
     if: needs.rp.outputs.release_created == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: write # upload to and publish the draft release
       packages: write # push images to ghcr.io
@@ -122,6 +124,7 @@ jobs:
     needs: [rp, goreleaser]
     if: needs.rp.outputs.release_created == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     environment: release
     env:
       TAG: ${{ needs.rp.outputs.tag_name }}

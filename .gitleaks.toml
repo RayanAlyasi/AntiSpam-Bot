@@ -1,0 +1,26 @@
+# gitleaks: the `security` job in .github/workflows/ci.yml scans the commits of every PR and
+# push with the default rules. Allow only clearly synthetic test values, each by path AND value,
+# so a real key in the same file still fails. Split the values so this file holds no key-shaped
+# literal of its own.
+title = "antispam-bot"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Dummy hex API key in the replay integration test"
+condition = "AND"
+paths = ['''^cmd/antispam/replay_integration_test\.go$''']
+regexes = ['''^(0123456789abcdef){2}$''']
+
+[[allowlists]]
+description = "Made-up Google-style key in an older version of the API-key env test (it now builds the key at run time)"
+condition = "AND"
+paths = ['''^internal/config/apikeyenv_test\.go$''']
+regexes = ['''^AIzaSy(A1b2C3d4E5f6G7h8I9j0)(KlMnOpQrStUvW)$''']
+
+[[allowlists]]
+description = "Placeholder secret in the config acceptance test"
+condition = "AND"
+paths = ['''^acceptance/config/config_test\.go$''']
+regexes = ['''^sk-live-(SECRET)123$''']

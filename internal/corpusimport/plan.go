@@ -135,7 +135,7 @@ func NewPlan(recs []Record, o Options) (Plan, error) {
 	}
 	hasher, err := blacklist.NewHasher(o.HashKey)
 	if err != nil {
-		return Plan{}, fmt.Errorf("%w: number hash key: %v", ErrOptions, err)
+		return Plan{}, fmt.Errorf("%w: number hash key: %w", ErrOptions, err)
 	}
 	var p Plan
 	var spam []Item

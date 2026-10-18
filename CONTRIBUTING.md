@@ -18,13 +18,14 @@ tests at one. A mistake can get that number banned. Only the maintainers' stagin
 ## Setup
 
 - Go (the version in `go.mod`), Docker (for the Postgres integration tests) and
-  [golangci-lint](https://golangci-lint.run).
-- `sqlc` and the other code generators are pinned in `tools/go.mod` and run through
-  `go tool`, so you don't install them separately.
+  [golangci-lint](https://golangci-lint.run) v2 (CI pins the version in
+  `.github/workflows/ci.yml`).
+- `sqlc`, `govulncheck` and the other code generators are pinned in `tools/go.mod` and run
+  through `go tool`, so you don't install them separately.
 
 ```bash
 make setup-hooks   # once per clone: routes git hooks through .githooks
-make check-fast    # build, vet, lint, architecture rules and race tests
+make check-fast    # build, vet, lint (with the architecture rules) and race tests
 make check         # everything, including the Postgres integration tests (needs Docker)
 make gen           # regenerate sqlc code after changing a query or migration
 ```
@@ -86,8 +87,11 @@ fake client.
   characters. Mark a breaking change with `!` and explain the upgrade in a `BREAKING CHANGE:`
   footer. The changelog and version numbers are generated from these.
 - Feature PRs are squash-merged, so the PR title becomes the commit. Fill in the PR template.
-- CI must be green: build, lint, architecture rules, unit, property, integration and replay
-  tests.
+- CI must be green: `go mod tidy`, build, vet, lint (golangci-lint, which also enforces the
+  architecture rules), govulncheck, gitleaks secret scanning, actionlint, and the unit,
+  property, integration and replay tests. Fix lint findings rather than silencing them;
+  `//nolint` isn't accepted. To check for vulnerabilities locally, run
+  `go tool -modfile=tools/go.mod govulncheck ./...`.
 
 ## Security
 

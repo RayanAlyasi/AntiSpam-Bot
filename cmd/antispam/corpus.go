@@ -40,7 +40,7 @@ const corpusUsage = `usage:
 func corpusCmd(ctx context.Context, args []string, getenv func(string) string, in io.Reader, out, logOut io.Writer) int {
 	log := zerolog.New(logOut)
 	if len(args) == 0 {
-		fmt.Fprint(logOut, corpusUsage)
+		_, _ = fmt.Fprint(logOut, corpusUsage) // the exit code already reports the error
 		return 2
 	}
 	switch args[0] {
@@ -49,7 +49,7 @@ func corpusCmd(ctx context.Context, args []string, getenv func(string) string, i
 	case "remove":
 		return corpusRemove(ctx, args[1:], getenv, out, log, logOut)
 	}
-	fmt.Fprint(logOut, corpusUsage)
+	_, _ = fmt.Fprint(logOut, corpusUsage) // the exit code already reports the error
 	return 2
 }
 
@@ -67,7 +67,7 @@ func corpusImport(ctx context.Context, args []string, getenv func(string) string
 	}
 	if len(pos) != 1 || *scope == "" {
 		log.Error().Msg("give exactly one dataset file (or - for stdin) and --scope")
-		fmt.Fprint(logOut, corpusUsage)
+		_, _ = fmt.Fprint(logOut, corpusUsage) // the exit code already reports the error
 		return 2
 	}
 	sc, err := corpusimport.ParseScope(*scope)
@@ -117,7 +117,7 @@ func corpusImport(ctx context.Context, args []string, getenv func(string) string
 			log.Error().Err(err).Msg("open dataset")
 			return 1
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		src = f
 		opts.FileName = filepath.Base(name)
 	} else {
@@ -137,7 +137,7 @@ func corpusImport(ctx context.Context, args []string, getenv func(string) string
 	}
 	if len(recs) == 0 {
 		for _, r := range rejected {
-			fmt.Fprintf(out, "rejected %s\n", r)
+			_, _ = fmt.Fprintf(out, "rejected %s\n", r) // on the way to exit 1 anyway
 		}
 		log.Error().Int("rejected", len(rejected)).Msg("the dataset has no valid record; nothing was written")
 		return 1
@@ -241,7 +241,7 @@ func readLines(path string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var out []string
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {

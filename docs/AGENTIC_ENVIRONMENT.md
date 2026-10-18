@@ -194,7 +194,7 @@ Evidence and helpful/harmful counters live in a **sidecar file** (`harness/rules
 
 ### 6.1 Once: the initializer session
 
-- **Project skeleton:** `go.mod` (go 1.26 / toolchain 1.27.2), Makefile, `.golangci.yml`, `.go-arch-lint.yml` (deny-by-default module map), depguard, CI (arm64/amd64), docker-compose test Postgres, `tools/go.mod`.
+- **Project skeleton:** `go.mod` (go 1.26 / toolchain 1.27.2), Makefile, `.golangci.yml` (with depguard for the architecture rules), CI (arm64/amd64), docker-compose test Postgres, `tools/go.mod`.
 - **Interfaces and fakes:** the `WAClient` interface with a fake client.
 - **The plan:** `harness/features.json` from DESIGN.md's roadmap (ID, phase, dependencies, DESIGN.md sections, description, `core: true/false`, `passes`, `evidence`).
 - **Git:** the git pre-commit hook, then the first commit.
@@ -243,7 +243,7 @@ Hitting a cap writes a blocker and a dead-end entry.
   - the rate never exceeds the ceiling.
 - **Fuzzing:** normalization, URL and phone extraction, vCards, the unwrapper.
 - **Postgres:** testcontainers, behind a build tag.
-- **Architecture:** depguard + go-arch-lint.
+- **Architecture:** depguard rules in `.golangci.yml`, run as part of lint.
 - **Output:** `make check-fast` (affected packages) prints a summary plus the first failures, with full logs written to files.
 - **Nightly:** gremlins mutation testing on core packages, govulncheck, full integration and acceptance runs.
 
@@ -346,7 +346,7 @@ acceptance/   testdata/fixtures/
 | Go 1.27.2 | `brew install go` |
 | gopls (for the plugin) | `go install golang.org/x/tools/gopls@latest` |
 | Lint, SQL, GitHub CLI | `brew install golangci-lint sqlc gh` then `gh auth login` |
-| Architecture and mutation tools | `go install github.com/fe3dback/go-arch-lint@latest github.com/go-gremlins/gremlins/cmd/gremlins@latest` |
+| Mutation tools | `go install github.com/go-gremlins/gremlins/cmd/gremlins@latest` |
 | Docker Desktop **running** | for real-Postgres tests |
 | Go code intelligence | `claude plugin install gopls-lsp@anthropic-plugin-directory --scope user`. Use this plugin *instead of* the gopls MCP server, not both. |
 

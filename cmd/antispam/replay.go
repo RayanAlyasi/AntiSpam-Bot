@@ -109,7 +109,7 @@ func replayFixtures(path, weightsPath, comparePath string, out io.Writer) error 
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	recs, err := replay.Load(f)
 	if err != nil {
 		return fmt.Errorf("%s: %w", path, err)
@@ -129,9 +129,13 @@ func replayFixtures(path, weightsPath, comparePath string, out io.Writer) error 
 		return err
 	}
 	changes := replay.Diff(before, after)
-	fmt.Fprintf(out, "-- %d changed with %s\n", len(changes), comparePath)
+	if _, err := fmt.Fprintf(out, "-- %d changed with %s\n", len(changes), comparePath); err != nil {
+		return err
+	}
 	for _, c := range changes {
-		fmt.Fprintf(out, "- %s\n+ %s\n", orDash(c.Before), orDash(c.After))
+		if _, err := fmt.Fprintf(out, "- %s\n+ %s\n", orDash(c.Before), orDash(c.After)); err != nil {
+			return err
+		}
 	}
 	_, err = fmt.Fprint(out, after.Summarize().String())
 	return err
@@ -222,8 +226,10 @@ func shadowReport(ctx context.Context, url string, group wa.JID, since time.Dura
 				reviews++
 			}
 		}
-		fmt.Fprintf(out, "%s %s %s route=%s source=%s would=%s score=%.2f why=%s\n", r.CreatedAt.UTC().Format(time.RFC3339),
-			r.GroupJid, r.MsgID, r.Route, text(r.ConfidenceSource, "none"), orDash(strings.Join(acts, "+")), r.Score, why(r.Signals))
+		if _, err := fmt.Fprintf(out, "%s %s %s route=%s source=%s would=%s score=%.2f why=%s\n", r.CreatedAt.UTC().Format(time.RFC3339),
+			r.GroupJid, r.MsgID, r.Route, text(r.ConfidenceSource, "none"), orDash(strings.Join(acts, "+")), r.Score, why(r.Signals)); err != nil {
+			return err
+		}
 	}
 	_, err = fmt.Fprintf(out, "-- %d shadow detections: would have deleted %d messages, banned %d people and asked admins %d times\n",
 		len(rows), deletes, bans, reviews)

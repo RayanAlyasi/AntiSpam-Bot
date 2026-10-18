@@ -37,7 +37,7 @@ func healthcheck(ctx context.Context, getenv func(string) string, logOut io.Writ
 		logger.Error().Err(err).Str("url", url).Msg("unreachable")
 		return 1
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		logger.Error().Str("url", url).Int("status", resp.StatusCode).Msg("unhealthy")
 		return 1

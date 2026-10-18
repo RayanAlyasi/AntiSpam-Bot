@@ -25,6 +25,13 @@ type Presets struct {
 	Default string `yaml:"default"` // relaxed, standard, strict or ask_admins
 }
 
+// NewGroups holds what a newly protected group starts with (DESIGN.md §12.2).
+type NewGroups struct {
+	// AskAdmins is the starting enforcement.mode: before (ask_before_action, the default:
+	// the message stays up until an admin decides), delete (ask_delete_first) or off (auto).
+	AskAdmins string `yaml:"ask_admins"`
+}
+
 // Scoring holds the scoring defaults (DESIGN.md §7.3).
 type Scoring struct {
 	Thresholds Thresholds         `yaml:"thresholds"`
@@ -76,7 +83,8 @@ func Defaults() Config {
 			MaxKickBatch:       8,
 			DailyAlertWrites:   7500,
 		},
-		Presets: Presets{Default: "standard"},
+		Presets:   Presets{Default: "standard"},
+		NewGroups: NewGroups{AskAdmins: "before"},
 		Scoring: Scoring{
 			Thresholds: Thresholds{Review: 0.60, Delete: 0.85, Ban: 0.95},
 			Weights:    map[string]float64{},

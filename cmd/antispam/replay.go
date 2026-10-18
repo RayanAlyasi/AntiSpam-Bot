@@ -183,7 +183,9 @@ func inboxReport(ctx context.Context, getenv func(string) string, weightsPath st
 		return err
 	}
 	defer pool.Close()
-	rep, err := fastlane.InboxReplay{Pool: pool, HashKey: key, Weights: w, Log: zerolog.Nop()}.Run(ctx, group, time.Now().Add(-since), limit)
+	rep, err := fastlane.InboxReplay{
+		Pool: pool, HashKey: key, Weights: w, Log: zerolog.Nop(), NewGroupMode: newGroupMode(cfg.NewGroups.AskAdmins),
+	}.Run(ctx, group, time.Now().Add(-since), limit)
 	if err != nil {
 		return err
 	}

@@ -115,8 +115,8 @@ func TestReplayInbox(t *testing.T) {
 		t.Fatalf("exit %d; log: %s", code, log.String())
 	}
 	got := out.String()
-	if !strings.Contains(got, string(group)+" I1 mode=enforce band=certain source=known route=auto_ban") || !strings.Contains(got, string(group)+" I2 mode=enforce band=clean") {
-		t.Fatalf("inbox replay output:\n%s\nwant I1 certain known and I2 clean", got)
+	if !strings.Contains(got, string(group)+" I1 mode=enforce band=certain source=known route=ask") || !strings.Contains(got, string(group)+" I2 mode=enforce band=clean") {
+		t.Fatalf("inbox replay output:\n%s\nwant I1 certain known and routed to the admins (new groups ask first) and I2 clean", got)
 	}
 	if rows, _ := store.NewPolicyStore(pool).ListDetections(ctx, group, 0, 10); len(rows) != 0 {
 		t.Fatalf("the replay recorded %d detections; it must only read", len(rows))

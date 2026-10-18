@@ -192,7 +192,8 @@ acted on. Modes: `shadow` records only, `enforce` acts, `pause` does nothing.
 
 ## Everyday commands
 
-Admins send these in a DM with the bot (after `.use <group>`), in the review group, or in the
+Admins send these in a DM with the bot (with several groups, pick one first: `.groups` numbers
+them, then `.use 2` or `.use <part of the name>`), in the review group, or in the
 protected group, where the command message is deleted and the reply comes by DM.
 
 | Command | What it does |
@@ -202,7 +203,8 @@ protected group, where the command message is deleted and the reply comes by DM.
 | `.blacklist add <number>` | ban that number if they're in the group now, and treat the number as spam wherever it appears |
 | `.mode shadow\|enforce\|pause` | switch mode |
 | `.preset relaxed\|standard\|strict\|ask` | switch preset |
-| `.status` | preset, mode, review destination and today's counts |
+| `.askadmins delete` | delete spam right away and ask the admins before banning; `before` keeps the message until an admin decides, `off` acts automatically |
+| `.status` | preset, mode, review destination and how many cases wait for a decision |
 | `.pending` | uncertain cases waiting for a decision; decide one with `.review <code> ban` or `ok` |
 | `.help` | the command menu; `.help moderation`, `.help reviews`, `.help settings` and `.help blacklist` explain each part |
 
@@ -214,6 +216,9 @@ The full list is in [docs/COMMANDS.md](docs/COMMANDS.md).
   provider. See [`env.example`](env.example).
 - **`config.yaml`** (optional): defaults for pacing, presets, scoring and AI; every key and its
   default are in [`config.example.yaml`](config.example.yaml). The bot starts without it.
+  New groups start by asking the admins before acting (the message stays up; with no decision in
+  15 minutes it's deleted without a ban). Change that with `new_groups.ask_admins` (`before`,
+  `delete` or `off`), or per group with `.askadmins`.
 - **Per-group settings** change through the commands above.
 
 **The AI check is optional.** Without it, uncertain messages go straight to the admins. With

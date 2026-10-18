@@ -243,7 +243,21 @@ func (h *Handler) OnPromoted(ctx context.Context, group, by wa.JID) error {
 	if by == "" {
 		return nil
 	}
-	return h.Notify(ctx, by, group, h.withSite("onboard.promoted"), map[string]string{"prefix": h.d.Prefix, "url": h.d.WebsiteURL})
+	// What happens to the messages the bot flags depends on how the group asks its admins.
+	key := "onboard.promoted"
+	vars := map[string]string{"prefix": h.d.Prefix}
+	if h.d.Settings != nil {
+		switch mode, _ := h.d.Settings.Get(ctx, group, "enforcement.mode"); mode {
+		case "ask_before_action":
+			key, vars["timeout"] = key+"_before", h.askTimeout(ctx, group)
+			if on, err := h.d.Settings.Get(ctx, group, "enforcement.ask_before.on_timeout"); err == nil && on == "leave" {
+				key += "_leave"
+			}
+		case "ask_delete_first":
+			key += "_delete"
+		}
+	}
+	return h.Notify(ctx, by, group, key, vars)
 }
 
 // OnNotAdmin handles the bot being in a group without admin rights (§13.6 step 4): at most one

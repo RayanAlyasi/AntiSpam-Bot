@@ -33,9 +33,10 @@ const (
 	offerInvite   = "a group invite"
 	offerChannel  = "a channel link"
 	offerTelegram = "a Telegram link"
+	offerPrivate  = "a request to order or ask in private"
 )
 
-var offerOrder = []string{offerPhone, offerCard, offerChat, offerInvite, offerChannel, offerTelegram}
+var offerOrder = []string{offerPhone, offerCard, offerChat, offerInvite, offerChannel, offerTelegram, offerPrivate}
 
 // telegramHosts are the Telegram link hosts.
 var telegramHosts = map[string]bool{"t.me": true, "telegram.me": true, "telegram.dog": true}
@@ -100,6 +101,9 @@ func Offers(e *envelope.Envelope) []string {
 		default: // wa.me/<number>, wa.me/message, wa.me/qr, api.whatsapp.com/send
 			has[offerChat] = true
 		}
+	}
+	if privateOrder(e) {
+		has[offerPrivate] = true
 	}
 	var out []string
 	for _, o := range offerOrder {

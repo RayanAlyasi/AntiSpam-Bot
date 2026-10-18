@@ -1,0 +1,26 @@
+{
+ "feature": "shadow-reactions",
+ "branch": "feat/shadow-reactions",
+ "category": null,
+ "core": null,
+ "harness_version": "fb19b08dbbbd",
+ "commit": "ccb5264",
+ "gate_runs": 7,
+ "gate_first_pass": true,
+ "gate_failed_steps": [
+  "integration",
+  "lint"
+ ],
+ "acceptance_first_pass": true,
+ "judge_rounds": 2,
+ "judge_first_verdict": "FAIL",
+ "judge_final_verdict": "PASS",
+ "tamper_hits": 0,
+ "guard_blocks": 12,
+ "test_change_requests": 1,
+ "cost_usd": null,
+ "turns": null,
+ "mutation_score": null,
+ "human_verdict": null,
+ "ts": "2026-10-18T17:25:15Z"
+}

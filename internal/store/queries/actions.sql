@@ -97,10 +97,15 @@ SELECT COALESCE((doc->>'silent')::boolean, true)::boolean AS silent,
 FROM app.group_settings WHERE group_jid = @group_jid;
 
 -- name: IsReviewGroup :one
--- A group named as some protected group's review group isn't protected itself (DESIGN.md §9.7).
-SELECT EXISTS (
-    SELECT 1 FROM app.group_settings WHERE doc->'review'->>'review_group' = @chat::text
-)::boolean AS review_group;
+-- A group named as some protected group's review group isn't protected itself (DESIGN.md §9.7),
+-- even if it has a settings document from when it was protected, unless the bot is an admin
+-- moderating it again or it names itself: a protected group can't be its own review group (§9.5).
+SELECT (EXISTS (
+    SELECT 1 FROM app.group_settings
+    WHERE doc->'review'->>'review_group' = @chat::text AND group_jid <> @chat::text
+) AND NOT EXISTS (
+    SELECT 1 FROM app.groups WHERE jid = @chat::text AND status = 'active'
+))::boolean AS review_group;
 
 -- name: FailPendingActionsReturning :many
 UPDATE app.actions SET status = 'failed', last_error = @reason, updated_at = @now

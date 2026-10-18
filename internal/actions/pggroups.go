@@ -15,9 +15,10 @@ import (
 // PGGroups is the executor's Groups on Postgres. It reads posting rules from the group settings
 // documents (app.group_settings, DESIGN.md §12.1) without importing the policy package, which
 // enqueues through this one:
-//   - a group with a settings document is protected, and silent unless "silent" is false;
-//     shadow reactions are allowed when its "mode" is shadow and "shadow.reactions" is true;
-//   - a group named as some group's review group ("review.review_group") isn't protected;
+//   - a group named as some group's review group ("review.review_group") isn't protected, even
+//     with a settings document left from when it was, unless the bot is active (admin) there;
+//   - any other group with a settings document is protected, and silent unless "silent" is
+//     false; shadow reactions are allowed when its "mode" is shadow and "shadow.reactions" is true;
 //   - any other group is unknown, and treated as protected and silent: nothing is posted there.
 //
 // DMs are never protected.
@@ -37,19 +38,21 @@ func (g PGGroups) Posting(ctx context.Context, chat wa.JID) (Posting, error) {
 		return Posting{}, nil
 	}
 	q := db.New(g.DB)
-	row, err := q.GroupPosting(ctx, string(chat))
-	switch {
-	case err == nil:
-		return Posting{Protected: true, Silent: row.Silent, ShadowReactions: row.ShadowReactions}, nil
-	case !errors.Is(err, pgx.ErrNoRows):
-		return Posting{}, fmt.Errorf("posting rules of %s: %w", chat, err)
-	}
+	// The review group comes first: a group that was once protected keeps its settings document
+	// after the bot is demoted there, and an admin may then make it a review group.
 	review, err := q.IsReviewGroup(ctx, string(chat))
 	if err != nil {
 		return Posting{}, fmt.Errorf("review groups: %w", err)
 	}
 	if review {
 		return Posting{}, nil
+	}
+	row, err := q.GroupPosting(ctx, string(chat))
+	switch {
+	case err == nil:
+		return Posting{Protected: true, Silent: row.Silent, ShadowReactions: row.ShadowReactions}, nil
+	case !errors.Is(err, pgx.ErrNoRows):
+		return Posting{}, fmt.Errorf("posting rules of %s: %w", chat, err)
 	}
 	return Posting{Protected: true, Silent: true}, nil
 }

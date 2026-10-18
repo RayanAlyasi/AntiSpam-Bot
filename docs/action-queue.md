@@ -103,7 +103,9 @@ Before every message, edit or reaction in a group, the queue checks the group's 
   10-minute deadline never makes it urgent, so it takes turns with real work. It is dropped after
   10 minutes, or as soon as the group leaves shadow mode or turns the setting off;
 - with `silent` off it gets at most 1 post per minute;
-- a group named as a review group isn't protected, so review items can be posted there;
+- a group named as a review group isn't protected, so review items can be posted there, even
+  if the bot protected it before and its old settings remain; only while the bot is an admin
+  moderating it again is it protected and silent;
 - a group the bot can't place gets no posts at all.
 
 Deletes, kicks and lockdowns aren't posts and still run in silent groups.

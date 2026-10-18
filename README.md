@@ -190,8 +190,9 @@ admins.
   the release notes first: they lead with breaking changes.
 - **Health:** `/healthz`, `/readyz` and `/metrics` (Prometheus, including `wa_connected` per
   bot) are served on port 8080.
-- **Tracing a problem:** every log line about one message carries the same `request_id` (and its
-  `detection_id` once one is recorded), so `grep` for it shows the message's whole path;
+- **Tracing a problem:** every log line the detection and command paths write about one message
+  carries the same `request_id` (and its `detection_id` once one is recorded), so `grep` for it
+  shows the message's path;
   warnings and errors name the file and line they came from. `panics_total` and `errors_total`
   on `/metrics` count recovered panics and failures by component. Logs never contain message
   text or unmasked phone numbers.

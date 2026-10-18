@@ -31,5 +31,5 @@ more conservative option was taken:
    broke the hidden acceptance suite, which has its own WAClient double. The adapter's and the
    fake's clients implement both; the connector's community source type-asserts the bot's client
    and reports `errors.ErrUnsupported` for one that can't list a community.
-9. **Migration 00036**, not 00017: 00030–00035 are already applied in released databases, and goose
+9. **Migration 00037**, not 00017: 00030–00035 are already applied in released databases, and goose
    refuses a missing lower-numbered migration.

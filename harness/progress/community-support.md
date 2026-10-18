@@ -8,7 +8,7 @@ Branch `feat/communities`, PR into `staging`. Built on the numbered `.groups` /
 - `wa`: `GroupInfo.IsCommunity` / `IsAnnouncement`, `CommunityReader.SubGroups` (beside
   WAClient), `GroupEvent.Link` / `Unlink`. Adapter and connector convert whatsmeow's `IsParent`, `IsDefaultSubGroup`,
   `GetSubGroups` and link changes; the fake serves communities (`SetSubGroup`).
-- Migration 00036: `groups.kind`, `community_jid`, `community_name`; `community_groups`.
+- Migration 00037 (00036 is the corpus import, #59): `groups.kind`, `community_jid`, `community_name`; `community_groups`.
 - Tracker records each group's community on join, refresh and group events (link/unlink too),
   fetches a community's name and list at most once per 6 h, and calls a start hook on join or
   promotion; the connector wires it to `SettingsService.StartFrom` (community defaults).

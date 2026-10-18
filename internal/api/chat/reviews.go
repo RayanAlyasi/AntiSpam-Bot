@@ -58,7 +58,7 @@ func (h *Handler) reviewDestination(ctx context.Context, c *call, dest string) e
 	switch dest {
 	case "dm":
 		// Reviewer DMs with opt-in arrive with F-183 (v0.3).
-		return h.reply(ctx, c, "cmd.review_dm_later", nil)
+		return h.reply(ctx, c, "cmd.review_dm_later", map[string]string{"prefix": h.d.Prefix})
 	case "group":
 		rg, err := h.d.Settings.Get(ctx, c.group, "review.review_group")
 		if err != nil && !errors.Is(err, ErrUnknownKey) {
@@ -67,6 +67,15 @@ func (h *Handler) reviewDestination(ctx context.Context, c *call, dest string) e
 		if rg == "" {
 			// Until a review group is set, reviews stay on the dashboard; say how to set one.
 			return errors.Join(h.setAndReply(ctx, c, "review.destination", dest), h.reply(ctx, c, "cmd.review_group_missing", nil))
+		}
+	case "dashboard":
+		if h.d.WebsiteURL == "" {
+			// No website yet (v0.1): the setting still stops posting to a review group, and the
+			// reply says where the cases wait instead.
+			if ok, err := h.set(ctx, c, "review.destination", dest); err != nil || !ok {
+				return err
+			}
+			return h.reply(ctx, c, "cmd.review_dashboard_no_site", map[string]string{"group": h.groupName(ctx, c.group)})
 		}
 	}
 	return h.setAndReply(ctx, c, "review.destination", dest)
@@ -168,9 +177,13 @@ func (h *Handler) cmdPending(ctx context.Context, c *call) error {
 		if who == "" && it.Subject.Phone != "" {
 			who = review.MaskNumber("+" + it.Subject.Phone.User())
 		}
-		lines = append(lines, fmt.Sprintf("#%s · %s · %s", it.Code, it.Kind, who))
+		line := fmt.Sprintf("*#%s* · %s", it.Code, h.t(c, "review.kind."+string(it.Kind), nil))
+		if who != "" {
+			line += " · " + who
+		}
+		lines = append(lines, line)
 	}
-	return h.reply(ctx, c, "cmd.pending", map[string]string{"items": strings.Join(lines, "\n")})
+	return h.reply(ctx, c, "cmd.pending", map[string]string{"items": strings.Join(lines, "\n"), "n": strconv.Itoa(len(items))})
 }
 
 // cmdReviewGroup sets (.reviewgroup here [group name]) or clears (.reviewgroup off) the review

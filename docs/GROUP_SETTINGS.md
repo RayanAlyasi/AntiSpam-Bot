@@ -1,8 +1,8 @@
 # Group settings, presets and enforcement
 
 Each protected group has one settings document (DESIGN.md §12.1). Every value has a dotted key, such
-as `enforcement.autoban_matrix.videos.action` or `review.timeout`. The website, the `.set`/`.get`
-commands and the audit log all use these keys. Most groups only ever pick a preset.
+as `enforcement.autoban_matrix.videos.action` or `review.timeout`. The `.set`/`.get`
+commands and the audit log use these keys. Most groups only ever pick a preset.
 
 ## Run modes (`mode`)
 
@@ -25,8 +25,8 @@ ban, keep the optional ladder off and keep the invisible "just joined" signal on
 | `strict` | auto-ban on certain evidence for every type except view-once | delete line 0.80 |
 | `ask_admins` | every type is `ask` | `enforcement.mode = ask_delete_first` |
 
-Switching preset resets the matrix and the preset's extras and keeps your other changes. The
-website and `.autoban` show which cells differ from the preset. `custom` keeps your grid and is
+Switching preset resets the matrix and the preset's extras and keeps your other changes. `.autoban`
+shows the current grid. `custom` keeps your grid and is
 compared against Standard.
 
 ## The auto-ban matrix (`enforcement.autoban_matrix.<type>`)
@@ -115,11 +115,11 @@ rejoins needs the connector and workers roles in the same process, which is the 
 
 ## How settings are stored
 
-Each change, whether from the website or a `.set` command, stores a new version of the group's
+Each change, whether from `.set` or a friendly command such as `.mode`, stores a new version of the group's
 document. Every earlier version is kept in `group_settings_history`, and the audit log gets one
 `settings.update` entry with each changed dotted key and its old and new value. A command that
 changes some keys is re-applied on top of a change another admin made meanwhile, so neither is
-lost; a whole-document edit from the website made on an older version is refused instead of
+lost; a whole-document edit through the API made on an older version is refused instead of
 overwriting the newer one. Each save is announced with Postgres `NOTIFY group_settings`, so
 processes that listen refresh their copy straight away.
 A document saved by an older release still loads after an upgrade: keys added since then take the

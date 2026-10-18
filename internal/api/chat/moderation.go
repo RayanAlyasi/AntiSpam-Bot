@@ -328,11 +328,11 @@ func domainOf(s string) string {
 }
 
 func (h *Handler) cmdDomain(ctx context.Context, c *call) error {
-	if len(c.cmd.Args) != 2 {
-		return h.reply(ctx, c, "cmd.usage.domain", nil)
-	}
 	if h.d.Lists == nil {
 		return h.unavailable(ctx, c)
+	}
+	if len(c.cmd.Args) != 2 {
+		return h.reply(ctx, c, "cmd.usage.domain", nil)
 	}
 	d := domainOf(c.cmd.Args[1])
 	if d == "" {
@@ -358,11 +358,11 @@ func (h *Handler) cmdDomain(ctx context.Context, c *call) error {
 // cmdWord edits the group's blocked words. .word block first replies with a dry-run count over
 // the recent messages and saves only when the same command is repeated (§8.4).
 func (h *Handler) cmdWord(ctx context.Context, c *call) error {
-	if len(c.cmd.Args) < 2 {
-		return h.reply(ctx, c, "cmd.usage.word", nil)
-	}
 	if h.d.Lists == nil {
 		return h.unavailable(ctx, c)
+	}
+	if len(c.cmd.Args) < 2 {
+		return h.reply(ctx, c, "cmd.usage.word", nil)
 	}
 	op := strings.ToLower(c.cmd.Args[0])
 	phrase := strings.TrimSpace(strings.TrimPrefix(c.cmd.Rest, c.cmd.Args[0]))

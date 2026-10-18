@@ -35,8 +35,8 @@ blacklist and the confirmed-spam corpus match messages is in
 **Status:** v0.1, the first release, is being built. It runs end to end: the bot receives
 messages, detects known spam (confirmed copies, word and phrase rules, blocklisted links and
 numbers, blacklisted numbers in contact cards), and deletes, bans or asks the admins. Until
-`v0.1.0` is tagged, run it only in shadow mode. Not in this build yet: the website and learning
-beyond admin-confirmed spam.
+`v0.1.0` is tagged, run it only in shadow mode. It is run entirely from WhatsApp commands, and
+it learns only from spam that admins confirm.
 
 ## Requirements
 
@@ -163,8 +163,9 @@ touches nothing. Switch to enforcing only once you've checked what it would have
    message up in the group by its time. To see what today's rules would decide for the last
    day's messages, run `docker compose exec bot /antispam replay -inbox -since 24h`. Look for
    anything it would have deleted or banned that wasn't spam. If something is wrong, fix it
-   before enforcing: allow a domain (`.domain allow example.com`), drop a word rule
-   (`.word unblock <phrase>`), or allow-list a member (`.allow @member`).
+   before enforcing: reply `.ok` to a message that was wrongly flagged (it restores the
+   member's trust and forgets the pattern), allow a type of message again (`.allow stickers`),
+   or change a setting (`.set <key> <value>`).
 8. **Switch to enforce:**
    ```
    .mode enforce
@@ -202,9 +203,10 @@ protected group, where the command message is deleted and the reply comes by DM.
 | `.mode shadow\|enforce\|pause` | switch mode |
 | `.preset relaxed\|standard\|strict\|ask` | switch preset |
 | `.status` | preset, mode, review destination and today's counts |
-| `.help` | short help |
+| `.pending` | uncertain cases waiting for a decision; decide one with `.review <code> ban` or `ok` |
+| `.help` | the command menu; `.help moderation`, `.help reviews`, `.help settings` and `.help blacklist` explain each part |
 
-The full list is in [DESIGN.md §13.7](docs/DESIGN.md#137-in-chat-commands-admins-only).
+The full list is in [docs/COMMANDS.md](docs/COMMANDS.md).
 
 ## Configuration
 

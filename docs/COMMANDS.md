@@ -97,9 +97,12 @@ admins; it tells whoever added the number instead. Nothing happens in groups in 
 mode. In ask-admins groups, instance-wide entries become review items, while the group's own
 entries apply directly.
 
-Not in this build yet: removing a listed person automatically when they join later, rejecting
-their join requests, and deleting their own messages. Until then, `.blacklist add` again (or
-`.ban`) removes someone who came back.
+The list keeps working after the add: their messages are deleted and they're banned, a listed
+person who joins later is removed, and their join requests are rejected in groups that approve
+new members (checked every 5 minutes). The list wins over an admin re-adding a listed person: to
+let them back, `.blacklist remove` the number. Removing joiners and rejecting join requests need
+the connector and workers roles in the same process, which is the default; with them split, use
+`.ban` on someone who came back.
 
 ## Getting started by DM
 

@@ -107,6 +107,7 @@ type waStack struct {
 	pairPhone string                                                      // PAIR_PHONE: pair by code at startup while no bot is paired
 	moderate  inbox.Sink                                                  // the detection fast lane (F-088); nil: moderated rows are only marked processed
 	chat      inbox.Sink                                                  // commands, DMs and review votes (wp-k's chat handler); nil: not handled
+	hooks     *groupHooks                                                 // wp-k: blacklist on joins and join requests, onboarding DMs; nil: none
 	runner    atomic.Pointer[actions.Runner]                              // the action executors, while the connector role runs
 	finished  atomic.Pointer[func(context.Context, actions.Action) error] // the review queue's completion hook
 }
@@ -188,7 +189,11 @@ func (s *waStack) connectorRole(databaseURL string, reg prometheus.Registerer, l
 			case *wa.MessageEvent, *wa.UndecryptableEvent:
 				return writer.HandleEvent(ctx, evt)
 			case *wa.GroupEvent, *wa.JoinedGroupEvent:
-				return tracker.HandleEvent(ctx, evt)
+				err := tracker.HandleEvent(ctx, evt)
+				if s.hooks != nil {
+					s.hooks.enqueue(ctx, evt)
+				}
+				return err
 			case *wa.ConnectionEvent, *wa.AccountEvent:
 				err := health.HandleEvent(ctx, evt)
 				s.connected.Store(int64(health.ConnectedBots()))
@@ -219,6 +224,10 @@ func (s *waStack) connectorRole(databaseURL string, reg prometheus.Registerer, l
 				return connector.Pair(ctx, container, opts)
 			}, log)
 		})
+		if s.hooks != nil {
+			wg.Go(func() { s.hooks.run(ctx, mgr.Self) })
+			wg.Go(func() { s.hooks.pollJoinRequests(ctx, s.groups, mgr.Client) })
+		}
 		err = mgr.Run(ctx)
 		wg.Wait()
 		s.connected.Store(0)

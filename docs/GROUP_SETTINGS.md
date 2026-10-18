@@ -109,8 +109,9 @@ probation.
 
 A ban is a kick plus a rejoin block for that group only (`enforcement.ban.rejoin_block: true`). If a
 banned person joins again they're removed at once. If a current admin deliberately re-adds them, the
-bot treats it as the admins' decision and lifts the block. Unbanning lifts the block; the bot never
-re-adds anyone.
+bot treats it as the admins' decision and lifts the block, unless the person is on the number
+blacklist. Unbanning lifts the block; the bot never re-adds anyone. Removing a banned person who
+rejoins needs the connector and workers roles in the same process, which is the default.
 
 ## How settings are stored
 

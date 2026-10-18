@@ -15,6 +15,7 @@ var (
 	providers         = []string{"anthropic", "openai_compatible", "google"}
 	structuredOutputs = []string{"auto", "native", "json"}
 	presetNames       = []string{"relaxed", "standard", "strict", "ask_admins"}
+	newGroupAskAdmins = []string{"before", "delete", "off"}
 
 	// envVarName is what ai.api_key_env must look like. It is upper-case only on purpose: errors
 	// name the variable, and a key pasted here by mistake (keys mix cases or contain "-") must
@@ -115,6 +116,10 @@ func (c *Config) validate(names keyNames) error {
 		bad("presets.default", "custom is set per group, not as the default; want one of %s", strings.Join(presetNames, ", "))
 	case !slices.Contains(presetNames, d):
 		bad("presets.default", "unknown preset; want one of %s", strings.Join(presetNames, ", "))
+	}
+
+	if !slices.Contains(newGroupAskAdmins, c.NewGroups.AskAdmins) {
+		bad("new_groups.ask_admins", "want one of %s", strings.Join(newGroupAskAdmins, ", "))
 	}
 
 	t := c.Scoring.Thresholds

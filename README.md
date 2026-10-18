@@ -216,6 +216,9 @@ The full list is in [docs/COMMANDS.md](docs/COMMANDS.md).
   provider. See [`env.example`](env.example).
 - **`config.yaml`** (optional): defaults for pacing, presets, scoring and AI; every key and its
   default are in [`config.example.yaml`](config.example.yaml). The bot starts without it.
+  New groups start by asking the admins before acting (the message stays up; with no decision in
+  15 minutes it's deleted without a ban). Change that with `new_groups.ask_admins` (`before`,
+  `delete` or `off`), or per group with `.askadmins`.
 - **Per-group settings** change through the commands above.
 
 **The AI check is optional.** Without it, uncertain messages go straight to the admins. With

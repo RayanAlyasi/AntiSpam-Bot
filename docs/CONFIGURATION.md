@@ -46,6 +46,12 @@ All counts, rates and durations must be greater than 0 (except `spacing_jitter`,
 |---|---|---|
 | `presets.default` | `standard` | Preset for new groups: `relaxed`, `standard`, `strict` or `ask_admins`. (`custom` is a per-group choice, not a default.) |
 
+### `new_groups`
+
+| Key | Default | Meaning |
+|---|---|---|
+| `new_groups.ask_admins` | `before` | How a newly protected group asks its admins (its `enforcement.mode`): `before` keeps the message up and asks, deleting it without a ban after 15 minutes with no decision (`ask_before_action`); `delete` deletes spam at once and asks before banning (`ask_delete_first`); `off` acts automatically (`auto`). Admins change it per group with `.askadmins`. |
+
 ### `scoring`
 
 | Key | Default | Meaning |

@@ -39,6 +39,15 @@ presets:
   # Preset for new groups: relaxed, standard, strict or ask_admins.
   default: standard
 
+new_groups:
+  # How a newly protected group starts asking the admins (its enforcement.mode; admins change it
+  # with .askadmins):
+  #   before: keep the message up and ask the admins to delete and ban; with no decision in
+  #           15 minutes it's deleted without a ban (ask_before_action).
+  #   delete: delete spam right away and ask before banning (ask_delete_first).
+  #   off:    act automatically (auto).
+  ask_admins: before
+
 scoring:
   # Score lines from 0 to 1, with review < delete <= ban.
   thresholds:

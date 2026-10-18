@@ -67,6 +67,18 @@ func checkHashKey(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, lo
 	return nil, true
 }
 
+// newGroupMode maps config new_groups.ask_admins to the enforcement.mode new groups start in.
+func newGroupMode(askAdmins string) policy.EnforcementMode {
+	switch askAdmins {
+	case "delete":
+		return policy.EnforceAskDeleteFirst
+	case "off":
+		return policy.EnforceAuto
+	default:
+		return policy.EnforceAskBeforeAction
+	}
+}
+
 // newFastlane assembles the fast lane. getenv reads the AI API key.
 func newFastlane(cfg config.Config, key []byte, pool *pgxpool.Pool, getenv func(string) string, logs *logging.Loggers, ws *waStack, lids *lidSwitch,
 	reg prometheus.Registerer, metrics *fastlane.Metrics,
@@ -107,7 +119,7 @@ func newFastlane(cfg config.Config, key []byte, pool *pgxpool.Pool, getenv func(
 		Standing: noStanding{},
 		Clock:    clk,
 	})
-	settings := policy.NewSettingsService(store.NewPolicyStore(pool))
+	settings := policy.NewSettingsService(store.NewPolicyStore(pool), policy.WithNewGroupMode(newGroupMode(cfg.NewGroups.AskAdmins)))
 	// A group is protected when the bot is an admin there (wp-f's groups table): the same rule
 	// the inbox router uses to send its messages to moderation.
 	protected := func(ctx context.Context, chat wa.JID) (bool, error) {

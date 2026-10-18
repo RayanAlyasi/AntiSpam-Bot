@@ -55,7 +55,7 @@ commands write the same keys:
 |---|---|
 | `.status` | shows preset, mode, review destination and how many cases wait for a decision |
 | `.mode shadow\|enforce\|pause` | `mode` |
-| `.preset relaxed\|standard\|strict\|ask` | `preset` (resets the auto-ban matrix) |
+| `.preset relaxed\|standard\|strict\|ask` | `preset` (resets the auto-ban matrix; a group that asks its admins keeps asking, and the reply says so) |
 | `.silent on\|off`, `.newsignal on\|off`, `.ladder on\|off` | `silent`, `new_members.just_joined.enabled`, `ladder.enabled` |
 | `.policy delete\|ask\|ban` | `policy.action` |
 | `.block videos`, `.allow stickers`, `.blocknew links` | `content.<type>` |

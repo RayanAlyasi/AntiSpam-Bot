@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/review"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/wa"
@@ -285,16 +286,70 @@ var summaryKeys = []string{"preset", "mode", "silent", "enforcement.mode", "revi
 
 func (h *Handler) summary(ctx context.Context, c *call) string {
 	var lines []string
+	mode, _ := h.d.Settings.Get(ctx, c.group, "enforcement.mode")
 	for _, k := range summaryKeys {
+		if mode == "ask_before_action" && (k == "review.timeout" || k == "review.on_timeout") {
+			// That mode has its own timeout and fallback, shown in the "before acting" line.
+			continue
+		}
 		if v, err := h.d.Settings.Get(ctx, c.group, k); err == nil {
 			if k == "review.destination" && v == string(review.DestinationDashboard) && h.d.WebsiteURL == "" {
 				// No website yet (v0.1): say where the cases really wait.
 				v = h.t(c, "cmd.destination_pending", nil)
 			}
+			if k == "enforcement.mode" {
+				lines = append(lines, h.t(c, "cmd.asking", map[string]string{"how": h.askingWords(ctx, c, v)}))
+				continue
+			}
+			if k == "review.timeout" {
+				v = shortDuration(v)
+			}
 			lines = append(lines, "*"+k+":* "+v)
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// shortDuration shows a stored duration ("15m0s", "6h0m0s") the way admins type it ("15m", "6h").
+func shortDuration(s string) string {
+	d, err := time.ParseDuration(s)
+	if err != nil || d <= 0 {
+		return s
+	}
+	switch {
+	case d%(24*time.Hour) == 0:
+		return strconv.Itoa(int(d/(24*time.Hour))) + "d"
+	case d%time.Hour == 0:
+		return strconv.Itoa(int(d/time.Hour)) + "h"
+	case d%time.Minute == 0 && d < time.Hour:
+		return strconv.Itoa(int(d/time.Minute)) + "m"
+	case d%time.Minute == 0:
+		return strconv.Itoa(int(d/time.Hour)) + "h" + strconv.Itoa(int(d%time.Hour/time.Minute)) + "m"
+	}
+	return d.String()
+}
+
+// askTimeout is how long ask_before_action waits for the admins in group, as admins type it.
+func (h *Handler) askTimeout(ctx context.Context, group wa.JID) string {
+	if d, err := h.d.Settings.Get(ctx, group, "enforcement.ask_before.timeout"); err == nil && d != "" {
+		return shortDuration(d)
+	}
+	return "15m" // the default, when the group's value can't be read
+}
+
+// askingWords says in plain words when the bot asks the admins, for enforcement.mode value mode.
+func (h *Handler) askingWords(ctx context.Context, c *call, mode string) string {
+	if mode != "auto" && mode != "ask_delete_first" && mode != "ask_before_action" {
+		return mode
+	}
+	key, vars := "cmd.ask."+mode, map[string]string{}
+	if mode == "ask_before_action" {
+		vars["timeout"] = h.askTimeout(ctx, c.group)
+		if on, err := h.d.Settings.Get(ctx, c.group, "enforcement.ask_before.on_timeout"); err == nil && on == "leave" {
+			key += "_leave"
+		}
+	}
+	return h.t(c, key, vars)
 }
 
 func (h *Handler) cmdSettings(ctx context.Context, c *call) error {
@@ -364,9 +419,15 @@ func (h *Handler) cmdPreset(ctx context.Context, c *call) error {
 	if err != nil {
 		return fmt.Errorf("apply preset %s: %w", v, err)
 	}
+	// A preset may keep or change when the bot asks the admins (policy.applyPreset): say how it
+	// acts now.
+	mode, err := h.d.Settings.Get(ctx, c.group, "enforcement.mode")
+	if err != nil {
+		mode = ""
+	}
 	return errors.Join(
 		h.audit(ctx, c, "settings.preset", map[string]any{"preset": v, "changes": len(changes)}),
-		h.reply(ctx, c, "cmd.preset", map[string]string{"preset": v, "group": h.groupName(ctx, c.group)}),
+		h.reply(ctx, c, "cmd.preset", map[string]string{"preset": v, "group": h.groupName(ctx, c.group), "how": h.askingWords(ctx, c, mode)}),
 	)
 }
 

@@ -23,10 +23,11 @@ var commandTexts = Catalog{
 			"{prefix}reviewgroup here – get cases in an admins-only group\n\n" +
 			"*Settings*\n" +
 			"{prefix}status – how this group is set up\n" +
-			"{prefix}preset strict – choose how strict I am\n" +
-			"{prefix}mode shadow – watch only, change nothing\n" +
-			"{prefix}askadmins delete – delete spam right away, ask before banning\n" +
-			"{prefix}settings – see the main settings\n\n" +
+			"{prefix}preset standard – how strict I am (also relaxed, strict, ask)\n" +
+			"{prefix}mode enforce – act on spam (also shadow to watch only, pause to stop)\n" +
+			"{prefix}askadmins before – ask the admins before acting (also delete, off)\n" +
+			"{prefix}settings – see the main settings\n" +
+			"{prefix}help settings explains each choice.\n\n" +
 			"*Blacklist*\n" +
 			"{prefix}blacklist add +966551234567 – block a phone number\n" +
 			"{prefix}blacklist list – see the list\n\n" +
@@ -42,7 +43,7 @@ var commandTexts = Catalog{
 			"_Example:_ reply {prefix}ban spam to an ad.\n" +
 			"I never act on group admins.",
 		"cmd.help.reviews": "*Reviews*\n" +
-			"When I'm not sure about a message, I open a case with a code like #K7Q2.\n\n" +
+			"When I flag a message and need an admin to decide, I open a case with a code like #K7Q2.\n\n" +
 			"*Where cases go*\n" +
 			"Without a review group, cases wait for you: send {prefix}pending to see them.\n" +
 			"{prefix}reviewgroup here – send this in a separate admins-only group to get cases there as they come in\n" +
@@ -52,20 +53,32 @@ var commandTexts = Catalog{
 			"Anywhere: {prefix}review K7Q2 ban or {prefix}review K7Q2 ok\n\n" +
 			"*If nobody decides*\n" +
 			"{prefix}review timeout 6h keep – after 6 hours, keep it deleted and ban no one\n" +
-			"Instead of keep: delete, ban or dismiss.",
+			"Instead of keep: delete, ban or dismiss.\n" +
+			"With {prefix}askadmins before, the message stays up instead, and after 15 minutes (by default) I delete it without a ban.",
 		"cmd.help.settings": "*Settings*\n" +
 			"{prefix}status – how this group is set up\n" +
 			"{prefix}settings – the main settings\n" +
-			"{prefix}preset standard – how strict I am: relaxed, standard or strict\n" +
+			"\n" +
+			"*How strict I am*\n" +
+			"{prefix}preset relaxed – act only when I'm very sure\n" +
+			"{prefix}preset standard – the default\n" +
+			"{prefix}preset strict – act sooner on suspicious messages\n" +
 			"{prefix}preset ask – delete spam right away, and ask the admins before banning\n" +
+			"\n" +
+			"*What I do*\n" +
 			"{prefix}mode enforce – act on spam\n" +
 			"{prefix}mode shadow – watch only: I note what I would do\n" +
 			"{prefix}mode pause – stop acting until you switch back\n" +
-			"{prefix}askadmins delete – delete spam right away, and ask the admins before banning\n" +
-			"{prefix}askadmins before – keep the message until an admin decides\n" +
+			"\n" +
+			"*Asking the admins*\n" +
+			"{prefix}askadmins before – keep the message up and ask; if nobody decides in 15 minutes (by default), I delete it, no ban\n" +
+			"{prefix}askadmins delete – delete spam right away, and ask before banning\n" +
 			"{prefix}askadmins off – act automatically\n" +
+			"\n" +
+			"*Message types*\n" +
 			"{prefix}block links – delete a type of message (also invites, images, videos…)\n" +
-			"{prefix}allow stickers – allow a type again\n\n" +
+			"{prefix}allow stickers – allow a type again\n" +
+			"\n" +
 			"Any setting by name: {prefix}get review.timeout, {prefix}set review.timeout 12h",
 		"cmd.help.blacklist": "*Blacklist*\n" +
 			"{prefix}blacklist add +966551234567 scam – ban this number here, now and if they come back\n" +
@@ -82,19 +95,24 @@ var commandTexts = Catalog{
 		"cmd.login_no_site": "Logging in isn't part of this version. Send {prefix}help to see the commands.",
 		"cmd.unavailable":   "{cmd} isn't available in this version.",
 
-		"cmd.saved":               "✔ Saved for *{group}*\n{changes}",
-		"cmd.value":               "{key} = {value}",
-		"cmd.destination_pending": "no review group (cases wait for .pending)",
-		"cmd.unknown_key":         "There's no setting called {key}. Send .settings for the main ones, or .help settings.",
-		"cmd.invalid_value":       "{value} isn't a valid value for {key}: {reason}",
-		"cmd.settings":            "*{group}*\n{summary}\n\nChange one with .set <key> <value>. More: .help settings",
-		"cmd.settings_web":        "*{group}*\n{summary}\n\nAll settings: {url}",
-		"cmd.status":              "*{group}*\n{summary}\n\n*Today:* {deleted} deleted · {banned} banned · {pending} waiting for review",
-		"cmd.status_pending":      "*{group}*\n{summary}\n\n*Waiting for review:* {pending}",
-		"cmd.status_brief":        "*{group}*\n{summary}",
-		"cmd.preset":              "*{group}* now uses the *{preset}* preset. The auto-ban table was reset to match.",
-		"cmd.autoban_grid":        "*Auto-ban table*\n{grid}",
-		"cmd.autoban_ai_refused":  "AI evidence can't auto-ban here until it has a track record. Use known evidence, or ask.",
+		"cmd.saved":                       "✔ Saved for *{group}*\n{changes}",
+		"cmd.value":                       "{key} = {value}",
+		"cmd.destination_pending":         "no review group (cases wait for .pending)",
+		"cmd.unknown_key":                 "There's no setting called {key}. Send .settings for the main ones, or .help settings.",
+		"cmd.invalid_value":               "{value} isn't a valid value for {key}: {reason}",
+		"cmd.settings":                    "*{group}*\n{summary}\n\nChange one with .set <key> <value>. More: .help settings",
+		"cmd.settings_web":                "*{group}*\n{summary}\n\nAll settings: {url}",
+		"cmd.status":                      "*{group}*\n{summary}\n\n*Today:* {deleted} deleted · {banned} banned · {pending} waiting for review",
+		"cmd.status_pending":              "*{group}*\n{summary}\n\n*Waiting for review:* {pending}",
+		"cmd.status_brief":                "*{group}*\n{summary}",
+		"cmd.preset":                      "*{group}* now uses the *{preset}* preset. The auto-ban table was reset to match.\n*Before acting:* {how}",
+		"cmd.asking":                      "*Before acting:* {how}",
+		"cmd.ask.auto":                    "act automatically",
+		"cmd.ask.ask_delete_first":        "delete spam, ask the admins before banning",
+		"cmd.ask.ask_before_action":       "ask the admins ({timeout}, then delete without a ban)",
+		"cmd.ask.ask_before_action_leave": "ask the admins ({timeout}, then leave the message)",
+		"cmd.autoban_grid":                "*Auto-ban table*\n{grid}",
+		"cmd.autoban_ai_refused":          "AI evidence can't auto-ban here until it has a track record. Use known evidence, or ask.",
 
 		"cmd.never_admin":     "I never act on group admins or on myself.",
 		"cmd.ban_ask_reason":  "Banned. Reason? Reply spam or other (no answer counts as other).",
@@ -139,12 +157,12 @@ var commandTexts = Catalog{
 		"cmd.usage.set":            "Send a setting and its value:\n.set review.timeout 12h – wait 12 hours for a decision",
 		"cmd.usage.get":            "Send a setting's name:\n.get review.timeout – show how long I wait for a decision",
 		"cmd.usage.mode":           "Choose a mode:\n.mode enforce – act on spam\n.mode shadow – watch only, change nothing\n.mode pause – stop acting until you switch back",
-		"cmd.usage.preset":         "Choose how strict I am:\n.preset relaxed – act only on clear spam\n.preset standard – the default\n.preset strict – act sooner\n.preset ask – delete spam right away, and ask the admins before banning",
+		"cmd.usage.preset":         "Choose how strict I am:\n.preset relaxed – act only when I'm very sure\n.preset standard – the default\n.preset strict – act sooner on suspicious messages\n.preset ask – delete spam right away, and ask the admins before banning",
 		"cmd.usage.toggle":         "Add on or off, for example .silent on",
 		"cmd.usage.policy":         "Choose what happens to messages that break the group's rules:\n.policy delete – delete them\n.policy ask – ask the admins\n.policy ban – delete and ban",
 		"cmd.usage.content":        "Name a type of message:\n.block links – delete links\n.allow stickers – allow stickers again\n*Types:* links, invites, channels, contacts, images, videos, stickers, documents, audio, polls, locations, events, view_once",
 		"cmd.usage.autoban":        ".autoban – show the auto-ban table\n.autoban links auto – ban known link spam without asking\n.autoban links ask – ask the admins first\nOther actions: delete, allow",
-		"cmd.usage.askadmins":      "Choose when I ask the admins:\n.askadmins delete – delete spam right away, and ask the admins before banning\n.askadmins before – keep the message until an admin decides\n.askadmins off – act automatically",
+		"cmd.usage.askadmins":      "Choose when I ask the admins:\n.askadmins delete – delete spam right away, and ask the admins before banning\n.askadmins before – keep the message up and ask; if nobody decides in 15 minutes (by default), I delete it, no ban\n.askadmins off – act automatically",
 		"cmd.usage.ban":            "Reply to the message (or @mention the person) with:\n.ban spam – ban and remember it as spam\n.ban other – ban for another reason",
 		"cmd.usage.kick":           "Reply to the message (or @mention the person) with:\n.kick – remove them; they can rejoin",
 		"cmd.usage.unban":          "Send the number, or reply to their message:\n.unban +966551234567 – lift the ban",
@@ -162,7 +180,7 @@ var commandTexts = Catalog{
 			"*Three steps to start*\n" +
 			"1. Add me to your group.\n" +
 			"2. Make me an admin there.\n" +
-			"3. Choose where uncertain cases go:\n" +
+			"3. Choose where the cases I flag go:\n" +
 			"- send .pending here to see them with their codes, then decide one: .review K7Q2 ban or .review K7Q2 ok\n" +
 			"- or send .reviewgroup here in a separate admins-only group to get them as they come in\n\n" +
 			"Send .help for all commands.",
@@ -170,17 +188,38 @@ var commandTexts = Catalog{
 			"*Three steps to start*\n" +
 			"1. Add me to your group.\n" +
 			"2. Make me an admin there.\n" +
-			"3. Choose where uncertain cases go: the website, or send .reviewgroup here in a separate admins-only group to get them as they come in.\n\n" +
+			"3. Choose where the cases I flag go: the website, or send .reviewgroup here in a separate admins-only group to get them as they come in.\n\n" +
 			"Send .help for all commands. Website: {url}",
-		"onboard.promoted": "🛡️ Protection is on in *{group}*. I stay silent there.\n\n" +
+		"onboard.promoted": "🛡️ Protection is on in *{group}*. I stay silent there.\n" +
+			"\n" +
 			"When I'm not sure about a message, I keep it as a case for you:\n" +
 			"- send .pending here to see them with their codes, then decide one: .review K7Q2 ban or .review K7Q2 ok\n" +
-			"- or send .reviewgroup here in a separate admins-only group to get them as they come in\n\n" +
+			"- or send .reviewgroup here in a separate admins-only group to get them as they come in\n" +
+			"\n" +
 			"_By default, if nobody decides in time, nobody is banned._",
-		"onboard.promoted_web": "🛡️ Protection is on in *{group}*. I stay silent there.\n\n" +
-			"When I'm not sure about a message, I keep it as a case for you on the website: {url}\n" +
-			"To get cases in WhatsApp, send .pending here, or .reviewgroup here in a separate admins-only group.\n" +
-			"_By default, if nobody decides in time, nobody is banned._",
+		"onboard.promoted_before": "🛡️ Protection is on in *{group}*. I stay silent there.\n" +
+			"\n" +
+			"I ask you before acting: when I flag a message, it stays up as a case for you.\n" +
+			"- send .pending here to see them with their codes, then decide one: .review K7Q2 ban or .review K7Q2 ok\n" +
+			"- or send .reviewgroup here in a separate admins-only group to get them as they come in\n" +
+			"\n" +
+			"_If nobody decides in {timeout}, I delete the message without a ban._" +
+			"\nSend .askadmins delete to have spam deleted right away.",
+		"onboard.promoted_before_leave": "🛡️ Protection is on in *{group}*. I stay silent there.\n" +
+			"\n" +
+			"I ask you before acting: when I flag a message, it stays up as a case for you.\n" +
+			"- send .pending here to see them with their codes, then decide one: .review K7Q2 ban or .review K7Q2 ok\n" +
+			"- or send .reviewgroup here in a separate admins-only group to get them as they come in\n" +
+			"\n" +
+			"_If nobody decides in {timeout}, I leave the message as it is._" +
+			"\nSend .askadmins delete to have spam deleted right away.",
+		"onboard.promoted_delete": "🛡️ Protection is on in *{group}*. I stay silent there.\n" +
+			"\n" +
+			"I delete spam right away and ask you before banning. Each ban waits as a case for you:\n" +
+			"- send .pending here to see them with their codes, then decide one: .review K7Q2 ban or .review K7Q2 ok\n" +
+			"- or send .reviewgroup here in a separate admins-only group to get them as they come in\n" +
+			"\n" +
+			"_If nobody decides in time, nobody is banned._",
 		"onboard.not_admin":        "⚠️ I'm in {group} but I'm not an admin there, so I can't protect it. Make me an admin and I'll start.",
 		"onboard.joined":           "✔ Joined {group}. Make me an admin there to turn protection on.",
 		"onboard.join_not_admin":   "You need to be an admin of {group} for me to join it.",
@@ -206,10 +245,11 @@ var commandTexts = Catalog{
 			"{prefix}مجموعة_المراجعة here – استلام الحالات في مجموعة للمشرفين فقط\n\n" +
 			"*الإعدادات*\n" +
 			"{prefix}حالة – إعداد هذه المجموعة\n" +
-			"{prefix}نمط strict – درجة الصرامة\n" +
-			"{prefix}وضع shadow – المراقبة فقط دون أي إجراء\n" +
-			"{prefix}اسأل_المشرفين delete – حذف السبام فوراً والسؤال قبل الحظر\n" +
-			"{prefix}اعدادات – أهم الإعدادات\n\n" +
+			"{prefix}نمط standard – درجة الصرامة (وأيضاً relaxed و strict و ask)\n" +
+			"{prefix}وضع enforce – التصرف مع السبام (وأيضاً shadow للمراقبة فقط، و pause للتوقف)\n" +
+			"{prefix}اسأل_المشرفين before – سؤال المشرفين قبل التصرف (وأيضاً delete و off)\n" +
+			"{prefix}اعدادات – أهم الإعدادات\n" +
+			"{prefix}مساعدة الإعدادات تشرح كل خيار.\n\n" +
 			"*القائمة السوداء*\n" +
 			"{prefix}القائمة_السوداء add \u200e+966551234567 – منع رقم هاتف\n" +
 			"{prefix}القائمة_السوداء list – عرض القائمة\n\n" +
@@ -225,7 +265,7 @@ var commandTexts = Catalog{
 			"_مثال:_ رُدّ بـ {prefix}حظر سبام على إعلان.\n" +
 			"لا أتخذ أي إجراء ضد مشرفي المجموعة.",
 		"cmd.help.reviews": "*المراجعات*\n" +
-			"عندما لا أكون متأكداً من رسالة، أفتح حالة برمز مثل \u200e#K7Q2.\n\n" +
+			"عندما أرصد رسالة وأحتاج إلى قرار مشرف، أفتح حالة برمز مثل \u200e#K7Q2.\n\n" +
 			"*أين تذهب الحالات*\n" +
 			"دون مجموعة مراجعة، تنتظرك الحالات: أرسل {prefix}معلق لعرضها.\n" +
 			"{prefix}مجموعة_المراجعة here – أرسلها في مجموعة منفصلة للمشرفين فقط لتصلك الحالات فيها أولاً بأول\n" +
@@ -235,20 +275,32 @@ var commandTexts = Catalog{
 			"من أي مكان: {prefix}مراجعة K7Q2 ban أو {prefix}مراجعة K7Q2 ok\n\n" +
 			"*إن لم يقرر أحد*\n" +
 			"{prefix}مراجعة timeout 6h keep – بعد ٦ ساعات تبقى الرسالة محذوفة ولا يُحظر أحد\n" +
-			"بدلاً من keep: delete أو ban أو dismiss.",
+			"بدلاً من keep: delete أو ban أو dismiss.\n" +
+			"مع {prefix}اسأل_المشرفين before تبقى الرسالة ظاهرة، وبعد ١٥ دقيقة (افتراضياً) أحذفها بلا حظر.",
 		"cmd.help.settings": "*الإعدادات*\n" +
 			"{prefix}حالة – إعداد هذه المجموعة\n" +
 			"{prefix}اعدادات – أهم الإعدادات\n" +
-			"{prefix}نمط standard – درجة الصرامة: relaxed أو standard أو strict\n" +
+			"\n" +
+			"*درجة الصرامة*\n" +
+			"{prefix}نمط relaxed – أتصرف فقط عندما أكون متأكداً جداً\n" +
+			"{prefix}نمط standard – الإعداد الافتراضي\n" +
+			"{prefix}نمط strict – أتصرف أسرع مع الرسائل المريبة\n" +
 			"{prefix}نمط ask – حذف السبام فوراً، وسؤال المشرفين قبل الحظر\n" +
+			"\n" +
+			"*ما أفعله*\n" +
 			"{prefix}وضع enforce – التصرف مع السبام\n" +
 			"{prefix}وضع shadow – المراقبة فقط: أسجّل ما كنت سأفعله\n" +
 			"{prefix}وضع pause – التوقف حتى تعيد التشغيل\n" +
-			"{prefix}اسأل_المشرفين delete – حذف السبام فوراً، وسؤال المشرفين قبل الحظر\n" +
-			"{prefix}اسأل_المشرفين before – إبقاء الرسالة حتى يقرر أحد المشرفين\n" +
+			"\n" +
+			"*سؤال المشرفين*\n" +
+			"{prefix}اسأل_المشرفين before – إبقاء الرسالة وسؤال المشرفين؛ إن لم يقرر أحد خلال ١٥ دقيقة (افتراضياً) أحذفها بلا حظر\n" +
+			"{prefix}اسأل_المشرفين delete – حذف السبام فوراً، والسؤال قبل الحظر\n" +
 			"{prefix}اسأل_المشرفين off – التصرف تلقائياً\n" +
+			"\n" +
+			"*أنواع الرسائل*\n" +
 			"{prefix}منع links – حذف نوع من الرسائل (وأيضاً invites وimages وvideos…)\n" +
-			"{prefix}سماح stickers – السماح بنوع من جديد\n\n" +
+			"{prefix}سماح stickers – السماح بنوع من جديد\n" +
+			"\n" +
 			"أي إعداد باسمه: {prefix}عرض review.timeout، {prefix}ضبط review.timeout 12h",
 		"cmd.help.blacklist": "*القائمة السوداء*\n" +
 			"{prefix}القائمة_السوداء add \u200e+966551234567 احتيال – حظر الرقم هنا الآن وإن عاد\n" +
@@ -265,19 +317,24 @@ var commandTexts = Catalog{
 		"cmd.login_no_site": "تسجيل الدخول ليس جزءاً من هذا الإصدار. أرسل {prefix}مساعدة لعرض الأوامر.",
 		"cmd.unavailable":   "الأمر {cmd} غير متاح في هذا الإصدار.",
 
-		"cmd.saved":               "✔ تم الحفظ لـ *{group}*\n{changes}",
-		"cmd.value":               "{key} = {value}",
-		"cmd.destination_pending": "بلا مجموعة مراجعة (الحالات تنتظر .معلق)",
-		"cmd.unknown_key":         "لا يوجد إعداد باسم {key}. أرسل .اعدادات لأهم الإعدادات، أو .مساعدة الإعدادات.",
-		"cmd.invalid_value":       "{value} ليست قيمة صحيحة لـ {key}: {reason}",
-		"cmd.settings":            "*{group}*\n{summary}\n\nلتغيير إعداد: \u200e.set <key> <value>. للمزيد: .مساعدة الإعدادات",
-		"cmd.settings_web":        "*{group}*\n{summary}\n\nكل الإعدادات: {url}",
-		"cmd.status":              "*{group}*\n{summary}\n\n*اليوم:* {deleted} حذف · {banned} حظر · {pending} بانتظار المراجعة",
-		"cmd.status_pending":      "*{group}*\n{summary}\n\n*بانتظار المراجعة:* {pending}",
-		"cmd.status_brief":        "*{group}*\n{summary}",
-		"cmd.preset":              "تستخدم *{group}* الآن النمط *{preset}*، وأُعيد ضبط جدول الحظر التلقائي ليطابقه.",
-		"cmd.autoban_grid":        "*جدول الحظر التلقائي*\n{grid}",
-		"cmd.autoban_ai_refused":  "لا يمكن لأدلة الذكاء الاصطناعي الحظر تلقائياً هنا قبل أن يكون لها سجل موثوق. استخدم الأدلة المعروفة أو اختر السؤال.",
+		"cmd.saved":                       "✔ تم الحفظ لـ *{group}*\n{changes}",
+		"cmd.value":                       "{key} = {value}",
+		"cmd.destination_pending":         "بلا مجموعة مراجعة (الحالات تنتظر .معلق)",
+		"cmd.unknown_key":                 "لا يوجد إعداد باسم {key}. أرسل .اعدادات لأهم الإعدادات، أو .مساعدة الإعدادات.",
+		"cmd.invalid_value":               "{value} ليست قيمة صحيحة لـ {key}: {reason}",
+		"cmd.settings":                    "*{group}*\n{summary}\n\nلتغيير إعداد: \u200e.set <key> <value>. للمزيد: .مساعدة الإعدادات",
+		"cmd.settings_web":                "*{group}*\n{summary}\n\nكل الإعدادات: {url}",
+		"cmd.status":                      "*{group}*\n{summary}\n\n*اليوم:* {deleted} حذف · {banned} حظر · {pending} بانتظار المراجعة",
+		"cmd.status_pending":              "*{group}*\n{summary}\n\n*بانتظار المراجعة:* {pending}",
+		"cmd.status_brief":                "*{group}*\n{summary}",
+		"cmd.preset":                      "تستخدم *{group}* الآن النمط *{preset}*، وأُعيد ضبط جدول الحظر التلقائي ليطابقه.\n*قبل التصرف:* {how}",
+		"cmd.asking":                      "*قبل التصرف:* {how}",
+		"cmd.ask.auto":                    "أتصرف تلقائياً",
+		"cmd.ask.ask_delete_first":        "أحذف السبام وأسأل المشرفين قبل الحظر",
+		"cmd.ask.ask_before_action":       "أسأل المشرفين ({timeout}، ثم حذف بلا حظر)",
+		"cmd.ask.ask_before_action_leave": "أسأل المشرفين ({timeout}، ثم إبقاء الرسالة)",
+		"cmd.autoban_grid":                "*جدول الحظر التلقائي*\n{grid}",
+		"cmd.autoban_ai_refused":          "لا يمكن لأدلة الذكاء الاصطناعي الحظر تلقائياً هنا قبل أن يكون لها سجل موثوق. استخدم الأدلة المعروفة أو اختر السؤال.",
 
 		"cmd.never_admin":     "لا أتخذ أي إجراء ضد المشرفين أو ضد نفسي.",
 		"cmd.ban_ask_reason":  "تم الحظر. ما السبب؟ رُدّ بـ سبام أو أخرى (عدم الرد يُعد أخرى).",
@@ -322,12 +379,12 @@ var commandTexts = Catalog{
 		"cmd.usage.set":            "أرسل الإعداد وقيمته:\n\u200e.set review.timeout 12h – انتظار القرار ١٢ ساعة",
 		"cmd.usage.get":            "أرسل اسم الإعداد:\n\u200e.get review.timeout – عرض مدة انتظار القرار",
 		"cmd.usage.mode":           "اختر الوضع:\n.وضع enforce – التصرف مع السبام\n.وضع shadow – المراقبة فقط دون أي تغيير\n.وضع pause – التوقف حتى تعيد التشغيل",
-		"cmd.usage.preset":         "اختر درجة الصرامة:\n.نمط relaxed – التصرف مع السبام الواضح فقط\n.نمط standard – الإعداد الافتراضي\n.نمط strict – التصرف أسرع\n.نمط ask – حذف السبام فوراً، وسؤال المشرفين قبل الحظر",
+		"cmd.usage.preset":         "اختر درجة الصرامة:\n.نمط relaxed – أتصرف فقط عندما أكون متأكداً جداً\n.نمط standard – الإعداد الافتراضي\n.نمط strict – أتصرف أسرع مع الرسائل المريبة\n.نمط ask – حذف السبام فوراً، وسؤال المشرفين قبل الحظر",
 		"cmd.usage.toggle":         "أضف on أو off، مثلاً .صامت on",
 		"cmd.usage.policy":         "اختر ما يحدث للرسائل المخالفة لقواعد المجموعة:\n.سياسة delete – حذفها\n.سياسة ask – سؤال المشرفين\n.سياسة ban – الحذف والحظر",
 		"cmd.usage.content":        "اذكر نوعاً من الرسائل:\n.منع links – حذف الروابط\n.سماح stickers – السماح بالملصقات من جديد\n*الأنواع:* links, invites, channels, contacts, images, videos, stickers, documents, audio, polls, locations, events, view_once",
 		"cmd.usage.autoban":        ".حظر_تلقائي – عرض جدول الحظر التلقائي\n.حظر_تلقائي links auto – حظر سبام الروابط المعروف دون سؤال\n.حظر_تلقائي links ask – سؤال المشرفين أولاً\nإجراءات أخرى: delete و allow",
-		"cmd.usage.askadmins":      "اختر متى أسأل المشرفين:\n.اسأل_المشرفين delete – حذف السبام فوراً، وسؤال المشرفين قبل الحظر\n.اسأل_المشرفين before – إبقاء الرسالة حتى يقرر أحد المشرفين\n.اسأل_المشرفين off – التصرف تلقائياً",
+		"cmd.usage.askadmins":      "اختر متى أسأل المشرفين:\n.اسأل_المشرفين delete – حذف السبام فوراً، وسؤال المشرفين قبل الحظر\n.اسأل_المشرفين before – إبقاء الرسالة وسؤال المشرفين؛ إن لم يقرر أحد خلال ١٥ دقيقة (افتراضياً) أحذفها بلا حظر\n.اسأل_المشرفين off – التصرف تلقائياً",
 		"cmd.usage.ban":            "رُدّ على الرسالة (أو أشر إلى الشخص) بـ:\n.حظر سبام – الحظر وحفظها كسبام\n.حظر أخرى – الحظر لسبب آخر",
 		"cmd.usage.kick":           "رُدّ على الرسالة (أو أشر إلى الشخص) بـ:\n.طرد – إزالته مع السماح بعودته",
 		"cmd.usage.unban":          "أرسل الرقم، أو رُدّ على رسالته:\n.فك_الحظر \u200e+966551234567 – رفع الحظر",
@@ -345,7 +402,7 @@ var commandTexts = Catalog{
 			"*ثلاث خطوات للبدء*\n" +
 			"1. أضفني إلى مجموعتك.\n" +
 			"2. اجعلني مشرفاً فيها.\n" +
-			"3. اختر أين تذهب الحالات غير المؤكدة:\n" +
+			"3. اختر أين تذهب الحالات التي أرصدها:\n" +
 			"- أرسل .معلق هنا لعرضها مع رموزها، ثم قرّر: .مراجعة K7Q2 ban أو .مراجعة K7Q2 ok\n" +
 			"- أو أرسل .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول\n\n" +
 			"أرسل .مساعدة لكل الأوامر.",
@@ -353,16 +410,37 @@ var commandTexts = Catalog{
 			"*ثلاث خطوات للبدء*\n" +
 			"1. أضفني إلى مجموعتك.\n" +
 			"2. اجعلني مشرفاً فيها.\n" +
-			"3. اختر أين تذهب الحالات غير المؤكدة: الموقع، أو أرسل .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول.\n\n" +
+			"3. اختر أين تذهب الحالات التي أرصدها: الموقع، أو أرسل .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول.\n\n" +
 			"أرسل .مساعدة لكل الأوامر. الموقع: {url}",
-		"onboard.promoted": "🛡️ الحماية مفعّلة في *{group}*، وأبقى صامتاً هناك.\n\n" +
+		"onboard.promoted": "🛡️ الحماية مفعّلة في *{group}*، وأبقى صامتاً هناك.\n" +
+			"\n" +
 			"عندما لا أكون متأكداً من رسالة، أحتفظ بها كحالة لك:\n" +
 			"- أرسل .معلق هنا لعرضها مع رموزها، ثم قرّر: .مراجعة K7Q2 ban أو .مراجعة K7Q2 ok\n" +
-			"- أو أرسل .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول\n\n" +
+			"- أو أرسل .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول\n" +
+			"\n" +
 			"_افتراضياً، إن لم يقرر أحد في الوقت المحدد، لا يُحظر أحد._",
-		"onboard.promoted_web": "🛡️ الحماية مفعّلة في *{group}*، وأبقى صامتاً هناك.\n\n" +
-			"عندما لا أكون متأكداً من رسالة، أحتفظ بها كحالة لك على الموقع: {url}\n" +
-			"لاستلام الحالات في واتساب، أرسل .معلق هنا، أو .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط.\n" +
+		"onboard.promoted_before": "🛡️ الحماية مفعّلة في *{group}*، وأبقى صامتاً هناك.\n" +
+			"\n" +
+			"أسألك قبل التصرف: عندما أرصد رسالة، تبقى ظاهرة كحالة لك.\n" +
+			"- أرسل .معلق هنا لعرضها مع رموزها، ثم قرّر: .مراجعة K7Q2 ban أو .مراجعة K7Q2 ok\n" +
+			"- أو أرسل .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول\n" +
+			"\n" +
+			"_إن لم يقرر أحد خلال {timeout}، أحذف الرسالة بلا حظر._" +
+			"\nأرسل .اسأل_المشرفين delete لحذف السبام فوراً.",
+		"onboard.promoted_before_leave": "🛡️ الحماية مفعّلة في *{group}*، وأبقى صامتاً هناك.\n" +
+			"\n" +
+			"أسألك قبل التصرف: عندما أرصد رسالة، تبقى ظاهرة كحالة لك.\n" +
+			"- أرسل .معلق هنا لعرضها مع رموزها، ثم قرّر: .مراجعة K7Q2 ban أو .مراجعة K7Q2 ok\n" +
+			"- أو أرسل .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول\n" +
+			"\n" +
+			"_إن لم يقرر أحد خلال {timeout}، أترك الرسالة كما هي._" +
+			"\nأرسل .اسأل_المشرفين delete لحذف السبام فوراً.",
+		"onboard.promoted_delete": "🛡️ الحماية مفعّلة في *{group}*، وأبقى صامتاً هناك.\n" +
+			"\n" +
+			"أحذف السبام فوراً وأسألك قبل الحظر. ينتظر كل حظر كحالة لك:\n" +
+			"- أرسل .معلق هنا لعرضها مع رموزها، ثم قرّر: .مراجعة K7Q2 ban أو .مراجعة K7Q2 ok\n" +
+			"- أو أرسل .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول\n" +
+			"\n" +
 			"_افتراضياً، إن لم يقرر أحد في الوقت المحدد، لا يُحظر أحد._",
 		"onboard.not_admin":        "⚠️ أنا في {group} لكنني لست مشرفاً فيها، فلا أستطيع حمايتها. اجعلني مشرفاً وسأبدأ.",
 		"onboard.joined":           "✔ انضممت إلى {group}. اجعلني مشرفاً لتفعيل الحماية.",

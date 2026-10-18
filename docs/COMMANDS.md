@@ -10,7 +10,7 @@ is ignored. The full design is in [DESIGN.md](DESIGN.md) §9.5, §9.7, §9.8, §
 | Where | Which group the command acts on |
 |---|---|
 | The protected group | That group. |
-| A DM with the bot | The group picked with `.use <name>` (remembered for an hour), or your only group. `.groups` lists them. |
+| A DM with the bot | Your only group, or the one picked with `.use` (remembered for an hour). `.groups` lists your groups numbered by name; `.use 2` picks the second, and `.use cars` the only one whose name contains "cars". An exact name wins over a number, so a group named "2" is still reachable. `.reviewgroup here` takes a number or name the same way. |
 | A review group | The group named in the review you reply to, the only group it serves, or the one picked with `.use`. |
 
 The bot DMs only people who have messaged it first. The one exception: a reply to a command you
@@ -55,12 +55,12 @@ commands write the same keys:
 |---|---|
 | `.status` | shows preset, mode, review destination and how many cases wait for a decision |
 | `.mode shadow\|enforce\|pause` | `mode` |
-| `.preset relaxed\|standard\|strict\|ask` | `preset` (resets the auto-ban matrix) |
+| `.preset relaxed\|standard\|strict\|ask` | `preset` (resets the auto-ban matrix; a group that asks its admins keeps asking, and the reply says so) |
 | `.silent on\|off`, `.newsignal on\|off`, `.ladder on\|off` | `silent`, `new_members.just_joined.enabled`, `ladder.enabled` |
 | `.policy delete\|ask\|ban` | `policy.action` |
 | `.block videos`, `.allow stickers`, `.blocknew links` | `content.<type>` |
 | `.autoban` / `.autoban <type> auto\|ask\|delete\|allow [known\|known,ai]` | `enforcement.autoban_matrix.<type>.*`. `ai` is refused until AI evidence has a track record. |
-| `.askadmins off\|delete\|before` | `enforcement.mode` |
+| `.askadmins delete`, `.askadmins before`, `.askadmins off` | `enforcement.mode`: delete spam right away and ask before banning (`ask_delete_first`), keep the message until an admin decides (`ask_before_action`), or act automatically (`auto`). `.preset ask` sets `ask_delete_first`. |
 
 Every change is written to the audit log.
 

@@ -950,7 +950,7 @@ Configurable per group (`review.send`):
 | Raids, "bot lost admin", breaker open | on (notify only, no decision) | Alerts. |
 | Daily digest | off | One summary message per day instead of a message per item. |
 
-While an item waits, the spam is normally already deleted and only the **ban** waits. Only ask-admins mode (b) (`enforcement.mode: ask_before_action`, §8.3) leaves the message visible until an admin decides or the short timeout hits.
+While an item waits, the spam is normally already deleted and only the **ban** waits. Only ask-admins mode (b) (`enforcement.mode: ask_before_action`, §8.3) leaves the message visible until an admin decides or the short timeout hits. New groups start in mode (b) unless the operator configures otherwise (§12.2).
 
 #### Where reviews go
 
@@ -1384,6 +1384,10 @@ All presets share the same defaults: **silent**; spam deleted instantly for ever
 | **Ask admins** | everything `ask`; `enforcement.mode = ask_delete_first` (variant (a)); can be switched to (b) `ask_before_action` | no auto-bans at all, including incoming network bans | groups that want a human behind every ban |
 
 A **delete-only** setup is just any preset with every matrix cell set to `delete_only` (website: "Never ban automatically, just delete").
+
+**New groups start by asking the admins** (maintainer decision of 2026-10-18). A group with no stored settings starts from the defaults with `enforcement.mode = ask_before_action`: the message stays up, admins are asked to delete and ban together, and with no decision within `enforcement.ask_before.timeout` (15 minutes) it is deleted without a ban. The operator sets this in `config.yaml` (`new_groups.ask_admins`: `before`, the default; `delete` for `ask_delete_first`; `off` for `auto`). The group's first saved change stores it with the rest of the document; `policy.Defaults()` itself keeps `auto`.
+
+**A preset never turns asking off** (same decision). Switching preset resets the matrix and the extras, but a group whose mode asks admins keeps its mode unless the new preset is Ask admins, which sets `ask_delete_first`. Only `.askadmins off` (or `.set enforcement.mode auto`) stops asking.
 
 ### 12.3 Lists and scopes
 

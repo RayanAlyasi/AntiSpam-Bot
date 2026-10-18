@@ -29,7 +29,12 @@ func applyPreset(s *Settings, p Preset) {
 		return
 	}
 	s.Enforcement.AutobanMatrix = presetMatrix(p)
-	s.Enforcement.Mode = presetMode[p]
+	// A group that asks its admins keeps asking when it switches to another preset: only the
+	// Ask admins preset sets an ask mode, and no preset turns asking off (maintainer decision of
+	// 2026-10-18). .askadmins off does that.
+	if m := presetMode[p]; m.AsksAdmins() || !s.Enforcement.Mode.AsksAdmins() {
+		s.Enforcement.Mode = m
+	}
 	s.Detection.Thresholds.Delete = presetDelete[p]
 	if s.Review.OnTimeout == TimeoutAutoBan && s.Enforcement.Mode.AsksAdmins() {
 		s.Review.OnTimeout = TimeoutKeepDeletedNoBan

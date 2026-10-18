@@ -19,10 +19,11 @@ type Config struct {
 	LogModules     map[string]zerolog.Level // LOG_LEVEL module=level entries after the global level; nil when none
 	HashKey        string                   // HASH_KEY: keys the phone-number hashes; required to run the bot (NumberHashKey)
 
-	Pacing  Pacing  `yaml:"pacing"`
-	Presets Presets `yaml:"presets"`
-	Scoring Scoring `yaml:"scoring"`
-	AI      AI      `yaml:"ai"`
+	Pacing    Pacing    `yaml:"pacing"`
+	Presets   Presets   `yaml:"presets"`
+	NewGroups NewGroups `yaml:"new_groups"`
+	Scoring   Scoring   `yaml:"scoring"`
+	AI        AI        `yaml:"ai"`
 
 	// Warnings are non-fatal notes about risky settings, for the caller to log at start-up.
 	Warnings []string

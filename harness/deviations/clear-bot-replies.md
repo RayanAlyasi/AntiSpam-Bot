@@ -16,6 +16,15 @@
 3. **"Reply to decide" from `.pending` is not offered.** The `.pending` list isn't a review message,
    so replying to it decides nothing. The texts say `.review <code> ban` or `ok` instead, which is
    what works in a DM and in a review group.
-4. **`.review dashboard` without a website still sets `review.destination = dashboard`** (it stops
+4. **New groups start in `ask_before_action`, and a preset never turns asking off** (maintainer
+   decision of 2026-10-18; DESIGN.md §12.2 and §9.5 updated). There is no "settings created" step
+   at onboarding: a group without a stored document reads its starting settings from
+   `SettingsService`, and its first saved change stores them. So the starting mode is applied
+   there (`policy.WithNewGroupMode`, from config `new_groups.ask_admins`, default `before`), and
+   `policy.Defaults()` keeps `auto` for the committed and hidden tests built on it.
+   `applyPreset` keeps an ask mode unless the new preset is `ask_admins`; `PresetSettings` starts
+   from `Defaults()` (auto), so its results are unchanged. Pre-existing gap, not changed here:
+   `presets.default` in config is documented as "Preset for new groups" but nothing applies it.
+5. **`.review dashboard` without a website still sets `review.destination = dashboard`** (it stops
    posting to a review group, which the contract requires), and the reply says the cases now wait
    for `.pending`.

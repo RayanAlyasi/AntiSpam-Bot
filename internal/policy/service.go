@@ -67,7 +67,8 @@ type SettingsRepo interface {
 // SettingsService reads and changes group settings through a cache that listeners invalidate
 // when another process changes a document (NOTIFY). It's safe for concurrent use.
 type SettingsService struct {
-	repo SettingsRepo
+	repo    SettingsRepo
+	newMode EnforcementMode // enforcement.mode of a group with nothing stored yet; "" keeps Defaults()
 
 	mu    sync.Mutex
 	cache map[wa.JID]cached
@@ -80,13 +81,41 @@ type cached struct {
 	version int
 }
 
+// SettingsOption configures a SettingsService.
+type SettingsOption func(*SettingsService)
+
+// WithNewGroupMode makes a group with no stored settings start in enforcement mode m instead of
+// Defaults()' auto (config new_groups.ask_admins; a maintainer decision of 2026-10-18, DESIGN.md
+// §12.2). The group's first saved change stores that mode with everything else. An unknown mode
+// is ignored; config validation rejects it before it gets here.
+func WithNewGroupMode(m EnforcementMode) SettingsOption {
+	return func(s *SettingsService) {
+		if oneOf("enforcement.mode", m, EnforceAuto, EnforceAskDeleteFirst, EnforceAskBeforeAction) == nil {
+			s.newMode = m
+		}
+	}
+}
+
 // NewSettingsService returns a service over repo.
-func NewSettingsService(repo SettingsRepo) *SettingsService {
-	return &SettingsService{repo: repo, cache: map[wa.JID]cached{}, gen: map[wa.JID]uint64{}}
+func NewSettingsService(repo SettingsRepo, opts ...SettingsOption) *SettingsService {
+	s := &SettingsService{repo: repo, cache: map[wa.JID]cached{}, gen: map[wa.JID]uint64{}}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
+}
+
+// NewGroupSettings returns what a group with no stored document starts with.
+func (s *SettingsService) NewGroupSettings() Settings {
+	d := Defaults()
+	if s.newMode != "" {
+		d.Enforcement.Mode = s.newMode
+	}
+	return d
 }
 
 // Get returns the group's settings and their version. A group without a stored document gets
-// the defaults at version 0.
+// NewGroupSettings at version 0.
 func (s *SettingsService) Get(ctx context.Context, group wa.JID) (Settings, int, error) {
 	s.mu.Lock()
 	c, ok := s.cache[group]
@@ -124,7 +153,7 @@ func (s *SettingsService) load(ctx context.Context, group wa.JID) (Settings, int
 	if err != nil {
 		return Settings{}, 0, fmt.Errorf("load settings of %s: %w", group, err)
 	}
-	c := cached{s: Defaults()}
+	c := cached{s: s.NewGroupSettings()}
 	if ok {
 		parsed, err := ParseStored(doc.Doc)
 		if err != nil {

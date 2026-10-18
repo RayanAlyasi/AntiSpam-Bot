@@ -226,21 +226,18 @@ func (h *Handler) cmdReviewGroup(ctx context.Context, c *call) error {
 // after "here", or the only one they administer), and warns about members who aren't admins of
 // that group, because they'd see the evidence.
 func (h *Handler) reviewGroupHere(ctx context.Context, c *call) error {
-	groups, err := h.d.Groups.AdminGroups(ctx, c.person)
+	groups, err := h.adminGroups(ctx, c.person)
 	if err != nil {
-		return fmt.Errorf("groups of sender: %w", err)
+		return err
 	}
-	want := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(c.cmd.Rest, c.cmd.Args[0])))
-	var match []GroupRef
-	for _, g := range groups {
-		if want == "" || strings.ToLower(g.Name) == want || strings.Contains(strings.ToLower(g.Name), want) {
-			match = append(match, g)
-		}
+	want := strings.TrimSpace(strings.TrimPrefix(c.cmd.Rest, c.cmd.Args[0]))
+	target, ok := matchGroup(groups, want)
+	if want == "" && len(groups) == 1 {
+		target, ok = groups[0], true
 	}
-	if len(match) != 1 {
+	if !ok {
 		return h.reply(ctx, c, "cmd.reviewgroup_pick", map[string]string{"groups": groupList(groups), "prefix": h.d.Prefix})
 	}
-	target := match[0]
 	c.group = target.JID
 	if ok, err := h.set(ctx, c, "review.review_group", string(c.m.Chat)); err != nil || !ok {
 		return err

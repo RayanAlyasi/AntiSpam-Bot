@@ -25,7 +25,9 @@ ban, keep the optional ladder off and keep the invisible "just joined" signal on
 | `strict` | auto-ban on certain evidence for every type except view-once | delete line 0.80 |
 | `ask_admins` | every type is `ask` | `enforcement.mode = ask_delete_first` |
 
-Switching preset resets the matrix and the preset's extras and keeps your other changes. `.autoban`
+Switching preset resets the matrix and the preset's extras and keeps your other changes. A group
+that asks its admins (`ask_delete_first` or `ask_before_action`) keeps asking: only `ask_admins`
+changes the mode (to `ask_delete_first`), and only `.askadmins off` turns asking off. `.autoban`
 shows the current grid. `custom` keeps your grid and is
 compared against Standard.
 
@@ -61,11 +63,16 @@ Trust and tenure never change the score. Known spam is deleted whoever sent it.
 
 | Value | What happens |
 |---|---|
-| `auto` (default) | The routing above. |
+| `auto` | The routing above. |
 | `ask_delete_first` | Certain or AI-verified spam is deleted at once; the ban goes to admins. |
-| `ask_before_action` | Nothing is deleted or banned until an admin decides. If nobody answers within `enforcement.ask_before.timeout` (default `15m`), `enforcement.ask_before.on_timeout` applies: `delete_no_ban` (default) or `leave`. It can never ban. |
+| `ask_before_action` (new groups) | Nothing is deleted or banned until an admin decides. If nobody answers within `enforcement.ask_before.timeout` (default `15m`), `enforcement.ask_before.on_timeout` applies: `delete_no_ban` (default) or `leave`. It can never ban. |
 
 `review.on_timeout: auto_ban` is refused in both ask modes.
+
+**New groups start in `ask_before_action`.** The operator chooses the starting mode with
+`new_groups.ask_admins` in `config.yaml`: `before` (the default), `delete` (`ask_delete_first`)
+or `off` (`auto`). It applies to a group until its settings are first saved, which stores it.
+Admins change it at any time with `.askadmins before`, `.askadmins delete` or `.askadmins off`.
 
 ## Messages the bot isn't sure about
 

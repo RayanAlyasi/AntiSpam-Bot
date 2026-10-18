@@ -33,6 +33,9 @@ type InboxReplay struct {
 	HashKey []byte
 	Weights scoring.Weights // default scoring.DefaultWeights
 	Log     zerolog.Logger
+	// NewGroupMode is the enforcement mode of groups with no stored settings, as the live bot
+	// uses it (config new_groups.ask_admins); empty means policy.Defaults().
+	NewGroupMode policy.EnforcementMode
 }
 
 // Run replays rows received since since, for one group or every group, at most limit rows.
@@ -50,7 +53,11 @@ func (r InboxReplay) Run(ctx context.Context, group wa.JID, since time.Time, lim
 	if err := corpus.Reload(ctx); err != nil {
 		return replay.Report{}, err
 	}
-	settings := policy.NewSettingsService(store.NewPolicyStore(r.Pool))
+	var opts []policy.SettingsOption
+	if r.NewGroupMode != "" {
+		opts = append(opts, policy.WithNewGroupMode(r.NewGroupMode))
+	}
+	settings := policy.NewSettingsService(store.NewPolicyStore(r.Pool), opts...)
 	groups := &groups{settings: settings, protected: func(context.Context, wa.JID) (bool, error) { return true, nil }}
 	w := r.Weights
 	if w.Version == "" {

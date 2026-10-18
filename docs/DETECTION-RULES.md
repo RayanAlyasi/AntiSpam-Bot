@@ -151,6 +151,28 @@ itself. Removing the entry lifts the signal at the next reload.
 WhatsApp's own domain is never stored as a learned domain; invite and channel links keep their
 target instead.
 
+**Matching.** Every message is compared with the corpus after the allow-list check, at three
+levels. The best one counts, and only the first is known evidence:
+
+| Level | Signal | Weight | When |
+|---|---|---|---|
+| near-duplicate | `corpus.near_duplicate` | +4.0, known | SimHash within 3 bits, or MinHash Jaccard ≥ 0.9 (an entry needs 4 tokens) |
+| similar | `corpus.similar` | +3.5 | SimHash within 12 bits, or MinHash Jaccard ≥ 0.4: reaches T_review alone |
+| related | `corpus.related` | +2.5 | the match terms overlap: Jaccard ≥ 0.2, or ≥ 40% of the smaller side's terms with at least 6 terms there. Below T_review alone |
+
+Match terms are the words that say what a message is about. Links and the words that only
+describe them ("join", "group", `رابط`, `قروب`), redaction placeholders, numbers under 3 digits,
+and common Arabic and English function words and greetings are left out. An Arabic word loses
+its leading article and conjunction, so `والواجبات`, `الواجبات` and `واجبات` are one term.
+Containment catches a short ad whose words all sit inside a longer one from the same campaign.
+
+A related match adds up with other evidence. Most often that is **`contact.advertised`** (+1.0):
+the message offers a way to reach someone outside the group, such as a phone number, a contact
+card, a `wa.me` or send link, a group or channel invite, or a Telegram link. Related wording plus
+a contact channel reaches T_review (p ≈ 0.62), so the message goes to the AI, or to admins without
+one. Neither signal deletes or bans on its own. An ordinary message that shares the vocabulary
+("I got a sick note and a medical report") but offers no contact stays clean.
+
 **Promotion.** `app.corpus_confirmations` records one confirmation per pattern per group. The rule
 that promotes a pattern after 3 unrelated groups confirm it counts these.
 

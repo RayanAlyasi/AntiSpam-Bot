@@ -22,6 +22,10 @@ type Fingerprint struct {
 	// fewer than MinCertainTokens tokens can only match loosely: "thank you all" must never make
 	// every "thank you all!!" known spam.
 	Tokens int
+	// Terms are the sorted hashes of the text's match terms (see Terms), which the Related band
+	// compares. Compute leaves them empty; FingerprintNorm fills them. A fingerprint without
+	// terms never matches as Related, so stored allow-list fingerprints work as before.
+	Terms []uint64
 }
 
 // MinCertainTokens is the fewest distinct tokens a corpus entry needs before a near-copy of it is
@@ -90,9 +94,20 @@ func Compute(norm string) Fingerprint {
 // like the original. Fingerprints of stored and live texts must both be computed from keys.
 func Key(norm string) string { return strings.ToLower(normalize.Skeleton(strings.ToLower(norm))) }
 
+// FingerprintNorm fingerprints normalized text the way the analyzer sees it: Compute of its key,
+// plus its match terms for the Related band. Use it for confirmed-spam entries rebuilt from their
+// stored normalized text.
+func FingerprintNorm(norm string) Fingerprint {
+	fp := Compute(Key(norm))
+	if !fp.Empty() {
+		fp.Terms = termHashes(norm)
+	}
+	return fp
+}
+
 // FingerprintText fingerprints a raw text the way the analyzer sees it: normalized (DESIGN.md
-// §7.2), keyed, then computed. Use it for confirmed-spam entries.
-func FingerprintText(raw string) Fingerprint { return Compute(Key(normalize.Text(raw).Norm)) }
+// §7.2), then FingerprintNorm. Use it for confirmed-spam entries.
+func FingerprintText(raw string) Fingerprint { return FingerprintNorm(normalize.Text(raw).Norm) }
 
 func tokenize(s string) []string {
 	return strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
@@ -147,24 +162,38 @@ func Jaccard(a, b Fingerprint) float64 {
 	return float64(same) / float64(len(a.MinHash))
 }
 
-// Thresholds are the CERTAIN and loose closeness limits. A fingerprint is CERTAIN when its
-// SimHash is within SimHashMaxDistance bits or its MinHash Jaccard is at least
+// Thresholds are the CERTAIN, loose and related closeness limits. A fingerprint is CERTAIN when
+// its SimHash is within SimHashMaxDistance bits or its MinHash Jaccard is at least
 // MinHashMinJaccard; loose (only a rules signal) within the looser pair.
+//
+// Related compares match terms (see Terms): the Jaccard of the two term sets is at least
+// RelatedMinJaccard, or the containment (shared terms over the smaller side's terms) is at least
+// RelatedMinContainment with RelatedMinTerms or more terms on the smaller side. It catches a
+// reworded or shortened campaign message, which shares the wording but not the word set. A zero
+// limit turns its test off, so thresholds without the related fields never match as Related.
 type Thresholds struct {
 	SimHashMaxDistance      int
 	MinHashMinJaccard       float64
 	LooseSimHashMaxDistance int
 	LooseMinHashMinJaccard  float64
+	RelatedMinJaccard       float64
+	RelatedMinContainment   float64
+	RelatedMinTerms         int
 }
 
 // DefaultThresholds returns the defaults: the tight CERTAIN limits of DESIGN.md §7.0 and §12.1
-// (`detection.certain`: 3 bits, Jaccard 0.9) and loose limits of 12 bits or Jaccard 0.4.
+// (`detection.certain`: 3 bits, Jaccard 0.9), loose limits of 12 bits or Jaccard 0.4, and
+// related limits of term Jaccard 0.2 or containment 0.4 over at least 6 terms.
 func DefaultThresholds() Thresholds {
-	return Thresholds{SimHashMaxDistance: 3, MinHashMinJaccard: 0.9, LooseSimHashMaxDistance: 12, LooseMinHashMinJaccard: 0.4}
+	return Thresholds{
+		SimHashMaxDistance: 3, MinHashMinJaccard: 0.9, LooseSimHashMaxDistance: 12, LooseMinHashMinJaccard: 0.4,
+		RelatedMinJaccard: 0.2, RelatedMinContainment: 0.4, RelatedMinTerms: 6,
+	}
 }
 
-// Validate reports whether the thresholds are usable: 0 ≤ certain distance ≤ loose distance ≤ 64
-// and 0 < loose Jaccard ≤ certain Jaccard ≤ 1, so loose is never stricter than certain.
+// Validate reports whether the thresholds are usable: 0 ≤ certain distance ≤ loose distance ≤ 64,
+// 0 < loose Jaccard ≤ certain Jaccard ≤ 1, so loose is never stricter than certain, and the
+// related limits are between 0 and 1 (terms: not negative).
 func (t Thresholds) Validate() error {
 	var errs []error
 	if t.SimHashMaxDistance < 0 || t.SimHashMaxDistance > t.LooseSimHashMaxDistance || t.LooseSimHashMaxDistance > 64 {
@@ -175,6 +204,10 @@ func (t Thresholds) Validate() error {
 		errs = append(errs, fmt.Errorf("minhash jaccard %v (certain) and %v (loose): want 0 < loose ≤ certain ≤ 1",
 			t.MinHashMinJaccard, t.LooseMinHashMinJaccard))
 	}
+	if !(t.RelatedMinJaccard >= 0 && t.RelatedMinJaccard <= 1) || !(t.RelatedMinContainment >= 0 && t.RelatedMinContainment <= 1) || t.RelatedMinTerms < 0 {
+		errs = append(errs, fmt.Errorf("related jaccard %v, containment %v and terms %d: want limits between 0 and 1 and terms ≥ 0",
+			t.RelatedMinJaccard, t.RelatedMinContainment, t.RelatedMinTerms))
+	}
 	return errors.Join(errs...)
 }
 
@@ -184,12 +217,15 @@ type Closeness int
 // Closeness levels.
 const (
 	None    Closeness = iota // not near any entry
+	Related                  // shares its wording: a weak rules signal, below T_review alone
 	Loose                    // related: a rules signal that sends the message to the AI
 	Certain                  // a near-copy: CERTAIN known evidence
 )
 
 func (c Closeness) String() string {
 	switch c {
+	case Related:
+		return "related"
 	case Loose:
 		return "loose"
 	case Certain:
@@ -206,7 +242,10 @@ type Match struct {
 	EntryID   string
 	Distance  int
 	Jaccard   float64
-	Allowed   bool
+	// Containment is the share of the smaller side's match terms the entry shares (0 when either
+	// fingerprint has no terms).
+	Containment float64
+	Allowed     bool
 }
 
 // Index holds confirmed-spam fingerprints and allow-listed fingerprints for one scope. It's safe
@@ -267,9 +306,10 @@ func (ix *Index) Allow(fp Fingerprint) {
 	ix.allowed = append(ix.allowed, clone(fp))
 }
 
-// Match finds the closest confirmed entry, after the allow-list check. Certain beats loose; among
-// equals the higher Jaccard, then the smaller distance, then the smaller ID wins, so the result
-// never depends on map order.
+// Match finds the closest confirmed entry, after the allow-list check. Certain beats loose beats
+// related; among related matches the higher containment wins, and among other equals the higher
+// Jaccard, then the smaller distance, then the smaller ID, so the result never depends on map
+// order. Related needs match terms on both fingerprints (FingerprintNorm).
 func (ix *Index) Match(fp Fingerprint) Match {
 	if fp.Empty() {
 		return Match{}
@@ -285,13 +325,17 @@ func (ix *Index) Match(fp Fingerprint) Match {
 	for id, e := range ix.entries {
 		d, j := Distance(fp, e), Jaccard(fp, e)
 		c := ix.closeness(d, j)
-		if c == None {
-			continue
-		}
 		if c == Certain && e.Tokens > 0 && e.Tokens < MinCertainTokens {
 			c = Loose
 		}
-		m := Match{Closeness: c, EntryID: id, Distance: d, Jaccard: j}
+		tj, tc := termCloseness(fp.Terms, e.Terms)
+		if c == None && ix.related(fp.Terms, e.Terms, tj, tc) {
+			c = Related
+		}
+		if c == None {
+			continue
+		}
+		m := Match{Closeness: c, EntryID: id, Distance: d, Jaccard: j, Containment: tc}
 		if better(m, best) {
 			best = m
 		}
@@ -327,10 +371,31 @@ func (ix *Index) closeness(d int, j float64) Closeness {
 	}
 }
 
+// termCloseness returns the Jaccard and containment of two sorted term-hash sets; 0, 0 when either
+// is empty.
+func termCloseness(a, b []uint64) (jaccard, containment float64) {
+	if len(a) == 0 || len(b) == 0 {
+		return 0, 0
+	}
+	n := shared(a, b)
+	return float64(n) / float64(len(a)+len(b)-n), float64(n) / float64(min(len(a), len(b)))
+}
+
+// related reports whether term closeness tj, tc of a and b is within the related limits.
+func (ix *Index) related(a, b []uint64, tj, tc float64) bool {
+	if len(a) == 0 || len(b) == 0 {
+		return false
+	}
+	return (ix.th.RelatedMinJaccard > 0 && tj >= ix.th.RelatedMinJaccard) ||
+		(ix.th.RelatedMinContainment > 0 && tc >= ix.th.RelatedMinContainment && min(len(a), len(b)) >= max(1, ix.th.RelatedMinTerms))
+}
+
 func better(a, b Match) bool {
 	switch {
 	case a.Closeness != b.Closeness:
 		return a.Closeness > b.Closeness
+	case a.Closeness == Related && a.Containment != b.Containment:
+		return a.Containment > b.Containment
 	case a.Jaccard != b.Jaccard:
 		return a.Jaccard > b.Jaccard
 	case a.Distance != b.Distance:
@@ -341,7 +406,7 @@ func better(a, b Match) bool {
 }
 
 func clone(fp Fingerprint) Fingerprint {
-	return Fingerprint{SimHash: fp.SimHash, MinHash: append([]uint64(nil), fp.MinHash...), Tokens: fp.Tokens}
+	return Fingerprint{SimHash: fp.SimHash, MinHash: append([]uint64(nil), fp.MinHash...), Tokens: fp.Tokens, Terms: append([]uint64(nil), fp.Terms...)}
 }
 
 // MinHashBytes encodes the MinHash signature for storage: 8 bytes per value, little-endian.

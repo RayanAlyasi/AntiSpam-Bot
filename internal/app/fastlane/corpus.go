@@ -68,7 +68,7 @@ func (c *Corpus) Reload(ctx context.Context) error {
 		return groups[g]
 	}
 	for _, r := range rows {
-		fp := neardup.Compute(neardup.Key(r.TextNorm))
+		fp := neardup.FingerprintNorm(r.TextNorm)
 		if fp.Empty() {
 			continue
 		}

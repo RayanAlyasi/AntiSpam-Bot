@@ -84,6 +84,14 @@ type AppBot struct {
 	CreatedAt   time.Time
 }
 
+type AppCommunityGroup struct {
+	CommunityJid string
+	GroupJid     string
+	Name         string
+	Announcement bool
+	RefreshedAt  time.Time
+}
+
 type AppCorpusAllow struct {
 	ID        int64
 	GroupJid  string
@@ -206,6 +214,9 @@ type AppGroup struct {
 	JoinedAt        pgtype.Timestamptz
 	Status          string
 	LastInfoRefresh pgtype.Timestamptz
+	Kind            string
+	CommunityJid    string
+	CommunityName   string
 }
 
 type AppGroupBan struct {

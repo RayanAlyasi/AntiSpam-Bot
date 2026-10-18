@@ -10,7 +10,7 @@ is ignored. The full design is in [DESIGN.md](DESIGN.md) §9.5, §9.7, §9.8, §
 | Where | Which group the command acts on |
 |---|---|
 | The protected group | That group. |
-| A DM with the bot | Your only group, or the one picked with `.use` (remembered for an hour). `.groups` lists your groups numbered by name; `.use 2` picks the second, and `.use cars` the only one whose name contains "cars". An exact name wins over a number, so a group named "2" is still reachable. `.reviewgroup here` takes a number or name the same way. |
+| A DM with the bot | Your only group, or the one picked with `.use` (remembered for an hour). `.groups` lists your groups numbered by name; `.use 2` picks the second, and `.use cars` the only one whose name contains "cars". An exact name wins over a number, so a group named "2" is still reachable. `.reviewgroup here` takes a number or name the same way. A community is listed with your groups in it indented under it, and `.use` on it picks all of them (see [Communities](#communities)). |
 | A review group | The group named in the review you reply to, the only group it serves, or the one picked with `.use`. |
 
 The bot DMs only people who have messaged it first. The one exception: a reply to a command you
@@ -30,8 +30,8 @@ examples for that part. Help lists only commands that work in this version. A co
 version doesn't have gets a short reply saying so.
 
 Replies use WhatsApp formatting: `*bold*` headings and labels, one item per line, numbered steps
-and a blank line between sections. All bot texts are in `internal/review/catalog.go` and
-`internal/review/catalog_cmd.go`, in English and Arabic.
+and a blank line between sections. All bot texts are in `internal/review/catalog.go`,
+`internal/review/catalog_cmd.go` and `internal/review/catalog_community.go`, in English and Arabic.
 
 ## Moderation
 
@@ -63,6 +63,34 @@ commands write the same keys:
 | `.askadmins delete`, `.askadmins before`, `.askadmins off` | `enforcement.mode`: delete spam right away and ask before banning (`ask_delete_first`), keep the message until an admin decides (`ask_before_action`), or act automatically (`auto`). `.preset ask` sets `ask_delete_first`. |
 
 Every change is written to the audit log.
+
+## Communities
+
+`.groups` lists each WhatsApp community you have groups in, numbered, with your groups in it
+indented under it, then the groups that aren't in a community:
+
+```
+1. *Riyadh Market* (community, 2 groups)
+   2. Cars
+   3. Phones
+4. Shop
+```
+
+`.use 1`, `.use riyadh market` or `.use market` (when only one name contains it) picks the
+community for the next hour. These commands then change every group of it that you're an admin
+of, and get one reply: `.mode`, `.preset`, `.askadmins`, `.block`, `.blocknew`, `.allow <type>`,
+`.set` and `.blacklist add` / `remove`. The reply says how many groups changed, which didn't and
+why, and which groups of the community the bot can't protect because it isn't in them or isn't an
+admin there. Add the bot to those groups yourself; it never joins them on its own. `.status` gives
+one line per group. Any other command works on one group at a time and asks you to pick one.
+
+A group where you aren't an admin is never changed. The settings you change on a community are also
+kept as the community's defaults: when the bot is added to (or made admin in) a new group of that
+community, the group starts with them instead of the normal starting settings. See
+[GROUP_SETTINGS.md](GROUP_SETTINGS.md#communities).
+
+The community's announcement group isn't listed: only admins post there, so there is nothing to
+protect.
 
 ## Reviews
 

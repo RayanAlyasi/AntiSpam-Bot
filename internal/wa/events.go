@@ -93,6 +93,20 @@ type GroupEvent struct {
 	Demote       []JID
 	// Pairs are LID↔PN links for the participants above, as whatsmeow's LID store knows them.
 	Pairs []JIDPair
+	// Link and Unlink report a group joining or leaving a community. The event may be about
+	// either side: Group is the event's group or Community is.
+	Link   *CommunityLink
+	Unlink *CommunityLink
+}
+
+// CommunityLink is a group linked to (or unlinked from) a community. Name is the other side's
+// name as the event gave it: the community's when the event is about the group, the group's when
+// it is about the community.
+type CommunityLink struct {
+	Community      JID
+	Group          JID
+	Name           string
+	IsAnnouncement bool
 }
 
 // JoinedGroupEvent means the bot joined or was added to a group. Info is the group's full

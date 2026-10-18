@@ -96,12 +96,16 @@ type ParticipantResult struct {
 
 // GroupInfo is a group's metadata and participant list.
 type GroupInfo struct {
-	JID            JID
-	Name           string
-	Topic          string
-	Owner          JID
-	OwnerPN        JID
-	LinkedParent   JID // the community this group belongs to, if any
+	JID          JID
+	Name         string
+	Topic        string
+	Owner        JID
+	OwnerPN      JID
+	LinkedParent JID // the community this group belongs to, if any
+	// IsCommunity is set for a community itself (its parent group), which holds no chat of its own.
+	IsCommunity bool
+	// IsAnnouncement is set for a community's announcement group, where only admins post.
+	IsAnnouncement bool
 	AddressingMode string
 	Announce       bool // only admins can send
 	Locked         bool // only admins can edit group info
@@ -117,6 +121,13 @@ type Participant struct {
 	LID          JID
 	IsAdmin      bool
 	IsSuperAdmin bool
+}
+
+// SubGroup is one group of a community, as the community lists it (the bot may not be in it).
+type SubGroup struct {
+	JID            JID
+	Name           string
+	IsAnnouncement bool // the community's announcement group
 }
 
 // JoinRequest is a pending request to join an approval-mode group.
@@ -199,6 +210,14 @@ type WAClient interface {
 	NewsletterInfo(ctx context.Context, jid JID) (NewsletterInfo, error)
 	// NewsletterInfoFromInvite resolves a channel invite code to the channel's metadata.
 	NewsletterInfoFromInvite(ctx context.Context, code string) (NewsletterInfo, error)
+}
+
+// CommunityReader lists a community's groups (DESIGN.md §12.4). The adapter's and the fake's
+// clients implement it next to WAClient; it's kept out of WAClient so existing WAClient doubles
+// stay valid. A caller with a WAClient type-asserts it.
+type CommunityReader interface {
+	// SubGroups lists a community's groups, including the ones the bot isn't in.
+	SubGroups(ctx context.Context, community JID) ([]SubGroup, error)
 }
 
 // Revoke is a "delete for everyone" the bot received: a sender deleting their own message or an

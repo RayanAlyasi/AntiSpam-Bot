@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -48,19 +49,20 @@ func newChatSink(pool *pgxpool.Pool, ws *waStack, settings *policy.SettingsServi
 		ops[strings.TrimPrefix(strings.ReplaceAll(p, " ", ""), "+")] = true
 	}
 	return &chatSink{handlers: map[wa.JID]*chat.Handler{}, deps: chat.Deps{
-		Groups:   chatGroups{ws: ws, settings: settings},
-		Admins:   identityAdmins{ws.ids},
-		Actions:  actions,
-		Reviews:  reviews,
-		Learning: learning,
-		Evidence: learning,
-		Settings: chat.DocSettings{Docs: settings},
-		Identity: chatIdentity{ws.ids},
-		Threads:  reviewpg.Threads{DB: pool},
-		Audit:    reviewpg.Audit{DB: pool},
-		Standing: noStanding{},
-		Clock:    clock.Real{},
-		Operator: func(j wa.JID) bool { return j.Server() == wa.ServerUser && ops[j.User()] },
+		Groups:      chatGroups{ws: ws, settings: settings},
+		Communities: chatGroups{ws: ws, settings: settings},
+		Admins:      identityAdmins{ws.ids},
+		Actions:     actions,
+		Reviews:     reviews,
+		Learning:    learning,
+		Evidence:    learning,
+		Settings:    chat.DocSettings{Docs: settings},
+		Identity:    chatIdentity{ws.ids},
+		Threads:     reviewpg.Threads{DB: pool},
+		Audit:       reviewpg.Audit{DB: pool},
+		Standing:    noStanding{},
+		Clock:       clock.Real{},
+		Operator:    func(j wa.JID) bool { return j.Server() == wa.ServerUser && ops[j.User()] },
 	}}
 }
 
@@ -148,7 +150,8 @@ func (g chatGroups) Name(ctx context.Context, group wa.JID) (string, error) {
 
 // AdminGroups lists the tracked groups where person is an admin, including ones still waiting
 // for the bot to be made admin: an admin can switch a group to shadow mode before the bot gets
-// the rights to act there (README "Try it in shadow mode first").
+// the rights to act there (README "Try it in shadow mode first"). A community's own entry and
+// its announcement group are left out: nobody but admins posts there.
 func (g chatGroups) AdminGroups(ctx context.Context, person wa.JID) ([]chat.GroupRef, error) {
 	p, ok, err := g.ws.ids.MatchPerson(ctx, person)
 	if err != nil || !ok {
@@ -164,7 +167,7 @@ func (g chatGroups) AdminGroups(ctx context.Context, person wa.JID) ([]chat.Grou
 		if err != nil {
 			return nil, err
 		}
-		if !ok || (r.Status != identity.GroupActive && r.Status != identity.GroupPendingAdmin) {
+		if !ok || !r.IsChat() || (r.Status != identity.GroupActive && r.Status != identity.GroupPendingAdmin) {
 			continue
 		}
 		m, ok, err := g.ws.ids.Member(ctx, j, p.ID)
@@ -172,11 +175,76 @@ func (g chatGroups) AdminGroups(ctx context.Context, person wa.JID) ([]chat.Grou
 			return nil, err
 		}
 		if ok && (m.Role == identity.RoleAdmin || m.Role == identity.RoleSuperAdmin) {
-			out = append(out, chat.GroupRef{JID: j, Name: r.Name})
+			ref := chat.GroupRef{JID: j, Name: r.Name, Community: r.Community, CommunityName: r.CommunityName}
+			if ref.Community != "" {
+				if ref.CommunityName, err = g.communityName(ctx, r); err != nil {
+					return nil, err
+				}
+			}
+			out = append(out, ref)
 		}
 	}
 	return out, nil
 }
+
+// communityName is the name of a group's community: the community's own row when the bot tracks
+// it (renames reach it first), otherwise the name stored with the group.
+func (g chatGroups) communityName(ctx context.Context, r identity.Group) (string, error) {
+	c, ok, err := g.ws.groups.Group(ctx, r.Community)
+	if err != nil {
+		return "", err
+	}
+	if ok && c.Kind == identity.KindCommunity && c.Name != "" {
+		return c.Name, nil
+	}
+	return r.CommunityName, nil
+}
+
+// CommunityGroups lists a community's groups from its stored list and the groups the bot tracks
+// in it, with the bot's standing in each; the announcement group is left out (DESIGN.md §12.4).
+func (g chatGroups) CommunityGroups(ctx context.Context, community wa.JID) ([]chat.CommunityGroup, error) {
+	listed, err := g.ws.groups.CommunityGroups(ctx, community)
+	if err != nil {
+		return nil, err
+	}
+	tracked, err := g.ws.groups.Groups(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byJID := map[wa.JID]chat.CommunityGroup{}
+	var order []wa.JID
+	add := func(cg chat.CommunityGroup) {
+		if _, ok := byJID[cg.JID]; !ok {
+			order = append(order, cg.JID)
+		}
+		byJID[cg.JID] = cg
+	}
+	announcement := map[wa.JID]bool{}
+	for _, s := range listed {
+		if s.IsAnnouncement {
+			announcement[s.JID] = true
+			continue
+		}
+		add(chat.CommunityGroup{JID: s.JID, Name: s.Name})
+	}
+	for _, r := range tracked {
+		if r.Community != community || !r.IsChat() || announcement[r.JID] {
+			continue
+		}
+		member := r.Status != identity.GroupLeft
+		add(chat.CommunityGroup{JID: r.JID, Name: cmpName(r.Name, byJID[r.JID].Name), Member: member, Admin: member && r.Status == identity.GroupActive})
+	}
+	out := make([]chat.CommunityGroup, 0, len(order))
+	for _, j := range order {
+		out = append(out, byJID[j])
+	}
+	slices.SortStableFunc(out, func(a, b chat.CommunityGroup) int {
+		return cmp.Or(cmp.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)), cmp.Compare(a.JID, b.JID))
+	})
+	return out, nil
+}
+
+func cmpName(a, b string) string { return cmp.Or(a, b) }
 
 func (g chatGroups) ServedBy(ctx context.Context, reviewGroup wa.JID) ([]wa.JID, error) {
 	groups, err := g.ws.groups.Groups(ctx, identity.GroupActive, identity.GroupPendingAdmin)

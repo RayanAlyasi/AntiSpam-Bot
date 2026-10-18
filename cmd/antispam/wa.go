@@ -26,6 +26,7 @@ import (
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/identity"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/inbox"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/logging"
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/policy"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/store"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/wa"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/wa/adapter/connector"
@@ -103,13 +104,15 @@ type waStack struct {
 	groups    identity.GroupStore
 	manager   *connector.Manager // nil without the connector role
 	connected *atomic.Int64
-	pacing    config.Pacing                                               // the action executors' pacing (config.yaml "pacing")
-	pairPhone string                                                      // PAIR_PHONE: pair by code at startup while no bot is paired
-	moderate  inbox.Sink                                                  // the detection fast lane (F-088); nil: moderated rows are only marked processed
-	chat      inbox.Sink                                                  // commands, DMs and review votes (wp-k's chat handler); nil: not handled
-	hooks     *groupHooks                                                 // wp-k: blacklist on joins and join requests, onboarding DMs; nil: none
-	runner    atomic.Pointer[actions.Runner]                              // the action executors, while the connector role runs
-	finished  atomic.Pointer[func(context.Context, actions.Action) error] // the review queue's completion hook
+	pacing    config.Pacing // the action executors' pacing (config.yaml "pacing")
+	// newGroupMode is the enforcement.mode a group with no settings starts in (new_groups.ask_admins).
+	newGroupMode policy.EnforcementMode
+	pairPhone    string                                                      // PAIR_PHONE: pair by code at startup while no bot is paired
+	moderate     inbox.Sink                                                  // the detection fast lane (F-088); nil: moderated rows are only marked processed
+	chat         inbox.Sink                                                  // commands, DMs and review votes (wp-k's chat handler); nil: not handled
+	hooks        *groupHooks                                                 // wp-k: blacklist on joins and join requests, onboarding DMs; nil: none
+	runner       atomic.Pointer[actions.Runner]                              // the action executors, while the connector role runs
+	finished     atomic.Pointer[func(context.Context, actions.Action) error] // the review queue's completion hook
 }
 
 // lidSwitch lets the identity service use the connector's LID resolver once it exists, and
@@ -182,7 +185,14 @@ func (s *waStack) connectorRole(databaseURL string, reg prometheus.Registerer, l
 			return err
 		}
 		defer parts.Close()
-		tracker := identity.NewTracker(s.ids, s.groups, parts, func(bot wa.JID) (wa.JID, wa.JID) { return mgr.Self(bot) }, s.clk, log)
+		// A new group of a community starts from the community's settings (DESIGN.md §12.4).
+		settings := policy.NewSettingsService(store.NewPolicyStore(s.pool), policy.WithNewGroupMode(s.newGroupMode))
+		tracker := identity.NewTracker(s.ids, s.groups, parts, func(bot wa.JID) (wa.JID, wa.JID) { return mgr.Self(bot) }, s.clk, log).
+			WithCommunities(communitySource{func(bot wa.JID) (wa.WAClient, bool) { return mgr.Client(bot) }},
+				func(ctx context.Context, g identity.Group) error {
+					_, err := settings.StartFrom(ctx, g.JID, g.Community, "system")
+					return err
+				})
 		writer := inbox.NewWriter(s.pool, s.clk)
 		sink := wa.EventSinkFunc(func(ctx context.Context, evt wa.Event) error {
 			switch evt.(type) {
@@ -248,6 +258,39 @@ func (s *waStack) autoPair(ctx context.Context, devices connector.DeviceLister, 
 	if err != nil {
 		log.Error().Err(err).Msg("PAIR_PHONE is set but unusable; not pairing")
 	}
+}
+
+// communitySource reads communities through the bot that reported the group.
+type communitySource struct {
+	clients clientFunc
+}
+
+func (c communitySource) client(bot wa.JID) (wa.WAClient, error) {
+	cl, ok := c.clients(bot)
+	if !ok {
+		return nil, fmt.Errorf("bot %s is not connected here", alert.MaskJID(bot))
+	}
+	return cl, nil
+}
+
+func (c communitySource) GroupInfo(ctx context.Context, bot, group wa.JID) (wa.GroupInfo, error) {
+	cl, err := c.client(bot)
+	if err != nil {
+		return wa.GroupInfo{}, err
+	}
+	return cl.GroupInfo(ctx, group)
+}
+
+func (c communitySource) SubGroups(ctx context.Context, bot, community wa.JID) ([]wa.SubGroup, error) {
+	cl, err := c.client(bot)
+	if err != nil {
+		return nil, err
+	}
+	r, ok := cl.(wa.CommunityReader)
+	if !ok {
+		return nil, fmt.Errorf("listing a community's groups: %w", errors.ErrUnsupported)
+	}
+	return r.SubGroups(ctx, community)
 }
 
 // groupInfo fetches a group's info through the bot that is in it.

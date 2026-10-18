@@ -213,6 +213,54 @@ func (s *SettingsService) ApplyPreset(ctx context.Context, group wa.JID, actor s
 	})
 }
 
+// StartFrom gives a group that has no settings of its own a copy of another document's settings:
+// a new group of a community starts with the community's defaults (DESIGN.md §12.4). The copy is
+// stored even when it equals what the group would start with, so the group keeps the community's
+// settings if the starting settings change. It changes nothing, and reports false, when the group
+// already has a stored document or from has none.
+func (s *SettingsService) StartFrom(ctx context.Context, group, from wa.JID, actor string) (bool, error) {
+	src, ok, err := s.repo.LoadSettings(ctx, from)
+	if err != nil {
+		return false, fmt.Errorf("load settings of %s: %w", from, err)
+	}
+	if !ok {
+		return false, nil
+	}
+	next, err := ParseStored(src.Doc)
+	if err != nil {
+		return false, fmt.Errorf("stored settings of %s (version %d): %w", from, src.Version, err)
+	}
+	if err := next.Validate(); err != nil {
+		return false, fmt.Errorf("settings of %s: %w", from, err)
+	}
+	cur, version, err := s.load(ctx, group)
+	if err != nil {
+		return false, err
+	}
+	if version != 0 {
+		return false, nil
+	}
+	changes, err := Diff(cur, next)
+	if err != nil {
+		return false, err
+	}
+	doc, err := json.Marshal(next)
+	if err != nil {
+		return false, fmt.Errorf("encode settings of %s: %w", group, err)
+	}
+	g, all := s.generation(group)
+	v, err := s.repo.SaveSettings(ctx, SettingsChange{Group: group, PrevVersion: 0, Doc: doc, Actor: actor, Changes: changes})
+	if errors.Is(err, ErrSettingsConflict) {
+		s.Invalidate(group)
+		return false, nil // the group got settings of its own meanwhile
+	}
+	if err != nil {
+		return false, fmt.Errorf("save settings of %s: %w", group, err)
+	}
+	s.remember(group, g, all, cached{s: next, version: v})
+	return true, nil
+}
+
 // update applies change to the latest document and saves it. base, when not negative, is the
 // version the change must apply to; otherwise the change is re-applied after a conflict.
 func (s *SettingsService) update(ctx context.Context, group wa.JID, actor string, base int, change func(Settings) (Settings, error)) (Settings, []Change, error) {

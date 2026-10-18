@@ -231,12 +231,17 @@ func (h *Handler) reviewGroupHere(ctx context.Context, c *call) error {
 		return err
 	}
 	want := strings.TrimSpace(strings.TrimPrefix(c.cmd.Rest, c.cmd.Args[0]))
-	target, ok := matchGroup(groups, want)
+	// The numbers are those of .groups; a community isn't a group a chat can review.
+	entries := listing(groups)
+	e, ok := matchEntry(entries, want)
+	target := e.GroupRef
 	if want == "" && len(groups) == 1 {
 		target, ok = groups[0], true
+	} else if e.community {
+		ok = false
 	}
 	if !ok {
-		return h.reply(ctx, c, "cmd.reviewgroup_pick", map[string]string{"groups": groupList(groups), "prefix": h.d.Prefix})
+		return h.reply(ctx, c, "cmd.reviewgroup_pick", map[string]string{"groups": h.groupList(c, entries), "prefix": h.d.Prefix})
 	}
 	c.group = target.JID
 	if ok, err := h.set(ctx, c, "review.review_group", string(c.m.Chat)); err != nil || !ok {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"sync"
 
@@ -28,6 +29,7 @@ const (
 	MethodGroupInfo                = "GroupInfo"
 	MethodJoinedGroups             = "JoinedGroups"
 	MethodGroupInfoFromLink        = "GroupInfoFromLink"
+	MethodSubGroups                = "SubGroups"
 	MethodUserInfo                 = "UserInfo"
 	MethodProfilePicture           = "ProfilePicture"
 	MethodNewsletterInfo           = "NewsletterInfo"
@@ -67,9 +69,13 @@ type Client struct {
 	newsletters       map[wa.JID]wa.NewsletterInfo
 	newsletterInvites map[string]wa.NewsletterInfo
 	joinRequests      map[wa.JID][]wa.JoinRequest
+	subGroups         map[wa.JID]map[wa.JID]wa.SubGroup // community → groups the bot isn't in
 }
 
-var _ wa.WAClient = (*Client)(nil)
+var (
+	_ wa.WAClient        = (*Client)(nil)
+	_ wa.CommunityReader = (*Client)(nil)
+)
 
 // New returns an empty fake client.
 func New() *Client {
@@ -83,6 +89,7 @@ func New() *Client {
 		newsletters:       map[wa.JID]wa.NewsletterInfo{},
 		newsletterInvites: map[string]wa.NewsletterInfo{},
 		joinRequests:      map[wa.JID][]wa.JoinRequest{},
+		subGroups:         map[wa.JID]map[wa.JID]wa.SubGroup{},
 	}
 }
 
@@ -130,6 +137,18 @@ func (c *Client) SetGroup(info wa.GroupInfo) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.groups[info.JID] = cloneGroup(info)
+}
+
+// SetSubGroup lists g as a group of community that the bot isn't in. Groups set with SetGroup
+// whose LinkedParent is community are listed too; a community is a group set with SetGroup and
+// IsCommunity.
+func (c *Client) SetSubGroup(community wa.JID, g wa.SubGroup) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.subGroups[community] == nil {
+		c.subGroups[community] = map[wa.JID]wa.SubGroup{}
+	}
+	c.subGroups[community][g.JID] = g
 }
 
 // SetInviteLink makes GroupInfoFromLink(code) return info.
@@ -382,6 +401,31 @@ func (c *Client) JoinedGroups(ctx context.Context) ([]wa.GroupInfo, error) {
 		out = append(out, cloneGroup(g))
 	}
 	slices.SortFunc(out, func(a, b wa.GroupInfo) int { return cmp.Compare(a.JID, b.JID) })
+	return out, nil
+}
+
+// SubGroups lists a community's groups, sorted by JID: those set with SetGroup and linked to it,
+// and those set with SetSubGroup. A community the fake doesn't know returns wa.ErrNotFound.
+func (c *Client) SubGroups(ctx context.Context, community wa.JID) ([]wa.SubGroup, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if err := c.begin(ctx, MethodSubGroups, community); err != nil {
+		return nil, err
+	}
+	byJID := maps.Clone(c.subGroups[community])
+	for _, g := range c.groups {
+		if g.LinkedParent == community {
+			if byJID == nil {
+				byJID = map[wa.JID]wa.SubGroup{}
+			}
+			byJID[g.JID] = wa.SubGroup{JID: g.JID, Name: g.Name, IsAnnouncement: g.IsAnnouncement}
+		}
+	}
+	if _, ok := c.groups[community]; !ok && byJID == nil {
+		return nil, c.record(fmt.Errorf("community %s: %w", community, wa.ErrNotFound))
+	}
+	out := slices.Collect(maps.Values(byJID))
+	slices.SortFunc(out, func(a, b wa.SubGroup) int { return cmp.Compare(a.JID, b.JID) })
 	return out, nil
 }
 

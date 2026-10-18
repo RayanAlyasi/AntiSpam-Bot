@@ -145,6 +145,7 @@ func serve(ctx context.Context, opts options, getenv func(string) string, logOut
 	reg := api.NewRegistry()
 	wa, lids := newWAStack(pool, getenv, logs, &connectedBots)
 	wa.pacing = cfg.Pacing
+	wa.newGroupMode = newGroupMode(cfg.NewGroups.AskAdmins)
 	metrics, err := fastlane.NewMetrics(reg)
 	if err != nil {
 		log.Error().Err(err).Msg("metrics")

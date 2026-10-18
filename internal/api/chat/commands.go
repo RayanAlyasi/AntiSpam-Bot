@@ -251,7 +251,7 @@ func (h *Handler) summary(ctx context.Context, c *call) string {
 				// No website yet (v0.1): say where the cases really wait.
 				v = h.t(c, "cmd.destination_pending", nil)
 			}
-			lines = append(lines, k+": "+v)
+			lines = append(lines, "*"+k+":* "+v)
 		}
 	}
 	return strings.Join(lines, "\n")

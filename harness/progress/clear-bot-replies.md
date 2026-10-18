@@ -31,12 +31,19 @@ Branch `feat/clear-bot-replies`, PR into `staging`.
 
 ## Follow-ups
 
+- Group names go raw into `*{group}*` (protection on, `cmd.saved`, `cmd.using`, …): a name with
+  `*` leaves a stray asterisk, and `Notify` doesn't fall back to the group ID when the name lookup
+  fails. One helper that strips `*`, `_` and `~` from names would cover these and `.pending`.
+- locales/README.md says aliases and keywords are checked at startup; nothing loads the
+  `locales` package at runtime (the live ones are `chat.Aliases` and `replyKeywords`).
+- docs/CONFIGURATION.md still describes `PUBLIC_URL` and `HTTP_ADDR` in terms of the website.
 - The Arabic "not available" reply names the canonical English command (`.undo` for `.تراجع`).
 - `cmd.autoban_ai_refused` mentions a track record, but production has no track-record source,
   so `ai` is always refused for now; reword when F-112's store is wired.
 
-- Move the built-in catalogue into `locales/` (DESIGN §22.2) once the test-change request
-  `harness/test-change-requests/replies-pinned-texts.md` is decided.
+- Move the built-in catalogue into `locales/` (DESIGN §22.2). The test-change request was
+  approved; card labels, setting keys and the group name are now bold, and `messages` in
+  `locales/*.yaml` is empty.
 - Command aliases exist twice: `chat.Aliases` (live) and `locales/*.yaml` `commands` (unused),
   and they differ (e.g. `.معلق` is only in code, `.المعلقة` in both). Same for the review reply
   keywords in `internal/review/votes.go` vs `locales` `keywords` (`تمام` is only in the yaml).

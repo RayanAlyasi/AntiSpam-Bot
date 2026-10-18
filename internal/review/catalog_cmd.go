@@ -167,12 +167,12 @@ var commandTexts = Catalog{
 			"2. Make me an admin there.\n" +
 			"3. Choose where uncertain cases go: the website, or send .reviewgroup here in a separate admins-only group to get them as they come in.\n\n" +
 			"Send .help for all commands. Website: {url}",
-		"onboard.promoted": "🛡️ Protection is on in {group}. I stay silent there.\n\n" +
+		"onboard.promoted": "🛡️ Protection is on in *{group}*. I stay silent there.\n\n" +
 			"When I'm not sure about a message, I keep it as a case for you:\n" +
 			"- send .pending here to see them with their codes, then decide one: .review K7Q2 ban or .review K7Q2 ok\n" +
 			"- or send .reviewgroup here in a separate admins-only group to get them as they come in\n\n" +
 			"_By default, if nobody decides in time, nobody is banned._",
-		"onboard.promoted_web": "🛡️ Protection is on in {group}. I stay silent there.\n\n" +
+		"onboard.promoted_web": "🛡️ Protection is on in *{group}*. I stay silent there.\n\n" +
 			"When I'm not sure about a message, I keep it as a case for you on the website: {url}\n" +
 			"To get cases in WhatsApp, send .pending here, or .reviewgroup here in a separate admins-only group.\n" +
 			"_By default, if nobody decides in time, nobody is banned._",
@@ -345,12 +345,12 @@ var commandTexts = Catalog{
 			"2. اجعلني مشرفاً فيها.\n" +
 			"3. اختر أين تذهب الحالات غير المؤكدة: الموقع، أو أرسل .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول.\n\n" +
 			"أرسل .مساعدة لكل الأوامر. الموقع: {url}",
-		"onboard.promoted": "🛡️ الحماية مفعّلة في {group}، وأبقى صامتاً هناك.\n\n" +
+		"onboard.promoted": "🛡️ الحماية مفعّلة في *{group}*، وأبقى صامتاً هناك.\n\n" +
 			"عندما لا أكون متأكداً من رسالة، أحتفظ بها كحالة لك:\n" +
 			"- أرسل .معلق هنا لعرضها مع رموزها، ثم قرّر: .مراجعة K7Q2 ban أو .مراجعة K7Q2 ok\n" +
 			"- أو أرسل .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول\n\n" +
 			"_افتراضياً، إن لم يقرر أحد في الوقت المحدد، لا يُحظر أحد._",
-		"onboard.promoted_web": "🛡️ الحماية مفعّلة في {group}، وأبقى صامتاً هناك.\n\n" +
+		"onboard.promoted_web": "🛡️ الحماية مفعّلة في *{group}*، وأبقى صامتاً هناك.\n\n" +
 			"عندما لا أكون متأكداً من رسالة، أحتفظ بها كحالة لك على الموقع: {url}\n" +
 			"لاستلام الحالات في واتساب، أرسل .معلق هنا، أو .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط.\n" +
 			"_افتراضياً، إن لم يقرر أحد في الوقت المحدد، لا يُحظر أحد._",

@@ -1,11 +1,9 @@
 # Locales
 
-User-facing text in variants, command aliases and review keywords live here, one file per
-language (`en.yaml`, `ar.yaml`). In v0.1 the texts the bot actually sends (replies, review cards,
-help pages, onboarding) come from the built-in catalogue in `internal/review/catalog.go` and
-`internal/review/catalog_cmd.go`, which is their only source; a message isn't kept in both
-places. Moving that catalogue here is planned. The files are
-embedded in the binary and checked when it starts and in CI:
+Command aliases and review keywords live here, one file per language (`en.yaml`, `ar.yaml`).
+The texts the bot sends (replies, review cards, help pages, onboarding) live only in the built-in
+catalogue in `internal/review/catalog.go` and `internal/review/catalog_cmd.go`, so `messages` is
+empty in v0.1. The files are embedded in the binary and checked when it starts and in CI:
 
 - every file has the same keys under `messages`, `commands` and `keywords` as `en.yaml`;
 - every message has at least two variants, so the bot doesn't send the same text over and over;

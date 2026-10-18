@@ -70,30 +70,48 @@ func TestParseRejectsAmbiguousAliases(t *testing.T) {
 	}
 }
 
+// TestRender uses its own catalogue, so it doesn't depend on which messages the shipped locale
+// files happen to carry.
 func TestRender(t *testing.T) {
-	c, err := Load()
+	en := `lang: en
+dir: ltr
+messages:
+  protection_on: ['On in "{group}" ({preset})', '{group} is protected ({preset})']
+  done: [Done., Done ✔]
+commands: {}
+keywords: {}
+`
+	ar := `lang: ar
+dir: rtl
+messages:
+  protection_on: ['الحماية مفعّلة في "{group}" ({preset})', '{group} محمية ({preset})']
+  done: [تم., تم ✔]
+commands: {}
+keywords: {}
+`
+	c, err := Parse(map[Lang][]byte{English: []byte(en), Arabic: []byte(ar)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	vars := map[string]string{"group": "Cars {link}", "preset": "Standard"}
-	a, err := c.Render(English, "onboarding.protection_on", 0, vars)
+	a, err := c.Render(English, "protection_on", 0, vars)
 	if err != nil || !strings.Contains(a, `"Cars {link}"`) || !strings.Contains(a, "Standard") {
 		t.Fatalf("got %q, %v, want both values inserted verbatim (values are never expanded again)", a, err)
 	}
-	b, _ := c.Render(English, "onboarding.protection_on", 1, vars)
+	b, _ := c.Render(English, "protection_on", 1, vars)
 	if a == b {
 		t.Fatal("got the same text for variants 0 and 1, want different texts (§10.3)")
 	}
-	if wrap, _ := c.Render(English, "onboarding.protection_on", -1, vars); wrap != b {
+	if wrap, _ := c.Render(English, "protection_on", -1, vars); wrap != b {
 		t.Fatal("got a different text for variant -1, want it to wrap around like 1")
 	}
-	if ar, err := c.Render(Arabic, "onboarding.protection_on", 0, vars); err != nil || !strings.Contains(ar, "الحماية") {
+	if ar, err := c.Render(Arabic, "protection_on", 0, vars); err != nil || !strings.Contains(ar, "الحماية") {
 		t.Fatalf("got %q, %v, want the Arabic text", ar, err)
 	}
-	if fr, _ := c.Render("fr", "command.done", 0, nil); fr != "Done." {
+	if fr, _ := c.Render("fr", "done", 0, nil); fr != "Done." {
 		t.Fatalf("got %q for an unknown language, want the English fallback", fr)
 	}
-	if _, err := c.Render(English, "onboarding.protection_on", 0, map[string]string{"group": "x"}); err == nil {
+	if _, err := c.Render(English, "protection_on", 0, map[string]string{"group": "x"}); err == nil {
 		t.Fatal("got nil error with a missing value, want an error (never send a half-filled template)")
 	}
 	if _, err := c.Render(English, "no.such.key", 0, nil); err == nil {

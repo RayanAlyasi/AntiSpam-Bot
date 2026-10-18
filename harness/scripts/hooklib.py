@@ -69,8 +69,13 @@ PROTECTED_BRANCHES = ("main", "master", "staging")
 
 
 def base_branch(root):
-    """Feature work branches from and merges into staging; fall back to main before staging exists."""
-    for ref in ("staging", "origin/staging"):
+    """Feature work branches from and merges into staging; fall back to main before staging exists.
+
+    origin/staging comes first: every fetch updates it, while a local staging branch only moves when
+    someone fast-forwards it, and a stale one made already-merged, approved changes look like the
+    current branch's own edits.
+    """
+    for ref in ("origin/staging", "staging"):
         if run(["git", "rev-parse", "--verify", "-q", ref], root).returncode == 0:
             return ref
     return "main"

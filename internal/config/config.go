@@ -17,6 +17,7 @@ type Config struct {
 	OperatorPhones []string                 // OPERATOR_PHONES: comma-separated phone numbers with the operator role
 	LogLevel       zerolog.Level            // LOG_LEVEL: debug, info, warn or error (default info)
 	LogModules     map[string]zerolog.Level // LOG_LEVEL module=level entries after the global level; nil when none
+	HashKey        string                   // HASH_KEY: keys the phone-number hashes; required to run the bot (NumberHashKey)
 
 	Pacing  Pacing  `yaml:"pacing"`
 	Presets Presets `yaml:"presets"`
@@ -35,6 +36,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg := Defaults()
 	cfg.DatabaseURL = strings.TrimSpace(getenv("DATABASE_URL"))
 	cfg.PublicURL = strings.TrimSpace(getenv("PUBLIC_URL"))
+	cfg.HashKey = strings.TrimSpace(getenv("HASH_KEY"))
 	if addr := strings.TrimSpace(getenv("HTTP_ADDR")); addr != "" {
 		if _, _, err := net.SplitHostPort(addr); err != nil {
 			return Config{}, fmt.Errorf("HTTP_ADDR %q: want host:port or :port", addr)

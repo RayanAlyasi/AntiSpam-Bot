@@ -1,0 +1,15 @@
+# 2026/10/17 20:48:52.134502 [TestMatchProperties] [rapid] draw corpus: []string{"our"}
+# 2026/10/17 20:48:52.134506 [TestMatchProperties] [rapid] draw query: "our"
+# 2026/10/17 20:48:52.134510 [TestMatchProperties] loose match inside the certain limits: {Closeness:loose EntryID:a Distance:0 Jaccard:1 Allowed:false}
+# 
+v0.4.8#8261740740904858727
+0x0
+0x5555555555555
+0x6b74f03291620
+0x6
+0x0
+0x0
+0x5555555555555
+0x6b74f03291620
+0x6
+0x0

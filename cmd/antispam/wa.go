@@ -101,6 +101,8 @@ type waStack struct {
 	groups    identity.GroupStore
 	manager   *connector.Manager // nil without the connector role
 	connected *atomic.Int64
+	moderate  inbox.Sink // the detection fast lane (F-088); nil: moderated rows are only marked processed
+	chat      inbox.Sink // commands, DMs and review votes (wp-k's chat handler); nil: not handled
 }
 
 // lidSwitch lets the identity service use the connector's LID resolver once it exists, and
@@ -246,8 +248,8 @@ func (s *waStack) syncGroups(ctx context.Context, mgr *connector.Manager, tracke
 }
 
 // inboxRole runs the inbox workers: claim, route, record the sender, write the message_index
-// base row, hand off (F-014–F-016, F-033). The detection pipeline plugs in as the moderation sink
-// when it lands; until then routed rows are only marked processed.
+// base row, hand off (F-014–F-016, F-033). Moderated messages go to the detection fast lane
+// (s.moderate, F-088).
 func (s *waStack) inboxRole() role {
 	return role{name: roleWorkers + "/inbox", run: func(ctx context.Context) error {
 		log := s.logs.For("inbox")
@@ -260,7 +262,7 @@ func (s *waStack) inboxRole() role {
 		defer parts.Close()
 		tracker := identity.NewTracker(s.ids, s.groups, nil, nil, s.clk, log)
 		router := inbox.NewRouter(tracker, adminCheck{parts}, s.ids)
-		d := inbox.NewDispatcher(router, senderObserver{s.ids}, inbox.NewIndex(s.pool), inbox.Sinks{}, log)
+		d := inbox.NewDispatcher(router, senderObserver{s.ids}, inbox.NewIndex(s.pool), inbox.Sinks{Moderate: s.moderate, Commands: s.chat, DM: s.chat}, log)
 		w := inbox.NewWorker(s.pool, d, inbox.WorkerOptions{Log: log})
 		return w.Run(ctx)
 	}}

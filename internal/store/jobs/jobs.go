@@ -42,6 +42,8 @@ type Options struct {
 	Clock clock.Clock
 	// Logger receives River's own logs (warnings and errors only) and the job logs.
 	Logger zerolog.Logger
+	// ErrorHandler, when set, is told about every job error and panic (river.ErrorHandler).
+	ErrorHandler river.ErrorHandler
 }
 
 // Client is the River client for one process.
@@ -78,6 +80,9 @@ func New(pool *pgxpool.Pool, opts Options) (*Client, error) {
 		Schema:  migrations.RiverSchema,
 		Workers: workers,
 		Logger:  slog.New(zerolog.NewSlogHandler(opts.Logger.Level(max(opts.Logger.GetLevel(), zerolog.WarnLevel)))),
+	}
+	if opts.ErrorHandler != nil {
+		cfg.ErrorHandler = opts.ErrorHandler
 	}
 	if opts.Work {
 		n := opts.MaxWorkers

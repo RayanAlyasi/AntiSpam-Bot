@@ -5,9 +5,6 @@ package pipeline
 
 import "github.com/RayanAlyasi/AntiSpam-Bot/internal/wa"
 
-// Stub for F-088: declares only the exported names the acceptance tests use
-// (.agent/contracts/F-088.md). The builder replaces this file.
-
 // Mode is a group's operating mode (DESIGN.md §8.4, §12.1).
 type Mode string
 
@@ -72,6 +69,11 @@ type Verdict struct {
 	Band        Band
 	Source      Source
 	Route       Route
-	Actions     []ActionKind
-	Explanation string
+	Actions     []ActionKind // what the bot does, or would do in shadow mode: delete, ban, review
+	Explanation string       // the signals behind the verdict, for admins
+	// Duplicate is set when the message had already been processed (a redelivery): nothing
+	// was recorded or enqueued again.
+	Duplicate bool
+	// DetectionID is the stored detection's ID (0 when none was recorded), for logs.
+	DetectionID int64
 }

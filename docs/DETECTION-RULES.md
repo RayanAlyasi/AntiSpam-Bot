@@ -168,10 +168,12 @@ Containment catches a short ad whose words all sit inside a longer one from the 
 
 A related match adds up with other evidence. Most often that is **`contact.advertised`** (+1.0):
 the message offers a way to reach someone outside the group, such as a phone number, a contact
-card, a `wa.me` or send link, a group or channel invite, or a Telegram link. Related wording plus
-a contact channel reaches T_review (p ≈ 0.62), so the message goes to the AI, or to admins without
-one. Neither signal deletes or bans on its own. An ordinary message that shares the vocabulary
-("I got a sick note and a medical report") but offers no contact stays clean.
+card, a `wa.me` or send link, a group or channel invite, a Telegram link, or a call to order or
+ask in private or through the group's admin ("للطلب خاص", "order through the group admin").
+Related wording plus a contact channel reaches T_review (p ≈ 0.62), so the message goes to
+the AI, or to admins without one. Neither signal deletes or bans on its own. An ordinary
+message that shares the vocabulary ("I got a sick note and a medical report") but offers no
+contact stays clean.
 
 **Promotion.** `app.corpus_confirmations` records one confirmation per pattern per group. The rule
 that promotes a pattern after 3 unrelated groups confirm it counts these.

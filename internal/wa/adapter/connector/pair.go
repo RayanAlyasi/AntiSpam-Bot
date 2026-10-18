@@ -38,13 +38,18 @@ type PairOptions struct {
 	Log   zerolog.Logger
 }
 
+// ErrPairTimeout means the login connection closed before the QR code was scanned or the
+// pairing code entered: the codes ran out (after about 160 s) or the connection dropped, and
+// pairing must start again.
+var ErrPairTimeout = errors.New("pair: timed out before the code was used")
+
 // Pair links a new bot number to the whatsmeow store by QR or pairing code, then sets its about
 // text and its "who can add me to groups" privacy setting to everyone (DESIGN.md §13.6 step 2).
 // It sends no message. It returns the new bot's JID.
 func Pair(ctx context.Context, container *sqlstore.Container, opts PairOptions) (wa.JID, error) {
-	phone := digits(opts.Phone)
-	if opts.Phone != "" && (len(phone) < 8 || len(phone) > 15) {
-		return "", fmt.Errorf("pair: %q is not an international phone number", opts.Phone)
+	phone, err := pairPhone(opts.Phone)
+	if err != nil {
+		return "", err
 	}
 	dev := container.NewDevice()
 	cli := whatsmeow.NewClient(dev, waLog.Zerolog(opts.Log.With().Str("module", "whatsmeow").Logger()))
@@ -76,6 +81,8 @@ func Pair(ctx context.Context, container *sqlstore.Container, opts PairOptions) 
 		case item.Event == "code":
 		case item == whatsmeow.QRChannelSuccess:
 			return finishPair(ctx, cli, opts)
+		case item == whatsmeow.QRChannelTimeout:
+			return "", ErrPairTimeout
 		case item.Event == "error":
 			return "", fmt.Errorf("pair: %w", item.Error)
 		default:
@@ -134,6 +141,15 @@ func setupProfile(ctx context.Context, cli profileSetter, about string) error {
 		return fmt.Errorf("set group-add privacy: %w", err)
 	}
 	return nil
+}
+
+// pairPhone returns the digits of a pairing phone number; empty stays empty (QR pairing).
+func pairPhone(s string) (string, error) {
+	phone := digits(s)
+	if s != "" && (len(phone) < 8 || len(phone) > 15) {
+		return "", fmt.Errorf("pair: %q is not an international phone number", s)
+	}
+	return phone, nil
 }
 
 func digits(s string) string {

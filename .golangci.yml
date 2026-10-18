@@ -1,0 +1,114 @@
+# golangci-lint v2. CI runs `golangci-lint run ./...` and fails on any issue; `make check-fast`
+# reports only issues new since staging. Fix the code rather than excluding a finding, and give
+# every exclusion below a reason. `//nolint` is rejected by the tamper audit.
+version: "2"
+
+run:
+  # Exclusion paths below are relative to go.mod.
+  relative-path-mode: gomod
+
+linters:
+  # standard: errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  enable:
+    - bodyclose
+    - copyloopvar
+    - depguard
+    - errorlint
+    - gosec
+    - misspell
+    - nilerr
+    - rowserrcheck
+    - sqlclosecheck
+    - unconvert
+  settings:
+    # The architecture rules from .claude/rules/go.md.
+    depguard:
+      rules:
+        whatsmeow:
+          # GO-004. Tests may build whatsmeow events to feed the adapter.
+          files: ["$all", "!$test", "!**/internal/wa/adapter/**"]
+          deny:
+            - pkg: go.mau.fi/whatsmeow
+              desc: only internal/wa/adapter imports whatsmeow; use the WAClient interface (GO-004)
+            - pkg: go.mau.fi/libsignal
+              desc: only internal/wa/adapter touches the WhatsApp protocol libraries (GO-004)
+        domain:
+          # GO-005.
+          files:
+            - "**/internal/normalize/**"
+            - "**/internal/envelope/**"
+            - "**/internal/detect/**"
+            - "**/internal/scoring/**"
+            - "**/internal/policy/**"
+          deny:
+            - pkg: github.com/jackc/pgx
+              desc: domain packages take data and return decisions; storage stays behind interfaces (GO-005)
+            - pkg: github.com/riverqueue/river
+              desc: domain packages take data and return decisions; queues stay behind interfaces (GO-005)
+            - pkg: database/sql
+              desc: domain packages don't touch the database (GO-005)
+            - pkg: net/http
+              desc: domain packages do no network I/O; enrichment and AI calls sit behind interfaces
+        fake-only-in-tests:
+          files: ["$all", "!$test"]
+          deny:
+            - pkg: github.com/RayanAlyasi/AntiSpam-Bot/internal/wa/fake
+              desc: the fake WAClient is for tests only
+    gosec:
+      excludes:
+        # Integer conversions: hash bit patterns stored in Postgres bigint, and bounded counts
+        # in int16/int32 columns. The rule can't see the bounds, so it flags every one.
+        - G115
+  exclusions:
+    paths:
+      - internal/store/db # sqlc output
+    rules:
+      # The operator names these files on the command line or in CONFIG_FILE; nothing reads a
+      # path that comes from WhatsApp.
+      - path: ^(cmd/antispam|internal/config)/
+        linters: [gosec]
+        text: G304|G703
+      # math/rand only spreads the action pacing; nothing secret comes from it.
+      - path: ^internal/actions/executor\.go$
+        linters: [gosec]
+        text: G404
+      # These loops return nil once their context is done: a clean shutdown, not a dropped
+      # error. Every other error in them is logged with Err(err).
+      - path: ^(internal/app/fastlane/fastlane|internal/wa/adapter/connector/autopair)\.go$
+        linters: [nilerr]
+      # Tests seed math/rand, open fixtures by path and write temp files.
+      - path: _test\.go$
+        linters: [gosec]
+      # Closing a listener or a read-only fixture in a test can't lose data.
+      - path: _test\.go$
+        linters: [errcheck]
+        text: \.Close` is not checked
+      # Spam samples are misspelled on purpose ("bitcion").
+      - path: ^internal/detect/.+_test\.go$
+        linters: [misspell]
+      # Obfuscation tests hold the invisible characters they must see through.
+      - path: _test\.go$
+        linters: [staticcheck]
+        text: ST1018
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/RayanAlyasi/AntiSpam-Bot
+  exclusions:
+    paths:
+      - internal/store/db
+      # Existing tests agents can't edit; drop these once they're reformatted.
+      - ^internal/detect/detect_test\.go$
+      - ^internal/identity/tracker_community_test\.go$
+      - ^internal/corpusimport/plan_test\.go$
+      - ^acceptance/config/config_test\.go$
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

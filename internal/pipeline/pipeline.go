@@ -177,8 +177,10 @@ func (p *Pipeline) Process(ctx context.Context, e *envelope.Envelope, at time.Ti
 				if personID == 0 {
 					// No person record to ban (identity not resolved yet): the bot never bans
 					// someone it can't keep track of, so the admins decide instead.
-					reviews = append(reviews, reviewItem(e, s, snd, d, policy.Action{Kind: policy.ActionReview,
-						Review: &policy.ReviewRequest{Kind: policy.ReviewBanDecision, ProposeBan: true}}, detID))
+					reviews = append(reviews, reviewItem(e, s, snd, d, policy.Action{
+						Kind:   policy.ActionReview,
+						Review: &policy.ReviewRequest{Kind: policy.ReviewBanDecision, ProposeBan: true},
+					}, detID))
 					break
 				}
 				err = p.ban(ctx, tx, e, s, personID, detID, a.Priority)
@@ -284,16 +286,16 @@ func reviewItem(e *envelope.Envelope, s policy.Settings, snd Sender, d Decision,
 // version identifies one version of a message: the same ID with the same content is a
 // redelivery; an edit (same ID, new content) is analyzed again (DESIGN.md §5.1).
 func version(e *envelope.Envelope) string {
-	h := sha256.New()
-	fmt.Fprintf(h, "%s\x00%t\x00", e.Kind, e.IsEdit)
+	h := sha256.New() // hash.Hash writes never fail
+	_, _ = fmt.Fprintf(h, "%s\x00%t\x00", e.Kind, e.IsEdit)
 	for _, t := range e.Texts {
-		fmt.Fprintf(h, "%s\x00%s\x00", t.Source, t.Raw)
+		_, _ = fmt.Fprintf(h, "%s\x00%s\x00", t.Source, t.Raw)
 	}
 	for _, m := range e.Media {
 		h.Write(m.SHA256)
 	}
 	for _, c := range e.Contacts {
-		fmt.Fprintf(h, "%v\x00", c.WAIDs)
+		_, _ = fmt.Fprintf(h, "%v\x00", c.WAIDs)
 	}
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }

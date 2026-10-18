@@ -284,8 +284,8 @@ func NewLIDResolver(lids pairLookup, users userInfoer) *LIDResolver {
 
 // PNForLID returns the phone number whatsmeow has learned for a LID, or "".
 func (r *LIDResolver) PNForLID(ctx context.Context, lid wa.JID) (wa.JID, error) {
-	j, err := types.ParseJID(string(lid))
-	if err != nil || j.Server != types.HiddenUserServer {
+	j, ok := userJID(lid, types.HiddenUserServer)
+	if !ok {
 		return "", nil
 	}
 	pn, err := r.lids.GetPNForLID(ctx, j)
@@ -295,10 +295,17 @@ func (r *LIDResolver) PNForLID(ctx context.Context, lid wa.JID) (wa.JID, error) 
 	return jid(pn), nil
 }
 
+// userJID parses j as a user on server. Anything else (unparseable, or another server) has no
+// mapping, which the resolvers answer with "" rather than an error.
+func userJID(j wa.JID, server string) (types.JID, bool) {
+	p, err := types.ParseJID(string(j))
+	return p, err == nil && p.Server == server
+}
+
 // LIDForPN returns the LID of a phone number, or "" when WhatsApp doesn't say.
 func (r *LIDResolver) LIDForPN(ctx context.Context, pn wa.JID) (wa.JID, error) {
-	j, err := types.ParseJID(string(pn))
-	if err != nil || j.Server != types.DefaultUserServer {
+	j, ok := userJID(pn, types.DefaultUserServer)
+	if !ok {
 		return "", nil
 	}
 	if lid, err := r.lids.GetLIDForPN(ctx, j); err == nil && !lid.IsEmpty() {

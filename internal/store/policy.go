@@ -342,8 +342,10 @@ func detectionFromRow(r db.AppDetection) (policy.DetectionRecord, error) {
 			if err != nil {
 				return policy.DetectionRecord{}, fmt.Errorf("decode detection %d review timeout: %w", r.ID, err)
 			}
-			a.Review = &policy.ReviewRequest{Kind: policy.ReviewKind(rv.Kind), ProposeBan: rv.ProposeBan,
-				Timeout: timeout, OnTimeout: policy.TimeoutAction(rv.OnTimeout), Batch: rv.Batch}
+			a.Review = &policy.ReviewRequest{
+				Kind: policy.ReviewKind(rv.Kind), ProposeBan: rv.ProposeBan,
+				Timeout: timeout, OnTimeout: policy.TimeoutAction(rv.OnTimeout), Batch: rv.Batch,
+			}
 		}
 		d.ActionPlan = append(d.ActionPlan, a)
 	}
@@ -370,8 +372,10 @@ func planJSON(actions []policy.Action) []plannedAction {
 	for _, a := range actions {
 		p := plannedAction{Kind: string(a.Kind), Priority: a.Priority}
 		if r := a.Review; r != nil {
-			p.Review = &plannedReview{Kind: string(r.Kind), ProposeBan: r.ProposeBan, Timeout: r.Timeout.String(),
-				OnTimeout: string(r.OnTimeout), Batch: r.Batch}
+			p.Review = &plannedReview{
+				Kind: string(r.Kind), ProposeBan: r.ProposeBan, Timeout: r.Timeout.String(),
+				OnTimeout: string(r.OnTimeout), Batch: r.Batch,
+			}
 		}
 		out = append(out, p)
 	}

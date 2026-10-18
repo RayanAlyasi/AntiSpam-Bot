@@ -223,8 +223,10 @@ func (s *Service) GroupInfoFromMembers(ctx context.Context, group wa.JID) (wa.Gr
 		if err != nil {
 			return wa.GroupInfo{}, err
 		}
-		pt := wa.Participant{JID: p.LID, LID: p.LID, PhoneNumber: p.PN,
-			IsAdmin: m.Role.IsAdmin(), IsSuperAdmin: m.Role == RoleSuperAdmin}
+		pt := wa.Participant{
+			JID: p.LID, LID: p.LID, PhoneNumber: p.PN,
+			IsAdmin: m.Role.IsAdmin(), IsSuperAdmin: m.Role == RoleSuperAdmin,
+		}
 		if pt.JID == "" {
 			pt.JID = p.PN
 		}

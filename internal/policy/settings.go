@@ -543,12 +543,22 @@ func (s Settings) Validate() error {
 		key  string
 		rule ContentRule
 	}{
-		{"content.links", c.Links}, {"content.group_invites", c.GroupInvites}, {"content.channel_shares", c.ChannelShares},
-		{"content.contacts", c.Contacts}, {"content.images", c.Images}, {"content.videos", c.Videos},
-		{"content.stickers", c.Stickers}, {"content.documents", c.Documents}, {"content.audio", c.Audio},
-		{"content.polls", c.Polls}, {"content.locations", c.Locations}, {"content.events", c.Events},
-		{"content.view_once", c.ViewOnce}, {"content.forwarded_many_times", c.ForwardedManyTimes},
-		{"content.status_shares", c.StatusShares}, {"content.status_mentions", c.StatusMentions},
+		{"content.links", c.Links},
+		{"content.group_invites", c.GroupInvites},
+		{"content.channel_shares", c.ChannelShares},
+		{"content.contacts", c.Contacts},
+		{"content.images", c.Images},
+		{"content.videos", c.Videos},
+		{"content.stickers", c.Stickers},
+		{"content.documents", c.Documents},
+		{"content.audio", c.Audio},
+		{"content.polls", c.Polls},
+		{"content.locations", c.Locations},
+		{"content.events", c.Events},
+		{"content.view_once", c.ViewOnce},
+		{"content.forwarded_many_times", c.ForwardedManyTimes},
+		{"content.status_shares", c.StatusShares},
+		{"content.status_mentions", c.StatusMentions},
 		{"content.group_status_posts", c.GroupStatusPosts},
 	} {
 		add(oneOf(r.key, r.rule, RuleAllow, RuleBlock, RuleBlockForNew, RuleBlockForUntrusted))

@@ -232,7 +232,7 @@ func parseCSV(data []byte) ([]Record, []Rejection, error) {
 	cr.FieldsPerRecord = -1
 	header, err := cr.Read()
 	if err != nil {
-		return nil, nil, fmt.Errorf("%w: CSV header: %v", ErrInput, err)
+		return nil, nil, fmt.Errorf("%w: CSV header: %w", ErrInput, err)
 	}
 	cols := make([]string, len(header))
 	for i, h := range header {

@@ -7,11 +7,26 @@ The maintainer's guide to the release automation. The design is
 
 | Workflow | Trigger | Does |
 |---|---|---|
-| `ci.yml` | every PR; pushes to `main` and `staging` | `make check` and the multi-arch image build; on `staging` pushes it also publishes `:edge` and `:sha-<7>` |
+| `ci.yml` | every PR; pushes to `main` and `staging` | static checks, lint, security scans, unit and integration tests, workflow lint and the multi-arch image build (below); on `staging` pushes it also publishes `:edge` and `:sha-<7>` once every job has passed |
 | `pr-title.yml` | PRs into `staging` | fails a title that isn't a Conventional Commit (types `feat`, `fix`, `perf`, `docs`, `refactor`, `test`, `ci`, `build`, `chore`, `revert`; lowercase subject) |
 | `release.yml` | pushes to `main` and `release/*` | release-please, then GoReleaser, then the back-merge into `staging` (below) |
 | `whatsmeow-bump.yml` | Mondays, or by hand | opens or updates a PR into `staging` that bumps whatsmeow to its latest commit |
 | Dependabot (`dependabot.yml`) | weekly | grouped PRs into `staging` for Go modules, actions, Dockerfiles and compose files |
+
+### CI checks
+
+`ci.yml` runs its checks as parallel jobs ([DESIGN.md §23.14](DESIGN.md#2314-continuous-integration)):
+`static checks` (tidy, build, vet, sqlc drift, tamper audit), `lint` (golangci-lint with
+`.golangci.yml`, including the architecture rules), `security` (govulncheck and gitleaks over the
+new commits), unit tests on amd64 and arm64, integration tests, `workflow lint` (actionlint) and
+the multi-arch image build. On pushes, the integration tests also run on arm64.
+
+The branch rules require only `make check (ubuntu-24.04)`, `make check (ubuntu-24.04-arm)` and
+`multi-arch image`. The first is a gate job that passes only when every amd64 job passed, so a new
+job goes into its `needs` list, and the required checks stay the same.
+
+GitHub's own secret scanning and push protection are on for the repository as well. To allow a
+synthetic test value that gitleaks flags, add a narrow entry (path and value) to `.gitleaks.toml`.
 
 ### The release workflow
 

@@ -47,7 +47,7 @@ func normalizeNumber(input, defaultCountry string) (string, error) {
 		case r >= '۰' && r <= '۹':
 			b.WriteRune('0' + (r - '۰'))
 		case r == ' ' || r == '-' || r == '.' || r == '(' || r == ')' || r == '+' || r == ' ' ||
-			r == '‎' || r == '‏' || r == '‪' || r == '‬':
+			r == '\u200e' || r == '\u200f' || r == '\u202a' || r == '\u202c':
 		default:
 			return "", fmt.Errorf("%q: unexpected %q: %w", input, r, ErrInvalid)
 		}

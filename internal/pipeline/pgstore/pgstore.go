@@ -147,8 +147,10 @@ func PlanJSON(acts []policy.Action) []PlannedAction {
 	for _, a := range acts {
 		p := PlannedAction{Kind: string(a.Kind), Priority: a.Priority}
 		if r := a.Review; r != nil {
-			p.Review = &PlannedReview{Kind: string(r.Kind), ProposeBan: r.ProposeBan, Timeout: r.Timeout.String(),
-				OnTimeout: string(r.OnTimeout), Batch: r.Batch}
+			p.Review = &PlannedReview{
+				Kind: string(r.Kind), ProposeBan: r.ProposeBan, Timeout: r.Timeout.String(),
+				OnTimeout: string(r.OnTimeout), Batch: r.Batch,
+			}
 		}
 		out = append(out, p)
 	}

@@ -1,6 +1,7 @@
 #!/bin/bash
 # The gate. Usage: check.sh fast|full
-#   fast: build, vet, lint (new issues only), architecture, sqlc drift, race tests, tamper audit
+#   fast: go mod tidy, build, vet, lint (new issues only; includes the architecture rules), sqlc drift,
+#         race tests, tamper audit
 #   full: the same with all lint issues, plus integration tests (needs Docker)
 # Output stays terse (one line per step, first failures only); full logs go to .agent/logs/check-*.log.
 set -u
@@ -25,6 +26,7 @@ step() { # name, command...
 skip() { printf 'skip  %s  (%s)\n' "$1" "$2"; }
 
 if [ -f go.mod ]; then
+  step tidy sh -c 'go mod tidy -diff && cd tools && go mod tidy -diff'
   step build go build ./...
   step vet go vet ./...
   if command -v golangci-lint >/dev/null 2>&1 && [ -f .golangci.yml ]; then
@@ -35,9 +37,6 @@ if [ -f go.mod ]; then
       step lint golangci-lint run ./...
     fi
   else skip lint "golangci-lint or .golangci.yml missing"; fi
-  if command -v go-arch-lint >/dev/null 2>&1 && [ -f .go-arch-lint.yml ]; then
-    step arch go-arch-lint check
-  else skip arch "go-arch-lint or .go-arch-lint.yml missing"; fi
   if [ -f sqlc.yaml ] || [ -f sqlc.yml ]; then
     step sqlc go tool -modfile=tools/go.mod sqlc diff
   else skip sqlc "no sqlc config"; fi

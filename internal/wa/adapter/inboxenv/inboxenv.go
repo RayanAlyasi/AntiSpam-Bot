@@ -44,7 +44,7 @@ type Result struct {
 func Decode(kind string, raw []byte, infoJSON json.RawMessage, bot wa.JID) (Result, error) {
 	var info types.MessageInfo
 	if err := json.Unmarshal(infoJSON, &info); err != nil {
-		return Result{}, fmt.Errorf("%w: message info: %v", ErrCorrupt, err)
+		return Result{}, fmt.Errorf("%w: message info: %w", ErrCorrupt, err)
 	}
 	switch kind {
 	case KindUndecryptable:
@@ -52,7 +52,7 @@ func Decode(kind string, raw []byte, infoJSON json.RawMessage, bot wa.JID) (Resu
 	case KindMessage:
 		var msg waE2E.Message
 		if err := proto.Unmarshal(raw, &msg); err != nil {
-			return Result{}, fmt.Errorf("%w: message %s: %v", ErrCorrupt, info.ID, err)
+			return Result{}, fmt.Errorf("%w: message %s: %w", ErrCorrupt, info.ID, err)
 		}
 		evt := (&events.Message{Info: info, Message: &msg, RawMessage: &msg}).UnwrapRaw()
 		res := adapter.Build(evt, bot)

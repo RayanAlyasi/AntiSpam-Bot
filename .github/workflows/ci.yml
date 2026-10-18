@@ -5,14 +5,20 @@ on:
     branches: [main, staging]
   pull_request:
 
-permissions:
-  contents: read
+permissions: {}
 
 # A newer push to a PR supersedes the older run, so that one is cancelled. Pushes to main and
 # staging get one group per commit, so every merge runs to the end on the combined code.
 concurrency:
   group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Tools are pinned here or in tools/go.mod and installed with the Go toolchain, so no
+# third-party action is needed to run them.
+env:
+  GOLANGCI_LINT_VERSION: v2.15.0
+  GITLEAKS_VERSION: v8.30.1
+  ACTIONLINT_VERSION: v1.7.12
 
 jobs:
   # The gate runs as parallel jobs. "make check (ubuntu-24.04)" waits for the amd64 jobs and is
@@ -21,41 +27,107 @@ jobs:
   static:
     name: static checks
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
-      # The tamper audit and new-issue lint compare against a local staging (or main).
+          persist-credentials: false
+      # The tamper audit compares against a local staging (or main).
       - name: Make base branches available locally
         run: |
           for b in main staging; do
-            git show-ref --verify --quiet "refs/heads/$b" || git fetch --no-tags origin "$b:$b" || true
+            git show-ref --verify --quiet "refs/heads/$b" || git branch --quiet "$b" "origin/$b"
           done
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
-      - name: Install linters
+      - name: go mod tidy
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v2.15.0/install.sh | sh -s -- -b "$(go env GOPATH)/bin" v2.15.0
-          go install github.com/fe3dback/go-arch-lint@v1.19.0
+          go mod tidy -diff
+          (cd tools && go mod tidy -diff)
       - run: go build ./...
       - run: go vet ./...
-      - name: lint
-        run: if [ -f .golangci.yml ]; then golangci-lint run ./...; else echo "no .golangci.yml, skipped"; fi
-      - name: architecture
-        run: if [ -f .go-arch-lint.yml ]; then go-arch-lint check; else echo "no .go-arch-lint.yml, skipped"; fi
       - name: sqlc drift
         run: go tool -modfile=tools/go.mod sqlc diff
       - name: tamper audit
         run: python3 harness/scripts/tamper.py
 
+  lint:
+    name: lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+      - name: Install golangci-lint
+        run: go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$GOLANGCI_LINT_VERSION"
+      # Linters, formatters and the architecture rules (depguard) all live in .golangci.yml.
+      - name: golangci-lint
+        run: |
+          if [ ! -f .golangci.yml ]; then
+            echo "::error::.golangci.yml is missing, so lint would run with the defaults only"
+            exit 1
+          fi
+          golangci-lint run ./...
+
+  security:
+    name: security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+      - name: govulncheck
+        run: go tool -modfile=tools/go.mod govulncheck ./...
+      - name: Install gitleaks
+        run: go install "github.com/zricethezav/gitleaks/v8@$GITLEAKS_VERSION"
+      # Scans the commits a PR or a push adds. A push with no usable "before" (a new branch or
+      # a force push) scans the whole history.
+      - name: gitleaks
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            range="$PR_BASE..$PR_HEAD"
+          elif git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            range="$BEFORE..$GITHUB_SHA"
+          else
+            range="$GITHUB_SHA"
+          fi
+          echo "scanning $range"
+          gitleaks git --no-banner --redact --log-opts="$range" .
+
   unit:
     name: unit tests (amd64)
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
     env:
       TZ: UTC
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
@@ -64,10 +136,15 @@ jobs:
   unit-arm:
     name: make check (ubuntu-24.04-arm)
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    permissions:
+      contents: read
     env:
       TZ: UTC
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
@@ -77,34 +154,88 @@ jobs:
   integration:
     name: integration tests
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
     env:
       TZ: UTC
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
       - name: go test -tags integration
         run: |
-          pkgs=$(grep -rl --include='*_test.go' '^//go:build integration' . | xargs -n1 dirname | sort -u)
-          go test -race -count=1 -tags integration $pkgs
+          mapfile -t pkgs < <(grep -rl --include='*_test.go' '^//go:build integration' . | xargs -n1 dirname | sort -u)
+          go test -race -count=1 -tags integration "${pkgs[@]}"
+
+  # The bot runs on arm64 servers, so before a release the integration tests run there too: on
+  # every push to staging and main, not on each PR.
+  integration-arm:
+    name: integration tests (arm64)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      TZ: UTC
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+      - name: go test -tags integration
+        run: |
+          mapfile -t pkgs < <(grep -rl --include='*_test.go' '^//go:build integration' . | xargs -n1 dirname | sort -u)
+          go test -race -count=1 -tags integration "${pkgs[@]}"
+
+  # actionlint also runs shellcheck (preinstalled on the runner) over the run: scripts.
+  actionlint:
+    name: workflow lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+      - name: actionlint
+        run: go run "github.com/rhysd/actionlint/cmd/actionlint@$ACTIONLINT_VERSION"
 
   gate:
     name: make check (ubuntu-24.04)
-    needs: [static, unit, integration]
+    needs: [static, lint, security, unit, integration, actionlint]
     if: always()
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions: {}
     steps:
       - name: All amd64 jobs passed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
         run: |
-          echo "static=${{ needs.static.result }} unit=${{ needs.unit.result }} integration=${{ needs.integration.result }}"
-          [ "${{ needs.static.result }}" = success ] && [ "${{ needs.unit.result }}" = success ] && [ "${{ needs.integration.result }}" = success ]
+          jq -r 'to_entries[] | "\(.key)=\(.value.result)"' <<<"$NEEDS"
+          jq -e 'all(.[]; .result == "success")' <<<"$NEEDS" >/dev/null
 
   image:
     name: multi-arch image
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - name: Build linux/amd64 and linux/arm64 (CGO_ENABLED=0)
@@ -116,18 +247,22 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Edge images (DESIGN.md §23.4): every push to staging that passes the gate publishes
-  # :edge and :sha-<7> for testing. Never latest or a version tag; those come from releases.
+  # Edge images (DESIGN.md §23.4): every push to staging that passes every job, including the
+  # arm64 integration tests, publishes :edge and :sha-<7> for testing. Never latest or a version
+  # tag; those come from releases.
   edge:
     name: edge image
-    needs: [gate, unit-arm, image]
+    needs: [gate, unit-arm, integration-arm, image]
     if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0

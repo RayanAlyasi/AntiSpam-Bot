@@ -106,7 +106,7 @@ func (c *Client) Complete(ctx context.Context, req llm.Request) (llm.Response, e
 		maxTok = c.maxTok
 	}
 	params := sdk.MessageNewParams{
-		Model:     sdk.Model(c.model),
+		Model:     c.model,
 		MaxTokens: int64(maxTok),
 		// The system prompt is stable and versioned, so it is the cache prefix; the per-message
 		// data block comes after the breakpoint.
@@ -133,7 +133,7 @@ func (c *Client) Complete(ctx context.Context, req llm.Request) (llm.Response, e
 	}
 
 	resp := llm.Response{
-		Model:   string(msg.Model),
+		Model:   msg.Model,
 		Latency: latency,
 		Usage: llm.Usage{
 			InputTokens:      msg.Usage.InputTokens,

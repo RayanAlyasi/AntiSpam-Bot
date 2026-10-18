@@ -168,7 +168,10 @@ Containment catches a short ad whose words all sit inside a longer one from the 
 
 A related match adds up with other evidence. Most often that is **`contact.advertised`** (+1.0):
 the message offers a way to reach someone outside the group, such as a phone number, a contact
-card, a `wa.me` or send link, a group or channel invite, or a Telegram link. Related wording plus
+card, a `wa.me` or send link, a group or channel invite, or a Telegram link. A national number
+counts when it has 9 to 15 digits and starts with + or a trunk 0, or is 11 to 15 digits written
+together; runs that read like dates, times or prices ("05-12-26 10.30", "0.50 0.75 1.00") don't,
+and an Arabic word typed straight onto the number ("واتساب0551234567") still does. Related wording plus
 a contact channel reaches T_review (p ≈ 0.62), so the message goes to the AI, or to admins without
 one. Neither signal deletes or bans on its own. An ordinary message that shares the vocabulary
 ("I got a sick note and a medical report") but offers no contact stays clean.

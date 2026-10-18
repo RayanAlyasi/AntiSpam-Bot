@@ -195,7 +195,8 @@ admins.
   carries the same `request_id` (and its `detection_id` once one is recorded), so `grep` for it
   shows the message's path;
   warnings and errors name the file and line they came from. `panics_total` and `errors_total`
-  on `/metrics` count recovered panics and failures by component. Logs never contain message
+  on `/metrics` count recovered panics and failed attempts (including ones that are retried) by
+  component. Logs never contain message
   text or unmasked phone numbers.
 - **Alerts:** temporary bans, logouts, a replaced session and a bot offline for more than two
   minutes are alerted to a webhook, Telegram or email (`ALERT_*` in [`env.example`](env.example));

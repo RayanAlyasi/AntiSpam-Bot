@@ -75,7 +75,9 @@ func (l *Lanes) Handle(ctx context.Context, it inbox.Item, info wa.MessageInfo, 
 		l.base.Metrics.failed("fastlane")
 		log.Error().Err(err).Msg("moderating a message failed permanently")
 	default:
-		// The inbox retries it and logs the final failure; a retry isn't an error yet.
+		// Counted per failed attempt, like River jobs, so a row the inbox finally gives up on is
+		// counted too; the inbox logs that final failure.
+		l.base.Metrics.failed("fastlane")
 		log.Warn().Err(err).Msg("moderating a message failed; the inbox will retry it")
 	}
 	return err

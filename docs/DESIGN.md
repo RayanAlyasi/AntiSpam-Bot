@@ -416,10 +416,10 @@ Every suspicious message ends up in one of three bands. This is the backbone of 
 Applied to every text surface, producing `Norm` (for matching) while keeping `Raw` (for evidence):
 
 1. Unicode **NFKC** (fullwidth → ASCII, ligatures, math alphanumerics 𝐟𝐫𝐞𝐞 → free, circled letters).
-2. Strip **invisible characters**: zero-width (U+200B–U+200F, U+2060–U+2064, U+FEFF), bidi controls (U+202A–U+202E, U+2066–U+2069), Unicode **tag characters** (U+E0000–U+E007F), variation selectors, soft hyphen, combining-mark floods (Zalgo). The *count* of stripped characters is itself a signal.
+2. Strip **invisible characters**: zero-width (U+200B–U+200F, U+2060–U+2064, U+FEFF), bidi controls (U+202A–U+202E, U+2066–U+2069), Unicode **tag characters** (U+E0000–U+E007F), variation selectors, soft hyphen, combining-mark floods (Zalgo), and underline/overline marks wherever they sit, spaces included (U+0305, U+0331–U+0333, U+033F, U+035E–U+035F: `س̲ڪ̲ل̲ي̲ف̲` → `سكليف`; strikethrough overlays U+0334–U+0338 count only as part of a flood). The *count* of stripped characters is itself a signal.
 3. **Confusables skeleton** (Unicode TR39 `confusables.txt`, embedded): Cyrillic "а" → Latin "a", Greek "ο" → "o", etc.
 4. **Leetspeak** and symbol folding (`0→o, 1→i/l, 3→e, 4→a, 5→s, $→s, @→a`), applied in a *separate* variant so we don't damage numbers.
-5. **Arabic/Persian normalization** (likely important for your users): remove tashkeel/tatweel, unify alef forms (أ إ آ → ا), ى→ي, ة→ه (match variant), Persian ک/ی → Arabic ك/ي, Arabic-Indic and Persian digits → ASCII digits.
+5. **Arabic/Persian normalization** (likely important for your users): remove tashkeel/tatweel, unify alef forms (أ إ آ → ا), ى→ي, ة→ه (match variant), Persian ک/ی and the kaf variants ڪ ګ ڬ → Arabic ك/ي, Arabic-Indic and Persian digits → ASCII digits. Separators (`. · • - _ | /`) wedged into a word with tatweel are removed and counted as stripped characters (`اجـ.ـازه` → `اجازه`); a separator between Arabic letters without tatweel is kept, since abbreviations and alternatives are written that way (`د.محمد`, `ذكر/أنثى`).
 6. Separator collapsing: `f.r.e.e`, `f r e e`, `f-r-e-e` → `free`; repeated-char squeeze (`freeeee` → `free`).
 7. **Phone number extraction** across scripts and obfuscations ("zero five five…", spaced digits, Arabic digits) → E.164, so they can be compared against number lists.
 8. Emoji handling: keep them in Raw; map common "spam emoji" sequences (💰🔥💸📈) to tokens for features.

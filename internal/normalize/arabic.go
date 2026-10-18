@@ -1,10 +1,13 @@
 package normalize
 
-import "strings"
+import (
+	"strings"
+	"unicode/utf8"
+)
 
 // FoldArabic applies the DESIGN.md §7.2 step 5 folds that keep words apart:
-// it removes tashkeel and tatweel, unifies alef forms, maps Persian ک/ی to
-// Arabic ك/ي, and turns Arabic-Indic and Persian digits into ASCII. Text
+// it removes tashkeel and tatweel, unifies alef forms, maps Persian ک/ی and
+// the kaf variants ڪ ګ ڬ to Arabic ك/ي, and turns Arabic-Indic and Persian digits into ASCII. Text
 // without these characters is returned unchanged.
 func FoldArabic(s string) string {
 	if !strings.ContainsFunc(s, isArabicFoldable) {
@@ -16,7 +19,7 @@ func FoldArabic(s string) string {
 			return -1
 		case r == 'آ', r == 'أ', r == 'إ', r == 'ٱ':
 			return 'ا'
-		case r == 'ک':
+		case isKafVariant(r):
 			return 'ك'
 		case r == 'ی':
 			return 'ي'
@@ -49,7 +52,7 @@ func LooseArabic(s string) string {
 
 func isArabicFoldable(r rune) bool {
 	return r >= 0x0622 && r <= 0x06F9 && (isTashkeel(r) || r == 'ـ' ||
-		r == 'آ' || r == 'أ' || r == 'إ' || r == 'ٱ' || r == 'ک' || r == 'ی' ||
+		r == 'آ' || r == 'أ' || r == 'إ' || r == 'ٱ' || isKafVariant(r) || r == 'ی' ||
 		r >= '٠' && r <= '٩' || r >= '۰' && r <= '۹')
 }
 
@@ -57,4 +60,86 @@ func isArabicFoldable(r rune) bool {
 // superscript alef U+0670, and the Quranic annotation signs U+06D6–U+06ED.
 func isTashkeel(r rune) bool {
 	return r >= 0x064B && r <= 0x065F || r == 0x0670 || r >= 0x06D6 && r <= 0x06ED
+}
+
+// isKafVariant reports Persian kaf ک and the kaf forms that spam writes in
+// place of ك: swash kaf ڪ, kaf with ring ګ and kaf with dot above ڬ.
+func isKafVariant(r rune) bool {
+	return r >= 0x06A9 && r <= 0x06AC
+}
+
+// StripWordSeparators removes separators wedged into an Arabic word with
+// tatweel (اجـ.ـازه → اجازه) and returns how many separators it removed. A
+// run of tatweel, tashkeel and the separators . · • - _ | / is removed whole
+// when it has at least one tatweel and one separator and sits between two
+// Arabic letters. Without
+// tatweel the separator is kept, because Arabic writes abbreviations and
+// alternatives that way (د.محمد, ذكر/أنثى). Latin, digits and URLs never
+// qualify.
+func StripWordSeparators(s string) (string, int) {
+	if !strings.ContainsRune(s, 'ـ') || !strings.ContainsAny(s, wordSeparators) {
+		return s, 0
+	}
+	var b strings.Builder
+	removed := 0
+	changed := false
+	afterLetter := false // the last non-mark character is an Arabic letter
+	for i := 0; i < len(s); {
+		r, w := utf8.DecodeRuneInString(s[i:])
+		if afterLetter && isWedge(r) {
+			end, tatweel, seps := i, false, 0
+			for end < len(s) {
+				r, w := utf8.DecodeRuneInString(s[end:])
+				if isTashkeel(r) {
+					end += w
+					continue
+				}
+				if !isWedge(r) {
+					break
+				}
+				if r == 'ـ' {
+					tatweel = true
+				} else {
+					seps++
+				}
+				end += w
+			}
+			if next, _ := utf8.DecodeRuneInString(s[end:]); tatweel && seps > 0 && isWordLetter(next) {
+				if !changed {
+					b.Grow(len(s))
+					b.WriteString(s[:i])
+					changed = true
+				}
+				removed += seps
+			} else if changed {
+				b.WriteString(s[i:end])
+			}
+			i, afterLetter = end, false
+			continue
+		}
+		if !isMark(r) {
+			afterLetter = isWordLetter(r)
+		}
+		if changed {
+			b.WriteString(s[i : i+w])
+		}
+		i += w
+	}
+	if !changed {
+		return s, 0
+	}
+	return b.String(), removed
+}
+
+// wordSeparators are the separators StripWordSeparators removes.
+const wordSeparators = ".·•-_|/"
+
+// isWedge reports tatweel and the separators spam wedges into Arabic words.
+func isWedge(r rune) bool {
+	return r == 'ـ' || strings.ContainsRune(wordSeparators, r)
+}
+
+// isWordLetter reports an Arabic letter other than tatweel.
+func isWordLetter(r rune) bool {
+	return r != 'ـ' && isArabicLetter(r)
 }

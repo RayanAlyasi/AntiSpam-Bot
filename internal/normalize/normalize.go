@@ -14,8 +14,9 @@ type Result struct {
 	Raw string
 	// Norm is the form used for matching.
 	Norm string
-	// Stripped counts the invisible and combining-flood characters removed as
-	// obfuscation. It is a signal input.
+	// Stripped counts the invisible characters, combining-mark floods,
+	// decorative marks and wedged separators removed as obfuscation. It is a
+	// signal input.
 	Stripped int
 	// Skeleton is the TR39 confusables skeleton of Norm; compare it with
 	// strings.EqualFold.
@@ -32,8 +33,8 @@ type Result struct {
 // too and compare the same field.
 func Text(raw string) Result {
 	folded, stripped := Fold(raw)
-	n, floods := matchForm(folded)
-	stripped = min(stripped+floods, utf8.RuneCountInString(raw))
+	n, removed := matchForm(folded)
+	stripped = min(stripped+removed, utf8.RuneCountInString(raw))
 	return Result{
 		Raw:         raw,
 		Norm:        n,
@@ -47,22 +48,25 @@ func Text(raw string) Result {
 
 // matchForm applies the folds that make up Norm after Fold: Arabic and
 // Persian folding, separator collapsing and repeat squeezing. The folds
-// themselves are never counted as obfuscation. Removing tatweel can join two
-// mark runs into a flood (ب+marks+ـ+marks), so floods are stripped and
-// counted again here, and removing marks or gaps can let NFKC compose again,
-// so it repeats until the result is stable.
+// themselves are never counted as obfuscation. Separators wedged into Arabic
+// words are, and they go first, while the tatweel that marks them is still
+// there. Removing tatweel can join two mark runs into a flood
+// (ب+marks+ـ+marks), so floods are stripped and counted again here, and
+// removing marks or gaps can let NFKC compose again, so it repeats until the
+// result is stable.
 func matchForm(s string) (string, int) {
-	floods := 0
+	removed := 0
 	for range maxFoldPasses {
-		t, n := StripFloods(SqueezeRepeats(CollapseSeparators(FoldArabic(s))))
-		floods += n
+		t, wedged := StripWordSeparators(s)
+		t, floods := StripFloods(SqueezeRepeats(CollapseSeparators(FoldArabic(t))))
+		removed += wedged + floods
 		t = norm.NFKC.String(t)
 		if t == s {
 			break
 		}
 		s = t
 	}
-	return s, floods
+	return s, removed
 }
 
 // maxFoldPasses bounds the NFKC/flood loop in Fold. Real input settles in two
@@ -71,9 +75,9 @@ func matchForm(s string) (string, int) {
 const maxFoldPasses = 8
 
 // Fold applies DESIGN.md §7.2 steps 1 and 2: it removes invisible characters,
-// strips combining-mark floods and applies NFKC, repeating until the result
-// is stable. It returns valid, NFKC-normal UTF-8 and the number of input
-// characters removed as obfuscation.
+// strips combining-mark floods and decorative marks and applies NFKC,
+// repeating until the result is stable. It returns valid, NFKC-normal UTF-8
+// and the number of input characters removed as obfuscation.
 func Fold(raw string) (string, int) {
 	if isPlainASCII(raw) {
 		return raw, 0
@@ -81,8 +85,11 @@ func Fold(raw string) (string, int) {
 	s, stripped := StripInvisibles(raw)
 	for range maxFoldPasses {
 		t, n := StripFloods(s)
-		stripped += n
-		t = norm.NFKC.String(t)
+		t, d := StripDecorations(t)
+		stripped += n + d
+		// NFKC spells ‾ and ‗ as a space plus a decoration. The sender typed no
+		// mark there, so those are removed without being counted.
+		t, _ = StripDecorations(norm.NFKC.String(t))
 		if strings.ContainsFunc(t, isInvisible) {
 			// NFKC maps a few compatibility fillers to invisible ones, and inserts
 			// U+034F into very long runs of non-starters. Neither came from the
@@ -90,7 +97,7 @@ func Fold(raw string) (string, int) {
 			s = removeInvisibles(t)
 			continue
 		}
-		if n == 0 && t == s {
+		if n == 0 && d == 0 && t == s {
 			break
 		}
 		s = t

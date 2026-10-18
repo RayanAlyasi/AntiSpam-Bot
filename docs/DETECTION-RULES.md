@@ -50,6 +50,11 @@ suspicious domain is still caught.
   whole words, so `free` doesn't match `freedom`.
 - Text is matched in every normalized form: plain, confusables skeleton, leetspeak fold and the
   Arabic match form. So `fr33`, `frее` (Cyrillic е) and `f.r.e.e` all match `free`.
+- Write Arabic patterns plainly. The normalizer removes underline and overline marks, including
+  the ones underline generators put on spaces (`س̲ك̲ل̲ي̲ف̲`, `f̲r̲e̲e̲`), folds the kaf variants `ک ڪ ګ ڬ` to `ك`, and drops
+  separators wedged into a word with tatweel (`اجـ.ـازه`). So `سكليف` matches `س̲ڪ̲ل̲ي̲ف̲`, and the
+  phrase `اجازه مرضيه` matches `اجـ.ـازه مرضـ.ـية`. A separator without tatweel is kept (`د.محمد`,
+  `ذكر/أنثى`), and so are separators in numbers, dates, emails and links.
 - The confusables skeleton is only used when the text has a non-ASCII letter. On plain ASCII text
   it would only add false matches (`.com` skeletonizes to `corn`, `101` to `lol`).
 - Domains are stored lower-case and in punycode. A domain rule covers its subdomains, and a leading

@@ -1,0 +1,2 @@
+go test fuzz v1
+string("f̲r̶e̅e̲ ‾ =\u0338 د.محمد اجـ. ازه")

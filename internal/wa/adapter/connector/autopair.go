@@ -3,7 +3,6 @@ package connector
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -58,7 +57,7 @@ func AutoPair(ctx context.Context, devices DeviceLister, pair PairFunc, opts Aut
 		return nil
 	}
 	if _, err := pairPhone(opts.Phone); err != nil {
-		return fmt.Errorf("pair: %s is not an international phone number", logging.Phone(opts.Phone)) // masked, unlike pairPhone's
+		return err
 	}
 	if opts.Attempts <= 0 {
 		opts.Attempts = DefaultAutoPairAttempts

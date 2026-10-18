@@ -90,7 +90,8 @@ and after 10 codes the bot stops asking until it is restarted. Once a number is 
 
 Pairing sends no messages. It sets the bot's "about" text to the appeal line, so removed
 members know how to appeal, and lets anyone add the bot to groups. A running bot picks up a
-newly paired number within 10 seconds. Give the number a neutral name and picture (e.g. "Group
+newly paired number within 10 seconds, once pairing has finished with it. Pairing a number that
+a running bot has connected is refused. Give the number a neutral name and picture (e.g. "Group
 Assistant").
 
 ## Deploying on Coolify

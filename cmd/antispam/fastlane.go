@@ -126,6 +126,8 @@ func newFastlane(cfg config.Config, key []byte, pool *pgxpool.Pool, getenv func(
 	if err != nil {
 		return nil, err
 	}
+	hook := reviews.Queue.OnFinished
+	ws.finished.Store(&hook)
 	lanes = fastlane.NewLanes(fastlane.Deps{
 		Pool: pool, Clock: clk, HashKey: key, Log: log, AI: verifier, Corpus: corpus.Indexes, Reviews: reviews, Protected: protected,
 		Settings: settings,

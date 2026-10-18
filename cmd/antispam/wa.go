@@ -103,10 +103,11 @@ type waStack struct {
 	groups    identity.GroupStore
 	manager   *connector.Manager // nil without the connector role
 	connected *atomic.Int64
-	pacing    config.Pacing                  // the action executors' pacing (config.yaml "pacing")
-	moderate  inbox.Sink                     // the detection fast lane (F-088); nil: moderated rows are only marked processed
-	chat      inbox.Sink                     // commands, DMs and review votes (wp-k's chat handler); nil: not handled
-	runner    atomic.Pointer[actions.Runner] // the action executors, while the connector role runs
+	pacing    config.Pacing                                               // the action executors' pacing (config.yaml "pacing")
+	moderate  inbox.Sink                                                  // the detection fast lane (F-088); nil: moderated rows are only marked processed
+	chat      inbox.Sink                                                  // commands, DMs and review votes (wp-k's chat handler); nil: not handled
+	runner    atomic.Pointer[actions.Runner]                              // the action executors, while the connector role runs
+	finished  atomic.Pointer[func(context.Context, actions.Action) error] // the review queue's completion hook
 }
 
 // lidSwitch lets the identity service use the connector's LID resolver once it exists, and
@@ -154,12 +155,13 @@ func (s *waStack) connectorRole(databaseURL string, reg prometheus.Registerer, l
 		// problems trip its breaker and disconnects slow it down.
 		var mgrRef atomic.Pointer[connector.Manager]
 		runner, err := actions.NewRunner(actions.ConfigFromPacing(s.pacing), actions.RunnerDeps{
-			Connector: managerConnector{&mgrRef},
-			Store:     actions.NewPGStore(s.pool, s.clk),
-			Groups:    actions.PGGroups{DB: s.pool, OnNotAdmin: markNotAdmin(s.groups), Log: s.logs.For("actions")},
-			Alerts:    actionsAlerter{s.notifier},
-			Clock:     s.clk,
-			Log:       s.logs.For("actions"),
+			Connector:  managerConnector{&mgrRef},
+			Store:      actions.NewPGStore(s.pool, s.clk),
+			Groups:     actions.PGGroups{DB: s.pool, OnNotAdmin: markNotAdmin(s.groups), Log: s.logs.For("actions")},
+			Alerts:     actionsAlerter{s.notifier},
+			OnFinished: s.actionFinished,
+			Clock:      s.clk,
+			Log:        s.logs.For("actions"),
 		})
 		if err != nil {
 			return err
@@ -367,4 +369,13 @@ func (s *waStack) wakeActions() {
 	if r := s.runner.Load(); r != nil {
 		r.WakeAll()
 	}
+}
+
+// actionFinished passes a finished action to the review queue (when the fast lane runs in this
+// process), so a sent review post is linked to its review at once instead of at the next sweep.
+func (s *waStack) actionFinished(ctx context.Context, a actions.Action) error {
+	if f := s.finished.Load(); f != nil {
+		return (*f)(ctx, a)
+	}
+	return nil
 }

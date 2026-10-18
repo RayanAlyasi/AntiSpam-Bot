@@ -602,11 +602,13 @@ func lowest(byPriority map[Priority][]*Action) Priority {
 
 // within orders the ready actions of one priority: urgent ones (deadline within UrgentWithin)
 // first, earliest deadline first; otherwise round robin across chats, and within a chat
-// lockdowns, then deletes newest first, then kicks, then the rest by age.
+// lockdowns, then deletes newest first, then kicks, then the rest by age. A shadow reaction is
+// never urgent: its short deadline only says when it stops being worth showing, and it must not
+// run ahead of the real work it stands in for (DESIGN.md §8.4, §10.3).
 func (e *Executor) within(p Priority, ready []*Action, now time.Time) *Action {
 	var urgent *Action
 	for _, a := range ready {
-		if a.Deadline.Sub(now) <= e.cfg.UrgentWithin {
+		if !a.shadowReact() && a.Deadline.Sub(now) <= e.cfg.UrgentWithin {
 			if urgent == nil || a.Deadline.Before(urgent.Deadline) || (a.Deadline.Equal(urgent.Deadline) && a.ID < urgent.ID) {
 				urgent = a
 			}

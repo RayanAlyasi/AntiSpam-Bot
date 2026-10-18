@@ -31,14 +31,15 @@ func TestPipelineShadowReactions(t *testing.T) {
 		text      string
 		route     Route
 		emoji     string // "" for no reaction
+		prio      actions.Priority
 	}{
-		{"certain spam would be banned", policy.ModeShadow, true, members{}, "9@lid", "buy spam now", RouteAutoBan, ShadowCertain},
-		{"established member: admins decide the ban", policy.ModeShadow, true, established, "2@lid", "buy spam now", RouteAsk, ShadowAsk},
-		{"still uncertain: admins decide", policy.ModeShadow, true, members{}, "9@lid", "maybe", RouteAsk, ShadowAsk},
-		{"clean message", policy.ModeShadow, true, members{}, "9@lid", "hello all", RouteNone, ""},
-		{"reactions off", policy.ModeShadow, false, members{}, "9@lid", "buy spam now", RouteAutoBan, ""},
-		{"enforce mode", policy.ModeEnforce, true, members{}, "9@lid", "buy spam now", RouteAutoBan, ""},
-		{"paused mode", policy.ModePaused, true, members{}, "9@lid", "buy spam now", "", ""},
+		{"certain spam would be banned", policy.ModeShadow, true, members{}, "9@lid", "buy spam now", RouteAutoBan, ShadowCertain, actions.P1},
+		{"established member: admins decide the ban", policy.ModeShadow, true, established, "2@lid", "buy spam now", RouteAsk, ShadowAsk, actions.P1},
+		{"still uncertain: admins decide", policy.ModeShadow, true, members{}, "9@lid", "maybe", RouteAsk, ShadowAsk, actions.P3},
+		{"clean message", policy.ModeShadow, true, members{}, "9@lid", "hello all", RouteNone, "", 0},
+		{"reactions off", policy.ModeShadow, false, members{}, "9@lid", "buy spam now", RouteAutoBan, "", 0},
+		{"enforce mode", policy.ModeEnforce, true, members{}, "9@lid", "buy spam now", RouteAutoBan, "", 0},
+		{"paused mode", policy.ModePaused, true, members{}, "9@lid", "buy spam now", "", "", 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -66,9 +67,9 @@ func TestPipelineShadowReactions(t *testing.T) {
 			}
 			r := reacts[0]
 			want := actions.Payload{Target: wa.MessageRef{Sender: tt.sender, ID: "M1"}, Emoji: tt.emoji, Purpose: actions.PurposeShadow}
-			if r.Payload.Target != want.Target || r.Payload.Emoji != want.Emoji || r.Priority != actions.P4 ||
+			if r.Payload.Target != want.Target || r.Payload.Emoji != want.Emoji || r.Priority != tt.prio ||
 				r.DedupeKey != actions.ShadowReactKey(group, "M1") || r.Chat != group || r.Bot != bot {
-				t.Fatalf("reaction %+v, want %+v at P4 on the message, keyed per message", r, want)
+				t.Fatalf("reaction %+v, want %+v at %s (the priority of the action it stands in for, DESIGN §8.4) on the message, keyed per message", r, want, tt.prio)
 			}
 			if len(dets) != 1 || r.ReasonDetectionID != dets[0].ID || *wakes != 1 {
 				t.Fatalf("detections %d, reason %d, wakes %d; want the reaction linked to its detection and the executor woken", len(dets), r.ReasonDetectionID, *wakes)

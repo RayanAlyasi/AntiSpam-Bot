@@ -23,8 +23,8 @@ type Config struct {
 	// GroupPerMin caps writes to one chat in any 60 s, so a raided group can't starve others.
 	GroupPerMin int
 	// PostsPerGroupPerMin caps posts (send, edit, react) in a protected group whose silent mode
-	// is off, in any 60 s. With silent on, posts there are refused, except shadow reactions,
-	// which are capped the same way.
+	// is off, in any 60 s. With silent on, posts there are refused, except shadow reactions.
+	// Shadow reactions never count against it: they stand in for deletes and are paced like them.
 	PostsPerGroupPerMin int
 	// OTPPerMin and ReviewPerMin are reserved P3 sub-budgets: an OTP or review send may run ahead
 	// of P1 and P2 work this often, so neither is starved by a raid. Zero disables a reserve.

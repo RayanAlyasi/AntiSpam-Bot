@@ -194,9 +194,10 @@ func (p *Pipeline) Process(ctx context.Context, e *envelope.Envelope, at time.Ti
 		}
 		if emoji := shadowReaction(s, d); emoji != "" {
 			// Shadow mode changes nothing but shows its judgement (DESIGN.md §8.4): one reaction
-			// per message, so an edit (same ID) never gets a second one.
+			// per message, so an edit (same ID) never gets a second one. It stands in for the
+			// action it reports, so it runs at that action's priority.
 			if err := tx.Enqueue(ctx, actions.Action{
-				Bot: p.c.Bot, Chat: e.Group, Kind: actions.KindReact, Priority: actions.P4,
+				Bot: p.c.Bot, Chat: e.Group, Kind: actions.KindReact, Priority: shadowPriority(d),
 				Payload:   actions.Payload{Target: wa.MessageRef{Sender: senderJID(e), ID: e.MsgID}, Emoji: emoji, Purpose: actions.PurposeShadow},
 				DedupeKey: actions.ShadowReactKey(e.Group, e.MsgID), ReasonDetectionID: detID,
 			}); err != nil {
@@ -334,6 +335,19 @@ func shadowReaction(s policy.Settings, d Decision) string {
 	default:
 		return ""
 	}
+}
+
+// shadowPriority is the queue priority of a shadow reaction: that of the most urgent action the
+// decision would have taken in enforce mode (the delete, P1, for a certain catch), so the
+// reaction shows up when that action would have run. P4 when it would take none.
+func shadowPriority(d Decision) actions.Priority {
+	prio := actions.P4
+	for _, a := range d.Plan.Would {
+		if p := actions.Priority(a.Priority); p.Valid() && p < prio {
+			prio = p
+		}
+	}
+	return prio
 }
 
 func tierReached(d Decision) string {

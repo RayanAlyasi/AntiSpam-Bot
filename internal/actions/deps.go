@@ -35,8 +35,10 @@ func (p Posting) rule(a Action) (refusal string, paced bool) {
 	case a.shadowReact() && !p.ShadowReactions:
 		// Stale: the group left shadow mode or turned shadow.reactions off since it was queued.
 		return "shadow reactions are off in this group", false
-	case a.shadowReact() && p.Protected:
-		return "", true
+	case a.shadowReact():
+		// A shadow reaction stands in for the delete it reports, so it is paced like one: by the
+		// per-chat cap and the global ceiling, not the per-group post cap.
+		return "", false
 	case p.Protected && p.Silent:
 		return "silent: the bot never posts in a silent protected group", false
 	default:

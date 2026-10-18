@@ -21,11 +21,12 @@ var (
 	shadowOff = actions.Posting{Protected: true, Silent: true}
 )
 
-// shadowReact builds shadow mode's reaction to message id in chat, as the fast lane enqueues it.
+// shadowReact builds shadow mode's reaction to message id in chat, as the fast lane enqueues it
+// for a caught message: at the priority of the delete it stands in for (DESIGN §8.4).
 func shadowReact(chat wa.JID, id, emoji string) actions.Action {
 	mid := wa.MessageID(id)
 	return actions.Action{
-		Bot: botA, Chat: chat, Kind: actions.KindReact, Priority: actions.P4,
+		Bot: botA, Chat: chat, Kind: actions.KindReact, Priority: actions.P1,
 		Payload:   actions.Payload{Target: wa.MessageRef{Sender: spammer, ID: mid}, Emoji: emoji, Purpose: actions.PurposeShadow},
 		DedupeKey: actions.ShadowReactKey(chat, mid),
 	}
@@ -84,7 +85,7 @@ func TestShadowReactRefusedOnceShadowReactionsTurnOff(t *testing.T) {
 			h.advance(time.Second)
 		}
 		// The admins leave shadow mode (or turn shadow.reactions off) before the second runs; it
-		// can't run yet because of the one-post-per-minute cap.
+		// can't run yet because writes are spaced out (DESIGN §10.3).
 		h.groups.set(g, shadowOff)
 		h.waitFinal(15*time.Minute, "the second react is refused when it comes up")
 
@@ -110,12 +111,15 @@ func TestShadowReactsPacedAndExpireAfterTenMinutes(t *testing.T) {
 	}
 
 	synctest.Test(t, func(t *testing.T) {
-		h := newHarness(t, actions.DefaultConfig())
+		cfg := actions.DefaultConfig()
+		h := newHarness(t, cfg)
 		g := group(1)
 		h.groups.set(g, shadowOn)
-		const n = 15
+		// 15 minutes' worth of reacts at the per-group cap, so only about 10 minutes' worth can go
+		// out before the deadline.
+		n := 15 * cfg.GroupPerMin
 		for i := range n {
-			h.add(shadowReact(g, fmt.Sprintf("M%02d", i), wouldAct))
+			h.add(shadowReact(g, fmt.Sprintf("M%03d", i), wouldAct))
 		}
 		h.start()
 		h.waitFinal(30*time.Minute, "every shadow react is sent or expires")
@@ -125,12 +129,9 @@ func TestShadowReactsPacedAndExpireAfterTenMinutes(t *testing.T) {
 			if d := h.off(r.Start); d > 10*time.Minute {
 				t.Errorf("React #%d started at +%s, want within 10 min of enqueue (expired shadow reacts are dropped, never sent late, DESIGN §10.4)", i, d)
 			}
-			if i > 0 {
-				if d := r.Start.Sub(reacts[i-1].Start); d < time.Minute {
-					t.Errorf("Reacts #%d and #%d in one silent group are %s apart, want at least 1 min (shadow reacts keep the per-group post cap, DESIGN §10.3)", i-1, i, d)
-				}
-			}
 		}
+		checkPerChat(t, reacts, cfg.GroupPerMin, "shadow reacts are paced like the deletes they stand for, by the per-group bucket and not the 1/min post cap, DESIGN §8.4, §10.3")
+		checkBucket(t, "shadow reacts", starts(reacts), cfg.Burst, float64(cfg.CeilingPerMin), "shadow reacts still count toward the bot's ceiling, DESIGN §10.3")
 		var done, expired int
 		for _, a := range h.store.All() {
 			switch a.Status {
@@ -140,9 +141,9 @@ func TestShadowReactsPacedAndExpireAfterTenMinutes(t *testing.T) {
 				expired++
 			}
 		}
-		if done < 2 || expired < 1 || done+expired != n || done != len(reacts) {
-			t.Errorf("%d done, %d expired, %d React calls of %d; want several done (1/min), the rest expired after 10 min, and one call per done react (DESIGN §10.3, §10.4)",
-				done, expired, len(reacts), n)
+		if done <= 11 || expired < 1 || done+expired != n || done != len(reacts) {
+			t.Errorf("%d done, %d expired, %d React calls of %d; want more than the 11 a 1/min post cap would allow in 10 min (paced like deletes, %d/min per group), the rest expired after 10 min, and one call per done react (DESIGN §8.4, §10.3, §10.4)",
+				done, expired, len(reacts), n, cfg.GroupPerMin)
 		}
 	})
 }

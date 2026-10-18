@@ -55,30 +55,33 @@ func TestShadowReactionsPostOnlyWhileOn(t *testing.T) {
 				t.Errorf("post %d is %s, want refused (only shadow reactions, only while shadow.reactions is on)", i, got)
 			}
 		}
-		var at []time.Time
+		var reacts []call
 		for _, c := range r.client.writes() {
 			if c.method != fake.MethodReact || c.chat != on {
 				t.Errorf("WhatsApp got %s in %s, want only the shadow reactions in %s", c.method, c.chat, on)
 			}
-			at = append(at, c.at)
+			reacts = append(reacts, c)
 		}
-		for i := 1; i < len(at); i++ {
-			if gap := at[i].Sub(at[i-1]); gap < time.Minute {
-				t.Errorf("shadow reactions %s apart, want at least a minute (the per-group post cap still applies)", gap)
-			}
+		if got, limit := maxInWindow(reacts, time.Minute), actions.DefaultConfig().GroupPerMin; got > limit {
+			t.Errorf("%d shadow reactions in a minute, want at most %d (paced like the deletes they stand for, by the per-group bucket)", got, limit)
+		}
+		if n := len(reacts); n > 1 && reacts[n-1].at.Sub(reacts[0].at) >= time.Minute {
+			t.Errorf("shadow reactions spread over %s, want them all within a minute (paced like deletes, not by the 1/min post cap)", reacts[n-1].at.Sub(reacts[0].at))
 		}
 	})
 }
 
 func TestShadowReactionsExpireInsteadOfGoingOutLate(t *testing.T) {
 	within(t, func(t *testing.T) {
-		r := newRig(t, actions.DefaultConfig())
+		cfg := actions.DefaultConfig()
+		r := newRig(t, cfg)
 		r.groups.postingFn = func(wa.JID) (actions.Posting, error) {
 			return actions.Posting{Protected: true, Silent: true, ShadowReactions: true}, nil
 		}
 		start := time.Now()
 		var ids []int64
-		for i := range 15 {
+		// 15 minutes' worth at the per-group cap: only about 10 minutes' worth fits before the deadline.
+		for i := range 15 * cfg.GroupPerMin {
 			ids = append(ids, r.enqueue(shadowReact(group(1), fmt.Sprint("M", i), "❌")).ID)
 		}
 		if d := r.status(ids[0]).Deadline.Sub(start); d != actions.DefaultShadowReactWindow {
@@ -98,7 +101,7 @@ func TestShadowReactionsExpireInsteadOfGoingOutLate(t *testing.T) {
 			}
 		}
 		if done == 0 || expired == 0 {
-			t.Errorf("%d done, %d expired; want the first ones shown and the rest dropped at the 1/min post cap", done, expired)
+			t.Errorf("%d done, %d expired; want the first ones shown and the rest dropped once the per-group bucket (%d/min) can't fit them in %s", done, expired, cfg.GroupPerMin, actions.DefaultShadowReactWindow)
 		}
 		for _, c := range r.client.writes() {
 			if c.at.Sub(start) > actions.DefaultShadowReactWindow {

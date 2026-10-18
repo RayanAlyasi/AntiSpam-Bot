@@ -61,6 +61,26 @@ type Reaction struct {
 type GroupRef struct {
 	JID  wa.JID
 	Name string
+	// Community is the WhatsApp community the group belongs to, if any, and CommunityName its
+	// name (DESIGN.md §12.4).
+	Community     wa.JID
+	CommunityName string
+}
+
+// CommunityGroup is one group of a community and whether the bot can protect it.
+type CommunityGroup struct {
+	JID    wa.JID
+	Name   string
+	Member bool // the bot is in the group
+	Admin  bool // the bot is an admin there, so it protects the group
+}
+
+// Communities lists a community's groups (DESIGN.md §12.4).
+type Communities interface {
+	// CommunityGroups lists every group of a community the bot knows of, including the ones it
+	// isn't in, with the bot's standing in each. The announcement group is left out: only
+	// admins post there.
+	CommunityGroups(ctx context.Context, community wa.JID) ([]CommunityGroup, error)
 }
 
 // Groups answers questions about groups.
@@ -168,31 +188,32 @@ type Joiner interface {
 // Deps are the Handler's collaborators. Optional ones may be nil; their commands then reply
 // that the feature isn't available.
 type Deps struct {
-	Groups    Groups
-	Admins    review.Admins
-	Actions   review.Actions
-	Reviews   *review.Service
-	Learning  review.Learner
-	Evidence  *review.Learning // evidence snapshots for command deletions
-	Blacklist *blacklist.Service
-	Normalize blacklist.Normalizer
-	Settings  Settings
-	Lists     Lists
-	Recent    Recent
-	Members   Members
-	History   History
-	Identity  Identity
-	Track     TrackRecord
-	Stats     Stats
-	Joiner    Joiner
-	Threads   ThreadStore
-	Audit     review.Audit
-	Standing  review.Standing  // .undo of a strike restores trust
-	Self      wa.JID           // the bot's own JID; it never acts on itself
-	Texts     review.Localizer // defaults to review.Texts
-	Clock     clock.Clock      // defaults to clock.Real
-	Prefix    string           // defaults to DefaultPrefix
-	Language  string           // reply language when a group has none; defaults to "en"
+	Groups      Groups
+	Communities Communities // nil: replies can't name the community groups the bot isn't in
+	Admins      review.Admins
+	Actions     review.Actions
+	Reviews     *review.Service
+	Learning    review.Learner
+	Evidence    *review.Learning // evidence snapshots for command deletions
+	Blacklist   *blacklist.Service
+	Normalize   blacklist.Normalizer
+	Settings    Settings
+	Lists       Lists
+	Recent      Recent
+	Members     Members
+	History     History
+	Identity    Identity
+	Track       TrackRecord
+	Stats       Stats
+	Joiner      Joiner
+	Threads     ThreadStore
+	Audit       review.Audit
+	Standing    review.Standing  // .undo of a strike restores trust
+	Self        wa.JID           // the bot's own JID; it never acts on itself
+	Texts       review.Localizer // defaults to review.Texts
+	Clock       clock.Clock      // defaults to clock.Real
+	Prefix      string           // defaults to DefaultPrefix
+	Language    string           // reply language when a group has none; defaults to "en"
 	// Operator reports whether a person is the instance operator.
 	Operator func(wa.JID) bool
 	// WebsiteURL is linked from onboarding and .settings.

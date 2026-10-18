@@ -92,6 +92,9 @@ func (h *Handler) dispatch(ctx context.Context, c *call) error {
 		}
 	}
 	if cmd.needsGroup && c.group == "" {
+		if c.community != "" {
+			return h.runCommunity(ctx, c, cmd)
+		}
 		return h.pickGroup(ctx, c)
 	}
 	return cmd.run(h, ctx, c)
@@ -113,7 +116,7 @@ func (h *Handler) pickGroup(ctx context.Context, c *call) error {
 	if err != nil {
 		return err
 	}
-	return h.reply(ctx, c, "cmd.pick_group", map[string]string{"groups": groupList(groups), "prefix": h.d.Prefix})
+	return h.reply(ctx, c, "cmd.pick_group", map[string]string{"groups": h.groupList(c, listing(groups)), "prefix": h.d.Prefix})
 }
 
 // adminGroups lists the protected groups person administers, sorted by name, so the numbers
@@ -124,19 +127,84 @@ func (h *Handler) adminGroups(ctx context.Context, person wa.JID) ([]GroupRef, e
 		return nil, fmt.Errorf("groups of sender: %w", err)
 	}
 	groups = slices.Clone(groups)
-	slices.SortStableFunc(groups, func(a, b GroupRef) int {
-		return cmp.Or(cmp.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)), cmp.Compare(a.JID, b.JID))
-	})
+	slices.SortStableFunc(groups, func(a, b GroupRef) int { return byName(a.Name, b.Name, a.JID, b.JID) })
 	return groups, nil
 }
 
-// groupList numbers groups for .use <number>: "1. Cars", "2. Shop".
-func groupList(groups []GroupRef) string {
-	names := make([]string, 0, len(groups))
-	for i, g := range groups {
-		names = append(names, strconv.Itoa(i+1)+". "+g.Name)
+func byName(a, b string, ja, jb wa.JID) int {
+	return cmp.Or(cmp.Compare(strings.ToLower(a), strings.ToLower(b)), cmp.Compare(ja, jb))
+}
+
+// entry is one numbered line of the groups list: a group, or a community with the admin's
+// groups in it listed under it.
+type entry struct {
+	GroupRef             // the group, or the community's JID and name
+	community bool       // the entry is a community
+	groups    []GroupRef // a community's groups, in name order
+	nested    bool       // a group listed under its community
+}
+
+// listing orders groups (as sorted by adminGroups) for the numbered list: each community by name
+// with its groups under it, then the groups in no community (DESIGN.md §12.4).
+func listing(groups []GroupRef) []entry {
+	var communities []*entry
+	byJID := map[wa.JID]*entry{}
+	var alone []entry
+	for _, g := range groups {
+		if g.Community == "" {
+			alone = append(alone, entry{GroupRef: g})
+			continue
+		}
+		e, ok := byJID[g.Community]
+		if !ok {
+			e = &entry{GroupRef: GroupRef{JID: g.Community, Name: g.CommunityName}, community: true}
+			byJID[g.Community] = e
+			communities = append(communities, e)
+		}
+		if e.Name == "" {
+			e.Name = g.CommunityName
+		}
+		e.groups = append(e.groups, g)
 	}
-	return strings.Join(names, "\n")
+	slices.SortStableFunc(communities, func(a, b *entry) int { return byName(a.Name, b.Name, a.JID, b.JID) })
+	var out []entry
+	for _, e := range communities {
+		out = append(out, *e)
+		for _, g := range e.groups {
+			out = append(out, entry{GroupRef: g, nested: true})
+		}
+	}
+	return append(out, alone...)
+}
+
+// groupList numbers a listing for .use <number>: "1. Cars", "2. Shop", with a community's
+// groups indented under it.
+func (h *Handler) groupList(c *call, entries []entry) string {
+	lines := make([]string, 0, len(entries))
+	for i, e := range entries {
+		n := strconv.Itoa(i+1) + ". "
+		switch {
+		case e.community:
+			key := "cmd.community_line"
+			if len(e.groups) == 1 {
+				key = "cmd.community_line_one"
+			}
+			lines = append(lines, n+h.t(c, key, map[string]string{"community": h.communityLabel(c, e.Name), "n": strconv.Itoa(len(e.groups))}))
+		case e.nested:
+			lines = append(lines, "   "+n+e.Name)
+		default:
+			lines = append(lines, n+e.Name)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// communityLabel is a community's name, or a plain word for one whose name isn't known.
+func (h *Handler) communityLabel(c *call, name string) string {
+	if name == "" {
+		return h.t(c, "cmd.community_unnamed", nil)
+	}
+	return name
 }
 
 // westernDigits turns Arabic-Indic digits into ASCII ones, so ".use ٢" works like ".use 2".
@@ -145,30 +213,30 @@ var westernDigits = strings.NewReplacer(
 	"۰", "0", "۱", "1", "۲", "2", "۳", "3", "۴", "4", "۵", "5", "۶", "6", "۷", "7", "۸", "8", "۹", "9",
 )
 
-// matchGroup picks one of groups (as sorted by adminGroups) for what an admin typed: an exact
-// name first, so a group named "2" stays reachable by name; then a number from groupList; then
-// the only name containing it. ok is false when nothing or several groups match.
-func matchGroup(groups []GroupRef, typed string) (GroupRef, bool) {
+// matchEntry picks one entry of a listing for what an admin typed: an exact name first, so a
+// group named "2" stays reachable by name; then a number from groupList; then the only name
+// containing it. ok is false when nothing or several entries match.
+func matchEntry(entries []entry, typed string) (entry, bool) {
 	want := strings.ToLower(strings.TrimSpace(typed))
 	if want == "" {
-		return GroupRef{}, false
+		return entry{}, false
 	}
-	for _, g := range groups {
-		if strings.ToLower(g.Name) == want {
-			return g, true
+	for _, e := range entries {
+		if strings.ToLower(e.Name) == want {
+			return e, true
 		}
 	}
-	if n, err := strconv.Atoi(westernDigits.Replace(want)); err == nil && n >= 1 && n <= len(groups) {
-		return groups[n-1], true
+	if n, err := strconv.Atoi(westernDigits.Replace(want)); err == nil && n >= 1 && n <= len(entries) {
+		return entries[n-1], true
 	}
-	var match []GroupRef
-	for _, g := range groups {
-		if strings.Contains(strings.ToLower(g.Name), want) {
-			match = append(match, g)
+	var match []entry
+	for _, e := range entries {
+		if strings.Contains(strings.ToLower(e.Name), want) {
+			match = append(match, e)
 		}
 	}
 	if len(match) != 1 {
-		return GroupRef{}, false
+		return entry{}, false
 	}
 	return match[0], true
 }
@@ -191,7 +259,7 @@ func (h *Handler) cmdGroups(ctx context.Context, c *call) error {
 	if err != nil {
 		return err
 	}
-	return h.reply(ctx, c, "cmd.groups", map[string]string{"groups": groupList(groups), "prefix": h.d.Prefix})
+	return h.reply(ctx, c, "cmd.groups", map[string]string{"groups": h.groupList(c, listing(groups)), "prefix": h.d.Prefix})
 }
 
 func (h *Handler) cmdUse(ctx context.Context, c *call) error {
@@ -199,12 +267,16 @@ func (h *Handler) cmdUse(ctx context.Context, c *call) error {
 	if err != nil {
 		return err
 	}
-	g, ok := matchGroup(groups, c.cmd.Rest)
+	entries := listing(groups)
+	e, ok := matchEntry(entries, c.cmd.Rest)
 	if !ok {
-		return h.reply(ctx, c, "cmd.pick_group", map[string]string{"groups": groupList(groups), "prefix": h.d.Prefix})
+		return h.reply(ctx, c, "cmd.pick_group", map[string]string{"groups": h.groupList(c, entries), "prefix": h.d.Prefix})
 	}
-	h.setContext(c, g.JID)
-	return h.reply(ctx, c, "cmd.using", map[string]string{"group": g.Name})
+	if e.community {
+		return h.useCommunity(ctx, c, e)
+	}
+	h.setContext(c, dmContext{group: e.JID})
+	return h.reply(ctx, c, "cmd.using", map[string]string{"group": e.Name})
 }
 
 func (h *Handler) cmdLogin(ctx context.Context, c *call) error {

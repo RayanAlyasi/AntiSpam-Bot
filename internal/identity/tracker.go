@@ -1,9 +1,11 @@
 package identity
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -19,6 +21,18 @@ const GroupRefreshEvery = 6 * time.Hour
 // from the people in its groups.
 type BotSelfFunc func(bot wa.JID) (pn, lid wa.JID)
 
+// CommunitySource reads communities through a bot's WAClient: a community's own info (for its
+// name) and its list of groups, including the ones the bot isn't in.
+type CommunitySource interface {
+	GroupInfo(ctx context.Context, bot, group wa.JID) (wa.GroupInfo, error)
+	SubGroups(ctx context.Context, bot, community wa.JID) ([]wa.SubGroup, error)
+}
+
+// StartFunc is called when the bot joins a community's group or becomes an admin there, after
+// the group is stored (DESIGN.md §12.4: a new community group starts from the community's
+// settings).
+type StartFunc func(ctx context.Context, g Group) error
+
 // Tracker keeps groups, members and the participant cache current from the connector's group
 // events and from full group-info fetches, and records every LID↔PN pair those reveal
 // (DESIGN.md §5.1, §7.7, §8.1, §11). It must not run on the receive loop: it writes to the
@@ -30,6 +44,12 @@ type Tracker struct {
 	self   BotSelfFunc
 	clk    clock.Clock
 	log    zerolog.Logger
+
+	src     CommunitySource // nil: communities are named only from events and their own rows
+	onStart StartFunc       // nil: nothing happens when the bot joins a community group
+
+	mu     sync.Mutex
+	listed map[wa.JID]time.Time // community → when its info and group list were last fetched
 }
 
 // NewTracker builds a tracker. parts may be nil (no cache to maintain).
@@ -40,7 +60,18 @@ func NewTracker(ids *Service, groups GroupStore, parts *Participants, self BotSe
 	if self == nil {
 		self = func(bot wa.JID) (wa.JID, wa.JID) { return bot, "" }
 	}
-	return &Tracker{ids: ids, groups: groups, parts: parts, self: self, clk: clk, log: log.With().Str("module", "groups").Logger()}
+	return &Tracker{
+		ids: ids, groups: groups, parts: parts, self: self, clk: clk, log: log.With().Str("module", "groups").Logger(),
+		listed: map[wa.JID]time.Time{},
+	}
+}
+
+// WithCommunities makes the tracker fetch each community's name and group list through src, at
+// most once per GroupRefreshEvery per community, and call onStart (which may be nil) when the
+// bot joins a community's group or becomes an admin there. It returns t.
+func (t *Tracker) WithCommunities(src CommunitySource, onStart StartFunc) *Tracker {
+	t.src, t.onStart = src, onStart
+	return t
 }
 
 // GroupState reports whether the bot tracks a group (it is in it) and whether the group is
@@ -101,9 +132,8 @@ func (t *Tracker) joined(ctx context.Context, e *wa.JoinedGroupEvent) error {
 	if existed && old.Status != GroupLeft && !old.JoinedAt.IsZero() {
 		joinedAt = old.JoinedAt
 	}
-	if err := t.apply(ctx, e.Bot, e.Info, joinedAt, preExisting); err != nil {
-		errs = append(errs, err)
-	}
+	g, err := t.apply(ctx, e.Bot, e.Info, old, joinedAt, preExisting)
+	errs = append(errs, err, t.started(ctx, g))
 	return errors.Join(errs...)
 }
 
@@ -119,7 +149,12 @@ func (t *Tracker) Refresh(ctx context.Context, bot wa.JID, info wa.GroupInfo) er
 	if existed && !old.JoinedAt.IsZero() {
 		joinedAt = old.JoinedAt
 	}
-	return t.apply(ctx, bot, info, joinedAt, false)
+	g, err := t.apply(ctx, bot, info, old, joinedAt, false)
+	if g.Status == GroupActive && old.Status != GroupActive {
+		// Made an admin while the bot wasn't listening.
+		err = errors.Join(err, t.started(ctx, g))
+	}
+	return err
 }
 
 // RefreshStale refetches every group not refreshed within GroupRefreshEvery and returns how many
@@ -195,13 +230,21 @@ func (t *Tracker) SyncJoined(ctx context.Context, bot wa.JID, infos []wa.GroupIn
 }
 
 // apply writes a full snapshot: the group row, one person and membership per participant, and
-// the participant cache. Memberships the snapshot no longer contains are removed.
-func (t *Tracker) apply(ctx context.Context, bot wa.JID, info wa.GroupInfo, joinedAt time.Time, preExisting bool) error {
+// the participant cache. Memberships the snapshot no longer contains are removed. old is the
+// stored row, if any. It returns the row it wrote.
+func (t *Tracker) apply(ctx context.Context, bot wa.JID, info wa.GroupInfo, old Group, joinedAt time.Time, preExisting bool) (Group, error) {
 	now := t.clk.Now()
 	g := Group{
 		JID: info.JID, Bot: bot, Name: info.Name, Topic: info.Topic, Size: info.Size,
 		AddressingMode: info.AddressingMode, Announce: info.Announce, Locked: info.Locked,
 		JoinApproval: info.JoinApproval, JoinedAt: joinedAt, LastInfoRefresh: now,
+		Kind: KindOf(info),
+	}
+	if g.Kind == KindCommunity {
+		t.refreshCommunity(ctx, bot, info.JID)
+	} else if info.LinkedParent != "" {
+		g.Community = info.LinkedParent
+		g.CommunityName = t.communityName(ctx, bot, info.LinkedParent, old)
 	}
 	if g.Size == 0 {
 		g.Size = len(info.Participants)
@@ -244,7 +287,7 @@ func (t *Tracker) apply(ctx context.Context, bot wa.JID, info wa.GroupInfo, join
 	if t.parts != nil {
 		t.parts.Set(info)
 	}
-	return errors.Join(errs...)
+	return g, errors.Join(errs...)
 }
 
 // changed applies a GroupInfo event.
@@ -290,6 +333,8 @@ func (t *Tracker) changed(ctx context.Context, e *wa.GroupEvent) error {
 	if e.JoinApproval != nil {
 		g.JoinApproval = *e.JoinApproval
 	}
+	wasActive := existed && g.Status == GroupActive
+	errs = append(errs, t.linked(ctx, &g, e.Link, false), t.linked(ctx, &g, e.Unlink, true))
 
 	at := e.Timestamp
 	if at.IsZero() {
@@ -349,11 +394,120 @@ func (t *Tracker) changed(ctx context.Context, e *wa.GroupEvent) error {
 	}
 	if err := t.groups.UpsertGroup(ctx, g); err != nil {
 		errs = append(errs, fmt.Errorf("upsert group %s: %w", g.JID, err))
+	} else if g.Status == GroupActive && !wasActive {
+		errs = append(errs, t.started(ctx, g))
 	}
 	if t.parts != nil {
 		t.parts.Apply(e)
 	}
 	return errors.Join(errs...)
+}
+
+// linked applies a community link change to g, the event's group, and to the community's group
+// list. When the event is about the community, the linked group's own row is updated too.
+func (t *Tracker) linked(ctx context.Context, g *Group, l *wa.CommunityLink, unlink bool) error {
+	if l == nil || l.Community == "" || l.Group == "" {
+		return nil
+	}
+	var errs []error
+	if unlink {
+		errs = append(errs, t.groups.UnlinkCommunityGroup(ctx, l.Community, l.Group))
+	} else {
+		sub := wa.SubGroup{JID: l.Group, IsAnnouncement: l.IsAnnouncement}
+		if l.Group != g.JID {
+			sub.Name = l.Name
+		} else {
+			sub.Name = g.Name
+		}
+		errs = append(errs, t.groups.LinkCommunityGroup(ctx, l.Community, sub))
+	}
+	set := func(grp *Group, communityName string) {
+		switch {
+		case unlink && grp.Community == l.Community:
+			grp.Community, grp.CommunityName = "", ""
+		case !unlink:
+			if grp.Community != l.Community {
+				grp.CommunityName = ""
+			}
+			grp.Community, grp.CommunityName = l.Community, cmp.Or(communityName, grp.CommunityName)
+			if l.IsAnnouncement {
+				grp.Kind = KindAnnouncement
+			}
+		}
+	}
+	if l.Group == g.JID {
+		set(g, l.Name)
+		return errors.Join(errs...)
+	}
+	// The event is about the community: g is it, and the linked group may be one of ours.
+	sub, ok, err := t.groups.Group(ctx, l.Group)
+	if err != nil || !ok {
+		return errors.Join(append(errs, err)...)
+	}
+	set(&sub, g.Name)
+	return errors.Join(append(errs, t.groups.UpsertGroup(ctx, sub))...)
+}
+
+// started tells onStart that the bot joined, or became an admin in, a community's group.
+func (t *Tracker) started(ctx context.Context, g Group) error {
+	if t.onStart == nil || g.JID == "" || g.Community == "" || !g.IsChat() || g.Status == GroupLeft {
+		return nil
+	}
+	if err := t.onStart(ctx, g); err != nil {
+		return fmt.Errorf("start %s from community %s: %w", g.JID, g.Community, err)
+	}
+	return nil
+}
+
+// communityName names a group's community: the community's own row when the bot tracks it, a
+// fresh fetch when one is due, or the name stored with the group before.
+func (t *Tracker) communityName(ctx context.Context, bot, community wa.JID, old Group) string {
+	var name string
+	if old.Community == community {
+		name = old.CommunityName
+	}
+	if c, ok, err := t.groups.Group(ctx, community); err == nil && ok && c.Kind == KindCommunity && c.Name != "" {
+		name = c.Name
+	}
+	if fetched := t.refreshCommunity(ctx, bot, community); fetched != "" {
+		name = fetched
+	}
+	return name
+}
+
+// refreshCommunity fetches a community's name and group list through the bot when the last
+// fetch is older than GroupRefreshEvery, stores the list, and returns the name ("" when nothing
+// was fetched). A failed fetch is logged and tried again on the next snapshot.
+func (t *Tracker) refreshCommunity(ctx context.Context, bot, community wa.JID) string {
+	if t.src == nil {
+		return ""
+	}
+	now := t.clk.Now()
+	t.mu.Lock()
+	last, ok := t.listed[community]
+	t.mu.Unlock()
+	if ok && now.Sub(last) < GroupRefreshEvery {
+		return ""
+	}
+	log := t.log.With().Str("community", string(community)).Logger()
+	subs, err := t.src.SubGroups(ctx, bot, community)
+	if err != nil {
+		log.Warn().Err(err).Msg("list a community's groups")
+		return ""
+	}
+	if err := t.groups.SetCommunityGroups(ctx, community, subs); err != nil {
+		log.Warn().Err(err).Msg("store a community's groups")
+		return ""
+	}
+	info, err := t.src.GroupInfo(ctx, bot, community)
+	if err != nil {
+		log.Warn().Err(err).Msg("community info")
+		return ""
+	}
+	t.mu.Lock()
+	t.listed[community] = now
+	t.mu.Unlock()
+	return info.Name
 }
 
 // person finds or creates a participant's person from whatever identifiers are known, recording

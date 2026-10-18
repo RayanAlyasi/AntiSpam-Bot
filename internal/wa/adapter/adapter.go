@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -44,6 +45,14 @@ type api interface {
 
 var _ api = (*whatsmeow.Client)(nil)
 
+// subGroupLister is the whatsmeow call that lists a community's groups. It's kept out of api so
+// the adapter's test stub doesn't have to implement it.
+type subGroupLister interface {
+	GetSubGroups(ctx context.Context, community types.JID) ([]*types.GroupLinkTarget, error)
+}
+
+var _ subGroupLister = (*whatsmeow.Client)(nil)
+
 // Client implements wa.WAClient on top of a whatsmeow client. Every error it returns matches
 // one of the wa error values with errors.Is when it's one of the cases the action executor
 // handles (DESIGN.md §10.5), and keeps the whatsmeow error in its chain.
@@ -58,7 +67,10 @@ type Client struct {
 	banUntil time.Time
 }
 
-var _ wa.WAClient = (*Client)(nil)
+var (
+	_ wa.WAClient        = (*Client)(nil)
+	_ wa.CommunityReader = (*Client)(nil)
+)
 
 // New wraps a whatsmeow client.
 func New(cli *whatsmeow.Client) *Client {
@@ -377,6 +389,33 @@ func (c *Client) GroupInfoFromLink(ctx context.Context, code string) (wa.GroupIn
 			return wa.ErrNotFound
 		}
 		res = groupInfo(info)
+		return nil
+	})
+	return res, err
+}
+
+// SubGroups lists a community's groups, including the ones the bot isn't in.
+func (c *Client) SubGroups(ctx context.Context, community wa.JID) ([]wa.SubGroup, error) {
+	var res []wa.SubGroup
+	err := c.call("sub groups", func() error {
+		g, err := toWM(community)
+		if err != nil {
+			return err
+		}
+		lister, ok := c.cli.(subGroupLister)
+		if !ok {
+			return fmt.Errorf("listing a community's groups: %w", errors.ErrUnsupported)
+		}
+		targets, err := lister.GetSubGroups(ctx, g)
+		if err != nil {
+			return err
+		}
+		res = make([]wa.SubGroup, 0, len(targets))
+		for _, t := range targets {
+			if t != nil {
+				res = append(res, wa.SubGroup{JID: FromWM(t.JID), Name: t.Name, IsAnnouncement: t.IsDefaultSubGroup})
+			}
+		}
 		return nil
 	})
 	return res, err

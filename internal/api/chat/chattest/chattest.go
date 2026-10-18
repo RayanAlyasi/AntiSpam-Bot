@@ -23,9 +23,14 @@ type Groups struct {
 	names     map[wa.JID]string
 	served    map[wa.JID][]wa.JID // review group → protected groups
 	members   map[wa.JID][]wa.JID
+	community map[wa.JID]chat.GroupRef         // group → its community's JID and name
+	listed    map[wa.JID][]chat.CommunityGroup // community → its groups
 }
 
-var _ chat.Groups = (*Groups)(nil)
+var (
+	_ chat.Groups      = (*Groups)(nil)
+	_ chat.Communities = (*Groups)(nil)
+)
 
 // NewGroups returns an empty Groups that reads admins from admins.
 func NewGroups(admins *reviewtest.Admins) *Groups {
@@ -35,7 +40,30 @@ func NewGroups(admins *reviewtest.Admins) *Groups {
 		names:     map[wa.JID]string{},
 		served:    map[wa.JID][]wa.JID{},
 		members:   map[wa.JID][]wa.JID{},
+		community: map[wa.JID]chat.GroupRef{},
+		listed:    map[wa.JID][]chat.CommunityGroup{},
 	}
+}
+
+// InCommunity puts group in the community with the given JID and name.
+func (g *Groups) InCommunity(group, community wa.JID, name string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.community[group] = chat.GroupRef{JID: community, Name: name}
+}
+
+// SetCommunityGroups sets the groups CommunityGroups lists for a community.
+func (g *Groups) SetCommunityGroups(community wa.JID, groups ...chat.CommunityGroup) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.listed[community] = slices.Clone(groups)
+}
+
+// CommunityGroups lists the groups set with SetCommunityGroups.
+func (g *Groups) CommunityGroups(_ context.Context, community wa.JID) ([]chat.CommunityGroup, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return slices.Clone(g.listed[community]), nil
 }
 
 // Protect makes group a protected group called name.
@@ -97,9 +125,10 @@ func (g *Groups) AdminGroups(_ context.Context, person wa.JID) ([]chat.GroupRef,
 	for _, grp := range g.Admins.GroupsOf(person) {
 		g.mu.Lock()
 		name, ok := g.protected[grp]
+		c := g.community[grp]
 		g.mu.Unlock()
 		if ok {
-			out = append(out, chat.GroupRef{JID: grp, Name: name})
+			out = append(out, chat.GroupRef{JID: grp, Name: name, Community: c.JID, CommunityName: c.Name})
 		}
 	}
 	return out, nil

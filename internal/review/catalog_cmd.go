@@ -32,6 +32,7 @@ var commandTexts = Catalog{
 			"{prefix}blacklist add +966551234567 – block a phone number\n" +
 			"{prefix}blacklist list – see the list\n\n" +
 			"In a DM, pick a group with {prefix}use 2 or {prefix}use part of the name. If you manage one group, you don't need {prefix}use.\n" +
+			"*Communities:* {prefix}groups lists each community with its groups. Pick a community with {prefix}use and settings change in all your groups there.\n" +
 			"More help: {prefix}help moderation, {prefix}help reviews, {prefix}help settings or {prefix}help blacklist",
 		"cmd.help.moderation": "*Moderation*\n" +
 			"Reply to the message (or @mention the person) with:\n\n" +
@@ -79,7 +80,14 @@ var commandTexts = Catalog{
 			"{prefix}block links – delete a type of message (also invites, images, videos…)\n" +
 			"{prefix}allow stickers – allow a type again\n" +
 			"\n" +
-			"Any setting by name: {prefix}get review.timeout, {prefix}set review.timeout 12h",
+			"Any setting by name: {prefix}get review.timeout, {prefix}set review.timeout 12h\n" +
+			"\n" +
+			"*Communities*\n" +
+			"{prefix}groups – your groups, each community with its groups under it\n" +
+			"{prefix}use 1 – pick a community: {prefix}mode, {prefix}preset, {prefix}askadmins, {prefix}block, {prefix}allow, {prefix}set and {prefix}blacklist add or remove then change all your groups in it\n" +
+			"{prefix}status – one line for each group of the community\n" +
+			"_Example:_ {prefix}use Riyadh Market, then {prefix}preset strict\n" +
+			"New groups of the community start with its settings. I also tell you which of its groups I'm not in or not an admin of.",
 		"cmd.help.blacklist": "*Blacklist*\n" +
 			"{prefix}blacklist add +966551234567 scam – ban this number here, now and if they come back\n" +
 			"{prefix}blacklist remove +966551234567 – take it off the list\n" +
@@ -254,6 +262,7 @@ var commandTexts = Catalog{
 			"{prefix}القائمة_السوداء add \u200e+966551234567 – منع رقم هاتف\n" +
 			"{prefix}القائمة_السوداء list – عرض القائمة\n\n" +
 			"في الخاص، اختر المجموعة بـ {prefix}استخدم 2 أو {prefix}استخدم جزء من الاسم. إن كنت تدير مجموعة واحدة فلا حاجة إلى {prefix}استخدم.\n" +
+			"*المجتمعات:* يعرض {prefix}المجموعات كل مجتمع ومجموعاته. اختر مجتمعاً بـ {prefix}استخدم فتتغيّر الإعدادات في كل مجموعاتك فيه.\n" +
 			"للمزيد: {prefix}مساعدة الإشراف، {prefix}مساعدة المراجعات، {prefix}مساعدة الإعدادات أو {prefix}مساعدة القائمة_السوداء",
 		"cmd.help.moderation": "*الإشراف*\n" +
 			"رُدّ على الرسالة (أو أشر إلى الشخص) بـ:\n\n" +
@@ -301,7 +310,14 @@ var commandTexts = Catalog{
 			"{prefix}منع links – حذف نوع من الرسائل (وأيضاً invites وimages وvideos…)\n" +
 			"{prefix}سماح stickers – السماح بنوع من جديد\n" +
 			"\n" +
-			"أي إعداد باسمه: {prefix}عرض review.timeout، {prefix}ضبط review.timeout 12h",
+			"أي إعداد باسمه: {prefix}عرض review.timeout، {prefix}ضبط review.timeout 12h\n" +
+			"\n" +
+			"*المجتمعات*\n" +
+			"{prefix}المجموعات – مجموعاتك، وتحت كل مجتمع مجموعاته\n" +
+			"{prefix}استخدم 1 – اختيار مجتمع: تغيّر حينها {prefix}وضع و{prefix}نمط و{prefix}اسأل_المشرفين و{prefix}منع و{prefix}سماح و{prefix}ضبط و{prefix}القائمة_السوداء add أو remove كل مجموعاتك فيه\n" +
+			"{prefix}حالة – سطر لكل مجموعة في المجتمع\n" +
+			"_مثال:_ {prefix}استخدم سوق الرياض، ثم {prefix}نمط strict\n" +
+			"تبدأ المجموعات الجديدة في المجتمع بإعداداته. وأخبرك أيضاً بمجموعاته التي لست فيها أو لست مشرفاً فيها.",
 		"cmd.help.blacklist": "*القائمة السوداء*\n" +
 			"{prefix}القائمة_السوداء add \u200e+966551234567 احتيال – حظر الرقم هنا الآن وإن عاد\n" +
 			"{prefix}القائمة_السوداء remove \u200e+966551234567 – إزالته من القائمة\n" +

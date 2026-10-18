@@ -41,11 +41,27 @@ type call struct {
 	group  wa.JID // the protected group the command acts on; empty if none could be chosen
 	where  where
 	lang   string
+	// community is the community picked with .use when no single group is: the command then
+	// acts on each of its groups the sender administers (DESIGN.md §12.4).
+	community     wa.JID
+	communityName string // as it was when .use picked it
+	// capture, when set, collects the replies instead of sending them, so a command run for
+	// each group of a community can be answered once.
+	capture *[]captured
 }
 
+// captured is one reply a command would have sent.
+type captured struct {
+	key  string
+	text string
+}
+
+// dmContext is what .use picked: a group, or a community.
 type dmContext struct {
-	group   wa.JID
-	expires time.Time
+	group         wa.JID
+	community     wa.JID
+	communityName string
+	expires       time.Time
 }
 
 type pendingBan struct {
@@ -238,6 +254,9 @@ func (h *Handler) handleOtherGroup(ctx context.Context, m Message) error {
 		// .reviewgroup here picks its group from the sender's own groups, so a review group can
 		// serve several protected groups.
 		c.group = h.contextGroup(ctx, c, served)
+		if c.group == "" {
+			h.useContextCommunity(c)
+		}
 	}
 	if c.group != "" {
 		admin, err := h.senderIsAdmin(ctx, c.group, m, person)
@@ -247,7 +266,7 @@ func (h *Handler) handleOtherGroup(ctx context.Context, m Message) error {
 		}
 	}
 	c.lang = h.lang(ctx, c)
-	if c.group == "" && table[cmd.Name].needsGroup {
+	if c.group == "" && c.community == "" && table[cmd.Name].needsGroup {
 		return h.pickGroup(ctx, c)
 	}
 	return h.dispatch(ctx, c)
@@ -276,6 +295,9 @@ func (h *Handler) handleDM(ctx context.Context, m Message) error {
 	if cmd, ok := Parse(m.Text, h.d.Prefix); ok {
 		c := &call{m: m, cmd: cmd, person: person, where: inDM}
 		c.group = h.contextGroup(ctx, c, nil)
+		if c.group == "" {
+			h.useContextCommunity(c)
+		}
 		c.lang = h.lang(ctx, c)
 		return errors.Join(append(errs, h.dispatch(ctx, c))...)
 	}
@@ -305,11 +327,8 @@ func (h *Handler) contextGroup(ctx context.Context, c *call, served []wa.JID) wa
 			return it.Group
 		}
 	}
-	key := string(c.person) + "|" + string(c.m.Chat)
-	h.mu.Lock()
-	dc, ok := h.contexts[key]
-	h.mu.Unlock()
-	if ok && h.now().Before(dc.expires) {
+	if dc, ok := h.context(c); ok {
+		// A community picked with .use keeps its place: the only group isn't chosen instead.
 		return dc.group
 	}
 	if len(served) == 1 {
@@ -329,10 +348,26 @@ func (h *Handler) reviewFor(ctx context.Context, chat wa.JID, id wa.MessageID) (
 	return h.d.Reviews.ItemForMessage(ctx, chat, id)
 }
 
-func (h *Handler) setContext(c *call, group wa.JID) {
+// context returns what .use picked in this chat, while it lasts.
+func (h *Handler) context(c *call) (dmContext, bool) {
+	h.mu.Lock()
+	dc, ok := h.contexts[string(c.person)+"|"+string(c.m.Chat)]
+	h.mu.Unlock()
+	return dc, ok && h.now().Before(dc.expires)
+}
+
+// useContextCommunity sets the call's community to the one picked with .use in this chat, if any.
+func (h *Handler) useContextCommunity(c *call) {
+	if dc, ok := h.context(c); ok {
+		c.community, c.communityName = dc.community, dc.communityName
+	}
+}
+
+func (h *Handler) setContext(c *call, dc dmContext) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.contexts[string(c.person)+"|"+string(c.m.Chat)] = dmContext{group: group, expires: h.now().Add(ContextTTL)}
+	dc.expires = h.now().Add(ContextTTL)
+	h.contexts[string(c.person)+"|"+string(c.m.Chat)] = dc
 }
 
 // lang is the reply language: Arabic when the command used an Arabic alias, otherwise the
@@ -356,6 +391,10 @@ func (h *Handler) t(c *call, key string, vars map[string]string) string {
 // reply answers a command where it came from: in the review group, or by DM (never in a
 // protected group). A DM to someone without an open thread uses the once-a-day exception.
 func (h *Handler) reply(ctx context.Context, c *call, key string, vars map[string]string) error {
+	if c.capture != nil {
+		*c.capture = append(*c.capture, captured{key: key, text: h.t(c, key, vars)})
+		return nil
+	}
 	return h.replyText(ctx, c, h.t(c, key, vars))
 }
 

@@ -1393,6 +1393,15 @@ A **delete-only** setup is just any preset with every matrix cell set to `delete
 
 Blocklist and allow-list entries live in `rules` with a **scope**: `global` (maintained by the operator, curated packs like "crypto scams", "adult", "fake jobs"), `account` (per bot), or `group`. Each rule has a type (keyword, phrase, regex, domain, URL prefix, phone number, channel JID, group invite, media SHA256, pHash, SimHash), an action class (hard / weighted), a weight, and an enabled flag. Groups subscribe to global packs.
 
+### 12.4 Communities
+
+A WhatsApp community groups several groups under one parent. Settings stay **per group**; a community is a way to pick many groups at once, not a new level of settings.
+
+- **What the bot records.** For each group, the community it belongs to (`groups.community_jid`, `community_name`), from the group's info (`LinkedParentJID`) on every join, refresh and group-info event, including link and unlink events. The community's own entry and its announcement group are tracked with `kind = community` / `announcement`; they're never listed for `.use` and never protected, since only admins post there. The community's own list of its groups (`GetSubGroups`, at most once per community per 6-hour refresh) is kept in `community_groups`, so the bot can name groups it isn't in.
+- **Picking a community.** `.groups` lists each community, numbered, with the sender's groups in it indented under it, then the groups in no community. `.use <number|name|part of name>` on a community picks every group of it the sender administers (for one hour, like a group).
+- **Commands on a community.** `.mode`, `.preset`, `.askadmins`, `.block` / `.blocknew` / `.allow <type>`, `.set` and `.blacklist add|remove` run once per picked group, each with that group's own admin check (a group where the sender isn't an admin is never touched), and get **one** reply: how many groups changed, which didn't and why, and the community's groups the bot **can't protect** (not a member, or not an admin), so the admin knows where to add it. The bot never joins a community's groups by itself. `.status` gives one line per group. Every other command needs a single group and says so.
+- **Community defaults.** A settings command on a community is also stored as the community's defaults: the settings document under the community's JID, starting from the normal starting settings. When the bot joins, or is made admin in, a group of that community that has no settings of its own, the group starts with a copy (actor `system`). A group that already has settings, or a community nobody configured, keeps the normal behaviour. Blacklist entries aren't defaults: they stay with the groups they were added to.
+
 ---
 
 ## 13. Web dashboard, auth and onboarding
@@ -1485,7 +1494,7 @@ Commands give **full day-to-day control without leaving WhatsApp** (§13.0). Pre
 
 - in the protected group itself: the context is that group. The bot **acts on the command, deletes the command message** (so members don't see moderation chatter), and replies **by DM**. If the admin has never messaged the bot, that first reply is a direct response to a command they just sent: it's a single short DM, rate-limited to one per admin per day until they reply. That's the one small exception to "inbound-first", and it's noted in the setup guide;
 - in the review group: the context is the group named in the item being replied to, or picked with `.use <group name>`;
-- in a DM with the bot: the admin picks a group with `.use <group name>` (or `.groups` to list them). The DM context is remembered for 1 hour.
+- in a DM with the bot: the admin picks a group with `.use <group name>` (or `.groups` to list them). The DM context is remembered for 1 hour. `.use` on a community picks all the admin's groups in it (§12.4).
 
 | Command | Effect |
 |---|---|
@@ -1513,7 +1522,7 @@ Commands give **full day-to-day control without leaving WhatsApp** (§13.0). Pre
 | `.autoban <type> auto\|ask\|delete\|allow [sources]` / `.autoban` | set one matrix cell, e.g. `.autoban videos ask`, `.autoban links auto known` (or `known,ai` after the track record); or show the grid (§9.2) |
 | `.review K7Q2 kick` / `.pending` | decide an item by ID, or list open items |
 | **Settings** | |
-| `.status` | current preset, mode, review destination, today's stats |
+| `.status` | current preset, mode, review destination, today's stats; on a community, one line per group |
 | `.mode shadow\|enforce\|pause` | switch mode |
 | `.preset relaxed\|standard\|strict\|ask` | switch preset (resets the matrix to that preset) |
 | `.block videos`, `.allow stickers`, `.blocknew links` (opt-in) | content **policy** shortcuts: violations are deleted silently, no ban (§9.3) |
@@ -1522,7 +1531,7 @@ Commands give **full day-to-day control without leaving WhatsApp** (§13.0). Pre
 | `.domain allow\|block example.com`, `.word block <phrase>` (the bot replies with a dry-run count before saving), `.word unblock <phrase>` | lists |
 | `.set <key> <value>` / `.get <key>` / `.settings` | **any** setting by its dotted key (§12.1), e.g. `.set new_members.just_joined.window 48h`. `.settings` gives a short summary plus a link to the website. Values are validated with the same schema as the website. |
 | **Other** | |
-| `.groups` / `.use <name>` | list your groups / set the DM context |
+| `.groups` / `.use <number\|name>` | list your groups, numbered, each community with its groups under it / set the DM context to a group or a whole community (§12.4) |
 | `.login` | the bot replies by DM with a website login link (never in the group) |
 | `.help [topic]` | short help |
 
@@ -1541,8 +1550,12 @@ bots(id, jid, lid, display_name, status /*active|paused|banned|unpaired*/, lease
 
 -- groups and settings
 groups(jid PK, bot_id FK, name, topic, size, addressing_mode, bot_is_admin, joined_at,
-       status /*pending_admin|active|left*/, last_info_refresh)
-group_settings(group_jid PK, version int, doc jsonb, updated_by, updated_at)   -- + history table
+       status /*pending_admin|active|left*/, last_info_refresh,
+       kind /*group|community|announcement*/, community_jid, community_name)        -- §12.4
+community_groups(community_jid, group_jid, name, announcement, refreshed_at,
+       PRIMARY KEY(community_jid, group_jid))   -- a community's own list of its groups, incl. ones the bot isn't in
+group_settings(group_jid PK, version int, doc jsonb, updated_by, updated_at)   -- + history table;
+                                                -- a community's JID holds its defaults (§12.4)
 group_settings_history(group_jid, version, doc, updated_by, updated_at)
 
 -- people (cross-group identity) and per-group membership

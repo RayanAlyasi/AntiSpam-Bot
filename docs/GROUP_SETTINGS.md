@@ -120,6 +120,19 @@ bot treats it as the admins' decision and lifts the block, unless the person is 
 blacklist. Unbanning lifts the block; the bot never re-adds anyone. Removing a banned person who
 rejoins needs the connector and workers roles in the same process, which is the default.
 
+## Communities
+
+Settings belong to each group, also in a WhatsApp community. Picking a community with
+`.use` is a way to change all your groups in it at once ([COMMANDS.md](COMMANDS.md#communities));
+each group still gets its own copy, its own history and its own admin check.
+
+A change made on a community is also stored as the community's defaults, in a settings document
+kept under the community's JID that starts from the normal starting settings. When the bot is added
+to a group of that community, or made admin there, and the group has no settings of its own, the
+group starts with a copy of those defaults (the history shows `system` as the author). A group that
+already has settings keeps them, and a community nobody has configured changes nothing. Blacklisted
+numbers aren't copied: they stay with the groups they were added to.
+
 ## How settings are stored
 
 Each change, whether from `.set` or a friendly command such as `.mode`, stores a new version of the group's

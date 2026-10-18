@@ -67,6 +67,8 @@ func groupInfo(g *types.GroupInfo) wa.GroupInfo {
 		Owner:          jid(g.OwnerJID),
 		OwnerPN:        jid(g.OwnerPN),
 		LinkedParent:   jid(g.LinkedParentJID),
+		IsCommunity:    g.IsParent,
+		IsAnnouncement: g.IsDefaultSubGroup,
 		AddressingMode: string(g.AddressingMode),
 		Announce:       g.IsAnnounce,
 		Locked:         g.IsLocked,
@@ -162,6 +164,22 @@ func convert(ctx context.Context, bot wa.JID, evt any, lids pairLookup) (wa.Even
 	return nil, false, nil
 }
 
+// communityLink turns whatsmeow's link change into a CommunityLink. The change names the other
+// side: the parent when the event is about a group, a subgroup when it is about a community.
+func communityLink(group wa.JID, c *types.GroupLinkChange) *wa.CommunityLink {
+	if c == nil {
+		return nil
+	}
+	other := jid(c.Group.JID)
+	switch c.Type {
+	case types.GroupLinkChangeTypeParent:
+		return &wa.CommunityLink{Community: other, Group: group, Name: c.Group.Name}
+	case types.GroupLinkChangeTypeSub:
+		return &wa.CommunityLink{Community: group, Group: other, Name: c.Group.Name, IsAnnouncement: c.Group.IsDefaultSubGroup}
+	}
+	return nil // a sibling link says nothing about this group's community
+}
+
 func groupEvent(ctx context.Context, bot wa.JID, e *events.GroupInfo, lids pairLookup) *wa.GroupEvent {
 	out := &wa.GroupEvent{
 		Bot: bot, Group: jid(e.JID), Sender: jidPtr(e.Sender), SenderPN: jidPtr(e.SenderPN),
@@ -183,6 +201,7 @@ func groupEvent(ctx context.Context, bot wa.JID, e *events.GroupInfo, lids pairL
 	if e.MembershipApprovalMode != nil {
 		out.JoinApproval = &e.MembershipApprovalMode.IsJoinApprovalRequired
 	}
+	out.Link, out.Unlink = communityLink(out.Group, e.Link), communityLink(out.Group, e.Unlink)
 	if lids == nil {
 		return out
 	}

@@ -14,7 +14,8 @@ import (
 const getGroup = `-- name: GetGroup :one
 
 SELECT g.jid, coalesce(b.jid, '')::text AS bot_jid, g.name, g.topic, g.size, g.addressing_mode,
-       g.bot_is_admin, g.announce, g.locked, g.join_approval, g.joined_at, g.status, g.last_info_refresh
+       g.bot_is_admin, g.announce, g.locked, g.join_approval, g.joined_at, g.status, g.last_info_refresh,
+       g.kind, g.community_jid, g.community_name
 FROM app.groups g LEFT JOIN app.bots b ON b.id = g.bot_id
 WHERE g.jid = $1
 `
@@ -33,6 +34,9 @@ type GetGroupRow struct {
 	JoinedAt        pgtype.Timestamptz
 	Status          string
 	LastInfoRefresh pgtype.Timestamptz
+	Kind            string
+	CommunityJid    string
+	CommunityName   string
 }
 
 // Groups the bots are in (DESIGN.md §14).
@@ -53,13 +57,75 @@ func (q *Queries) GetGroup(ctx context.Context, jid string) (GetGroupRow, error)
 		&i.JoinedAt,
 		&i.Status,
 		&i.LastInfoRefresh,
+		&i.Kind,
+		&i.CommunityJid,
+		&i.CommunityName,
 	)
 	return i, err
 }
 
+const linkCommunityGroup = `-- name: LinkCommunityGroup :exec
+INSERT INTO app.community_groups (community_jid, group_jid, name, announcement, refreshed_at)
+VALUES ($1, $2, $3, $4, now())
+ON CONFLICT (community_jid, group_jid) DO UPDATE SET
+    name = CASE WHEN EXCLUDED.name = '' THEN app.community_groups.name ELSE EXCLUDED.name END,
+    announcement = EXCLUDED.announcement, refreshed_at = EXCLUDED.refreshed_at
+`
+
+type LinkCommunityGroupParams struct {
+	CommunityJid string
+	GroupJid     string
+	Name         string
+	Announcement bool
+}
+
+func (q *Queries) LinkCommunityGroup(ctx context.Context, arg LinkCommunityGroupParams) error {
+	_, err := q.db.Exec(ctx, linkCommunityGroup,
+		arg.CommunityJid,
+		arg.GroupJid,
+		arg.Name,
+		arg.Announcement,
+	)
+	return err
+}
+
+const listCommunityGroups = `-- name: ListCommunityGroups :many
+SELECT group_jid, name, announcement FROM app.community_groups
+WHERE community_jid = $1
+ORDER BY group_jid
+`
+
+type ListCommunityGroupsRow struct {
+	GroupJid     string
+	Name         string
+	Announcement bool
+}
+
+// A community's own list of its groups (DESIGN.md §12.4), including those the bot isn't in.
+func (q *Queries) ListCommunityGroups(ctx context.Context, communityJid string) ([]ListCommunityGroupsRow, error) {
+	rows, err := q.db.Query(ctx, listCommunityGroups, communityJid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCommunityGroupsRow{}
+	for rows.Next() {
+		var i ListCommunityGroupsRow
+		if err := rows.Scan(&i.GroupJid, &i.Name, &i.Announcement); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listGroups = `-- name: ListGroups :many
 SELECT g.jid, coalesce(b.jid, '')::text AS bot_jid, g.name, g.topic, g.size, g.addressing_mode,
-       g.bot_is_admin, g.announce, g.locked, g.join_approval, g.joined_at, g.status, g.last_info_refresh
+       g.bot_is_admin, g.announce, g.locked, g.join_approval, g.joined_at, g.status, g.last_info_refresh,
+       g.kind, g.community_jid, g.community_name
 FROM app.groups g LEFT JOIN app.bots b ON b.id = g.bot_id
 WHERE cardinality($1::text[]) = 0 OR g.status = ANY($1::text[])
 ORDER BY g.jid
@@ -79,6 +145,9 @@ type ListGroupsRow struct {
 	JoinedAt        pgtype.Timestamptz
 	Status          string
 	LastInfoRefresh pgtype.Timestamptz
+	Kind            string
+	CommunityJid    string
+	CommunityName   string
 }
 
 // With an empty statuses array, every group.
@@ -105,6 +174,9 @@ func (q *Queries) ListGroups(ctx context.Context, statuses []string) ([]ListGrou
 			&i.JoinedAt,
 			&i.Status,
 			&i.LastInfoRefresh,
+			&i.Kind,
+			&i.CommunityJid,
+			&i.CommunityName,
 		); err != nil {
 			return nil, err
 		}
@@ -118,7 +190,8 @@ func (q *Queries) ListGroups(ctx context.Context, statuses []string) ([]ListGrou
 
 const listStaleGroups = `-- name: ListStaleGroups :many
 SELECT g.jid, coalesce(b.jid, '')::text AS bot_jid, g.name, g.topic, g.size, g.addressing_mode,
-       g.bot_is_admin, g.announce, g.locked, g.join_approval, g.joined_at, g.status, g.last_info_refresh
+       g.bot_is_admin, g.announce, g.locked, g.join_approval, g.joined_at, g.status, g.last_info_refresh,
+       g.kind, g.community_jid, g.community_name
 FROM app.groups g LEFT JOIN app.bots b ON b.id = g.bot_id
 WHERE g.status <> 'left' AND (g.last_info_refresh IS NULL OR g.last_info_refresh <= $1)
 ORDER BY g.last_info_refresh NULLS FIRST, g.jid
@@ -138,6 +211,9 @@ type ListStaleGroupsRow struct {
 	JoinedAt        pgtype.Timestamptz
 	Status          string
 	LastInfoRefresh pgtype.Timestamptz
+	Kind            string
+	CommunityJid    string
+	CommunityName   string
 }
 
 func (q *Queries) ListStaleGroups(ctx context.Context, refreshedBy pgtype.Timestamptz) ([]ListStaleGroupsRow, error) {
@@ -163,6 +239,9 @@ func (q *Queries) ListStaleGroups(ctx context.Context, refreshedBy pgtype.Timest
 			&i.JoinedAt,
 			&i.Status,
 			&i.LastInfoRefresh,
+			&i.Kind,
+			&i.CommunityJid,
+			&i.CommunityName,
 		); err != nil {
 			return nil, err
 		}
@@ -174,17 +253,61 @@ func (q *Queries) ListStaleGroups(ctx context.Context, refreshedBy pgtype.Timest
 	return items, nil
 }
 
+const replaceCommunityGroups = `-- name: ReplaceCommunityGroups :exec
+WITH gone AS (
+    DELETE FROM app.community_groups
+    WHERE community_jid = $1 AND NOT (group_jid = ANY($2::text[]))
+)
+INSERT INTO app.community_groups (community_jid, group_jid, name, announcement, refreshed_at)
+SELECT $1, unnest($2::text[]), unnest($3::text[]), unnest($4::boolean[]), now()
+ON CONFLICT (community_jid, group_jid) DO UPDATE SET
+    name = EXCLUDED.name, announcement = EXCLUDED.announcement, refreshed_at = EXCLUDED.refreshed_at
+`
+
+type ReplaceCommunityGroupsParams struct {
+	CommunityJid  string
+	GroupJids     []string
+	Names         []string
+	Announcements []bool
+}
+
+// Stores a community's full list: listed groups are added or updated, the rest are removed.
+func (q *Queries) ReplaceCommunityGroups(ctx context.Context, arg ReplaceCommunityGroupsParams) error {
+	_, err := q.db.Exec(ctx, replaceCommunityGroups,
+		arg.CommunityJid,
+		arg.GroupJids,
+		arg.Names,
+		arg.Announcements,
+	)
+	return err
+}
+
+const unlinkCommunityGroup = `-- name: UnlinkCommunityGroup :exec
+DELETE FROM app.community_groups WHERE community_jid = $1 AND group_jid = $2
+`
+
+type UnlinkCommunityGroupParams struct {
+	CommunityJid string
+	GroupJid     string
+}
+
+func (q *Queries) UnlinkCommunityGroup(ctx context.Context, arg UnlinkCommunityGroupParams) error {
+	_, err := q.db.Exec(ctx, unlinkCommunityGroup, arg.CommunityJid, arg.GroupJid)
+	return err
+}
+
 const upsertGroup = `-- name: UpsertGroup :exec
 INSERT INTO app.groups (jid, bot_id, name, topic, size, addressing_mode, bot_is_admin, announce, locked,
-                        join_approval, joined_at, status, last_info_refresh)
+                        join_approval, joined_at, status, last_info_refresh, kind, community_jid, community_name)
 VALUES ($1, (SELECT id FROM app.bots WHERE app.bots.jid = $2), $3, $4, $5, $6,
         $7, $8, $9, $10, $11, $12,
-        $13)
+        $13, $14, $15, $16)
 ON CONFLICT (jid) DO UPDATE SET
     bot_id = coalesce(EXCLUDED.bot_id, app.groups.bot_id), name = EXCLUDED.name, topic = EXCLUDED.topic,
     size = EXCLUDED.size, addressing_mode = EXCLUDED.addressing_mode, bot_is_admin = EXCLUDED.bot_is_admin,
     announce = EXCLUDED.announce, locked = EXCLUDED.locked, join_approval = EXCLUDED.join_approval,
-    joined_at = EXCLUDED.joined_at, status = EXCLUDED.status, last_info_refresh = EXCLUDED.last_info_refresh
+    joined_at = EXCLUDED.joined_at, status = EXCLUDED.status, last_info_refresh = EXCLUDED.last_info_refresh,
+    kind = EXCLUDED.kind, community_jid = EXCLUDED.community_jid, community_name = EXCLUDED.community_name
 `
 
 type UpsertGroupParams struct {
@@ -201,6 +324,9 @@ type UpsertGroupParams struct {
 	JoinedAt        pgtype.Timestamptz
 	Status          string
 	LastInfoRefresh pgtype.Timestamptz
+	Kind            string
+	CommunityJid    string
+	CommunityName   string
 }
 
 func (q *Queries) UpsertGroup(ctx context.Context, arg UpsertGroupParams) error {
@@ -218,6 +344,9 @@ func (q *Queries) UpsertGroup(ctx context.Context, arg UpsertGroupParams) error 
 		arg.JoinedAt,
 		arg.Status,
 		arg.LastInfoRefresh,
+		arg.Kind,
+		arg.CommunityJid,
+		arg.CommunityName,
 	)
 	return err
 }

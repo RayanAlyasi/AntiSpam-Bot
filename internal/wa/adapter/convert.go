@@ -72,6 +72,8 @@ func groupInfo(g *types.GroupInfo) wa.GroupInfo {
 		Owner:          FromWM(g.OwnerJID),
 		OwnerPN:        FromWM(g.OwnerPN),
 		LinkedParent:   FromWM(g.LinkedParentJID),
+		IsCommunity:    g.IsParent,
+		IsAnnouncement: g.IsDefaultSubGroup,
 		AddressingMode: string(g.AddressingMode),
 		Announce:       g.IsAnnounce,
 		Locked:         g.IsLocked,

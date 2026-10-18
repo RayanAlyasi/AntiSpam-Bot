@@ -441,12 +441,17 @@ func (q *Queries) InsertAction(ctx context.Context, arg InsertActionParams) (int
 }
 
 const isReviewGroup = `-- name: IsReviewGroup :one
-SELECT EXISTS (
-    SELECT 1 FROM app.group_settings WHERE doc->'review'->>'review_group' = $1::text
-)::boolean AS review_group
+SELECT (EXISTS (
+    SELECT 1 FROM app.group_settings
+    WHERE doc->'review'->>'review_group' = $1::text AND group_jid <> $1::text
+) AND NOT EXISTS (
+    SELECT 1 FROM app.groups WHERE jid = $1::text AND status = 'active'
+))::boolean AS review_group
 `
 
-// A group named as some protected group's review group isn't protected itself (DESIGN.md §9.7).
+// A group named as some protected group's review group isn't protected itself (DESIGN.md §9.7),
+// even if it has a settings document from when it was protected, unless the bot is an admin
+// moderating it again or it names itself: a protected group can't be its own review group (§9.5).
 func (q *Queries) IsReviewGroup(ctx context.Context, chat string) (bool, error) {
 	row := q.db.QueryRow(ctx, isReviewGroup, chat)
 	var review_group bool

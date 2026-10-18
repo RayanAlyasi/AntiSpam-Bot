@@ -3360,8 +3360,24 @@
         "F-113"
       ],
       "description": "`antispam corpus import` parses JSONL and CSV with the documented fields, defaults label to spam, reports rejected lines clearly, and `--dry-run` writes nothing; docs/CORPUS_FORMAT.md documents the format with synthetic examples.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/corpusimport: TestParseJSONL",
+        "TestParseJSONLRejectsWithLineNumbers",
+        "TestParseLineNumbersCountBlankLines",
+        "TestParseCSV",
+        "TestParseCSVHeaderSubsetAndBOM",
+        "TestParseCSVRejectsWithLineNumbers",
+        "TestParseKeepsUnicodeText",
+        "TestParseScope",
+        "FuzzParse",
+        "TestDryRunWritesNothing",
+        "internal/corpusimport: TestParseJSONL",
+        "TestParseCSV",
+        "FuzzParse",
+        "cmd/antispam: TestCorpusCmdBadCommandLines",
+        "TestCorpusImportFromStdin"
+      ]
     },
     {
       "id": "F-148",
@@ -3378,8 +3394,17 @@
         "F-117"
       ],
       "description": "Records are normalized and fingerprinted, deduped within the file and against the corpus, and stored as corpus entries with source import, the chosen scope and an import_batches row.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/corpusimport: TestImportStoresEntriesInScope",
+        "TestImportRedactsAndHashesNumbers",
+        "TestDedupeCounts",
+        "TestDedupeOnlyWithinScope",
+        "TestThinCategoriesAndLanguages",
+        "internal/corpusimport: TestNewPlanMergesDuplicates",
+        "TestNewPlanRedactsAndHashes",
+        "TestDropExisting"
+      ]
     },
     {
       "id": "F-149",
@@ -3396,8 +3421,19 @@
         "F-148"
       ],
       "description": "A hold-out slice (default 20%) stratified by category and kind is split by cluster_id or computed near-duplicate cluster, so no cluster lands on both sides, and stored in eval_corpus.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/corpusimport: TestHoldoutKeepsClustersTogether",
+        "TestHoldoutComputedClusters",
+        "TestHoldoutRatio",
+        "TestHoldoutStratified",
+        "TestHoldoutForcedClusters",
+        "TestReimportNeverLeaksHoldout",
+        "TestHoldoutRecall",
+        "internal/corpusimport: TestSplitNeverLeaks",
+        "TestSplitRatioAndSmallStrata",
+        "TestSplitExplicitClusters"
+      ]
     },
     {
       "id": "F-150",
@@ -3413,8 +3449,14 @@
         "F-148"
       ],
       "description": "Ham records are never stored as text, only used for an in-memory false-positive report and optional allow-list fingerprints; `antispam corpus remove --import <id>` removes every entry, fingerprint and learned rule of a batch.",
-      "passes": false,
-      "evidence": []
+      "passes": true,
+      "evidence": [
+        "acceptance/corpusimport: TestHamNeverStored",
+        "TestHamFalsePositiveCount",
+        "TestRemoveUndoesBatch",
+        "internal/corpusimport: TestNewPlanKeepsHamOutOfTheCorpus",
+        "cmd/antispam: TestCorpusImportFromStdin"
+      ]
     },
     {
       "id": "F-151",

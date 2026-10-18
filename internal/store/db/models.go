@@ -85,12 +85,13 @@ type AppBot struct {
 }
 
 type AppCorpusAllow struct {
-	ID        int64
-	GroupJid  string
-	Simhash   int64
-	Minhash   []byte
-	Tokens    int32
-	CreatedAt time.Time
+	ID            int64
+	GroupJid      string
+	Simhash       int64
+	Minhash       []byte
+	Tokens        int32
+	CreatedAt     time.Time
+	ImportBatchID pgtype.Int8
 }
 
 type AppCorpusConfirmation struct {
@@ -165,6 +166,21 @@ type AppDmThread struct {
 	Person          string
 	LastInboundAt   pgtype.Timestamptz
 	LastExceptionAt pgtype.Timestamptz
+}
+
+type AppEvalCorpu struct {
+	ID            int64
+	Source        string
+	ImportBatchID pgtype.Int8
+	ClusterKey    string
+	TextNorm      string
+	MediaSha256   [][]byte
+	Phashes       []int64
+	Label         string
+	Category      string
+	Kind          string
+	Language      string
+	AddedAt       time.Time
 }
 
 type AppEvidenceSnapshot struct {
@@ -252,6 +268,20 @@ type AppIdentity struct {
 	FirstSeen    time.Time
 	LastSeen     time.Time
 	ValidTo      pgtype.Timestamptz
+}
+
+type AppImportBatch struct {
+	ID         int64
+	FileName   string
+	FileSha256 string
+	Format     string
+	Scope      string
+	GroupJid   pgtype.Text
+	StartedBy  string
+	StartedAt  time.Time
+	FinishedAt pgtype.Timestamptz
+	RemovedAt  pgtype.Timestamptz
+	Stats      json.RawMessage
 }
 
 type AppInbox struct {

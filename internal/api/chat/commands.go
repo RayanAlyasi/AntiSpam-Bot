@@ -1,9 +1,11 @@
 package chat
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -106,19 +108,68 @@ func (h *Handler) withSite(key string) string {
 }
 
 func (h *Handler) pickGroup(ctx context.Context, c *call) error {
-	groups, err := h.d.Groups.AdminGroups(ctx, c.person)
+	groups, err := h.adminGroups(ctx, c.person)
 	if err != nil {
-		return fmt.Errorf("groups of sender: %w", err)
+		return err
 	}
 	return h.reply(ctx, c, "cmd.pick_group", map[string]string{"groups": groupList(groups), "prefix": h.d.Prefix})
 }
 
+// adminGroups lists the protected groups person administers, sorted by name, so the numbers
+// groupList shows stay the same from one reply to the next and .use 2 means what was listed.
+func (h *Handler) adminGroups(ctx context.Context, person wa.JID) ([]GroupRef, error) {
+	groups, err := h.d.Groups.AdminGroups(ctx, person)
+	if err != nil {
+		return nil, fmt.Errorf("groups of sender: %w", err)
+	}
+	groups = slices.Clone(groups)
+	slices.SortStableFunc(groups, func(a, b GroupRef) int {
+		return cmp.Or(cmp.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)), cmp.Compare(a.JID, b.JID))
+	})
+	return groups, nil
+}
+
+// groupList numbers groups for .use <number>: "1. Cars", "2. Shop".
 func groupList(groups []GroupRef) string {
 	names := make([]string, 0, len(groups))
-	for _, g := range groups {
-		names = append(names, "• "+g.Name)
+	for i, g := range groups {
+		names = append(names, strconv.Itoa(i+1)+". "+g.Name)
 	}
 	return strings.Join(names, "\n")
+}
+
+// westernDigits turns Arabic-Indic digits into ASCII ones, so ".use ٢" works like ".use 2".
+var westernDigits = strings.NewReplacer(
+	"٠", "0", "١", "1", "٢", "2", "٣", "3", "٤", "4", "٥", "5", "٦", "6", "٧", "7", "٨", "8", "٩", "9",
+	"۰", "0", "۱", "1", "۲", "2", "۳", "3", "۴", "4", "۵", "5", "۶", "6", "۷", "7", "۸", "8", "۹", "9",
+)
+
+// matchGroup picks one of groups (as sorted by adminGroups) for what an admin typed: an exact
+// name first, so a group named "2" stays reachable by name; then a number from groupList; then
+// the only name containing it. ok is false when nothing or several groups match.
+func matchGroup(groups []GroupRef, typed string) (GroupRef, bool) {
+	want := strings.ToLower(strings.TrimSpace(typed))
+	if want == "" {
+		return GroupRef{}, false
+	}
+	for _, g := range groups {
+		if strings.ToLower(g.Name) == want {
+			return g, true
+		}
+	}
+	if n, err := strconv.Atoi(westernDigits.Replace(want)); err == nil && n >= 1 && n <= len(groups) {
+		return groups[n-1], true
+	}
+	var match []GroupRef
+	for _, g := range groups {
+		if strings.Contains(strings.ToLower(g.Name), want) {
+			match = append(match, g)
+		}
+	}
+	if len(match) != 1 {
+		return GroupRef{}, false
+	}
+	return match[0], true
 }
 
 func (h *Handler) groupName(ctx context.Context, g wa.JID) string {
@@ -135,35 +186,24 @@ func (h *Handler) unavailable(ctx context.Context, c *call) error {
 }
 
 func (h *Handler) cmdGroups(ctx context.Context, c *call) error {
-	groups, err := h.d.Groups.AdminGroups(ctx, c.person)
+	groups, err := h.adminGroups(ctx, c.person)
 	if err != nil {
-		return fmt.Errorf("groups of sender: %w", err)
+		return err
 	}
-	return h.reply(ctx, c, "cmd.groups", map[string]string{"groups": groupList(groups)})
+	return h.reply(ctx, c, "cmd.groups", map[string]string{"groups": groupList(groups), "prefix": h.d.Prefix})
 }
 
 func (h *Handler) cmdUse(ctx context.Context, c *call) error {
-	groups, err := h.d.Groups.AdminGroups(ctx, c.person)
+	groups, err := h.adminGroups(ctx, c.person)
 	if err != nil {
-		return fmt.Errorf("groups of sender: %w", err)
+		return err
 	}
-	want := strings.ToLower(c.cmd.Rest)
-	var match []GroupRef
-	for _, g := range groups {
-		name := strings.ToLower(g.Name)
-		if name == want {
-			match = []GroupRef{g}
-			break
-		}
-		if want != "" && strings.Contains(name, want) {
-			match = append(match, g)
-		}
-	}
-	if len(match) != 1 {
+	g, ok := matchGroup(groups, c.cmd.Rest)
+	if !ok {
 		return h.reply(ctx, c, "cmd.pick_group", map[string]string{"groups": groupList(groups), "prefix": h.d.Prefix})
 	}
-	h.setContext(c, match[0].JID)
-	return h.reply(ctx, c, "cmd.using", map[string]string{"group": match[0].Name})
+	h.setContext(c, g.JID)
+	return h.reply(ctx, c, "cmd.using", map[string]string{"group": g.Name})
 }
 
 func (h *Handler) cmdLogin(ctx context.Context, c *call) error {

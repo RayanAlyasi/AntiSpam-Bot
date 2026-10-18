@@ -25,11 +25,12 @@ var commandTexts = Catalog{
 			"{prefix}status – how this group is set up\n" +
 			"{prefix}preset strict – choose how strict I am\n" +
 			"{prefix}mode shadow – watch only, change nothing\n" +
+			"{prefix}askadmins delete – delete spam right away, ask before banning\n" +
 			"{prefix}settings – see the main settings\n\n" +
 			"*Blacklist*\n" +
 			"{prefix}blacklist add +966551234567 – block a phone number\n" +
 			"{prefix}blacklist list – see the list\n\n" +
-			"In a DM, pick a group first with {prefix}use <group name>.\n" +
+			"In a DM, pick a group with {prefix}use 2 or {prefix}use part of the name. If you manage one group, you don't need {prefix}use.\n" +
 			"More help: {prefix}help moderation, {prefix}help reviews, {prefix}help settings or {prefix}help blacklist",
 		"cmd.help.moderation": "*Moderation*\n" +
 			"Reply to the message (or @mention the person) with:\n\n" +
@@ -55,10 +56,14 @@ var commandTexts = Catalog{
 		"cmd.help.settings": "*Settings*\n" +
 			"{prefix}status – how this group is set up\n" +
 			"{prefix}settings – the main settings\n" +
-			"{prefix}preset standard – how strict I am: relaxed, standard, strict or ask\n" +
+			"{prefix}preset standard – how strict I am: relaxed, standard or strict\n" +
+			"{prefix}preset ask – delete spam right away, and ask the admins before banning\n" +
 			"{prefix}mode enforce – act on spam\n" +
 			"{prefix}mode shadow – watch only: I note what I would do\n" +
 			"{prefix}mode pause – stop acting until you switch back\n" +
+			"{prefix}askadmins delete – delete spam right away, and ask the admins before banning\n" +
+			"{prefix}askadmins before – keep the message until an admin decides\n" +
+			"{prefix}askadmins off – act automatically\n" +
 			"{prefix}block links – delete a type of message (also invites, images, videos…)\n" +
 			"{prefix}allow stickers – allow a type again\n\n" +
 			"Any setting by name: {prefix}get review.timeout, {prefix}set review.timeout 12h",
@@ -70,8 +75,8 @@ var commandTexts = Catalog{
 			"Numbers work in any format: 0551234567, 00966…, Arabic digits or wa.me links.",
 		"cmd.help_unknown": "I don't have a help page called \"{topic}\". Try {prefix}help moderation, {prefix}help reviews, {prefix}help settings or {prefix}help blacklist.",
 
-		"cmd.groups":        "*Your groups*\n{groups}",
-		"cmd.pick_group":    "*Which group?* Send {prefix}use <group name>.\n{groups}",
+		"cmd.groups":        "*Your groups*\n{groups}\n\nPick one with {prefix}use 1, or part of its name.",
+		"cmd.pick_group":    "*Which group?* Send {prefix}use 1, or part of its name.\n{groups}",
 		"cmd.using":         "Now working on *{group}* for the next hour.",
 		"cmd.login":         "Log in here: {url}",
 		"cmd.login_no_site": "Logging in isn't part of this version. Send {prefix}help to see the commands.",
@@ -115,7 +120,7 @@ var commandTexts = Catalog{
 		"cmd.pending":                    "*Waiting for a decision* ({n})\n{items}\n\nDecide with .review <code> ban or .review <code> ok.",
 		"cmd.pending_none":               "Nothing is waiting for a decision.",
 		"cmd.reviewgroup_protected":      "A protected group can't review itself. Send .reviewgroup here in a separate admins-only group.",
-		"cmd.reviewgroup_pick":           "Which group should this chat review? Send {prefix}reviewgroup here <group name>.\n*Your groups*\n{groups}",
+		"cmd.reviewgroup_pick":           "Which group should this chat review? Send {prefix}reviewgroup here 1, or part of its name.\n*Your groups*\n{groups}",
 		"cmd.reviewgroup_set":            "✔ This chat now gets the review cases of *{group}*. React or reply to each one to decide.",
 		"cmd.reviewgroup_off":            "*{group}* no longer sends cases to a review group. They wait for you: send .pending to see them.",
 		"cmd.reviewgroup_outsiders":      "⚠️ {n} people here aren't admins of {group}. They'll see the evidence in reviews.",
@@ -134,12 +139,12 @@ var commandTexts = Catalog{
 		"cmd.usage.set":            "Send a setting and its value:\n.set review.timeout 12h – wait 12 hours for a decision",
 		"cmd.usage.get":            "Send a setting's name:\n.get review.timeout – show how long I wait for a decision",
 		"cmd.usage.mode":           "Choose a mode:\n.mode enforce – act on spam\n.mode shadow – watch only, change nothing\n.mode pause – stop acting until you switch back",
-		"cmd.usage.preset":         "Choose how strict I am:\n.preset relaxed – act only on clear spam\n.preset standard – the default\n.preset strict – act sooner\n.preset ask – ask admins before banning",
+		"cmd.usage.preset":         "Choose how strict I am:\n.preset relaxed – act only on clear spam\n.preset standard – the default\n.preset strict – act sooner\n.preset ask – delete spam right away, and ask the admins before banning",
 		"cmd.usage.toggle":         "Add on or off, for example .silent on",
 		"cmd.usage.policy":         "Choose what happens to messages that break the group's rules:\n.policy delete – delete them\n.policy ask – ask the admins\n.policy ban – delete and ban",
 		"cmd.usage.content":        "Name a type of message:\n.block links – delete links\n.allow stickers – allow stickers again\n*Types:* links, invites, channels, contacts, images, videos, stickers, documents, audio, polls, locations, events, view_once",
 		"cmd.usage.autoban":        ".autoban – show the auto-ban table\n.autoban links auto – ban known link spam without asking\n.autoban links ask – ask the admins first\nOther actions: delete, allow",
-		"cmd.usage.askadmins":      "Choose when I ask the admins:\n.askadmins off – act on my own\n.askadmins delete – delete first, then ask about the ban\n.askadmins before – ask before doing anything",
+		"cmd.usage.askadmins":      "Choose when I ask the admins:\n.askadmins delete – delete spam right away, and ask the admins before banning\n.askadmins before – keep the message until an admin decides\n.askadmins off – act automatically",
 		"cmd.usage.ban":            "Reply to the message (or @mention the person) with:\n.ban spam – ban and remember it as spam\n.ban other – ban for another reason",
 		"cmd.usage.kick":           "Reply to the message (or @mention the person) with:\n.kick – remove them; they can rejoin",
 		"cmd.usage.unban":          "Send the number, or reply to their message:\n.unban +966551234567 – lift the ban",
@@ -203,11 +208,12 @@ var commandTexts = Catalog{
 			"{prefix}حالة – إعداد هذه المجموعة\n" +
 			"{prefix}نمط strict – درجة الصرامة\n" +
 			"{prefix}وضع shadow – المراقبة فقط دون أي إجراء\n" +
+			"{prefix}اسأل_المشرفين delete – حذف السبام فوراً والسؤال قبل الحظر\n" +
 			"{prefix}اعدادات – أهم الإعدادات\n\n" +
 			"*القائمة السوداء*\n" +
 			"{prefix}القائمة_السوداء add \u200e+966551234567 – منع رقم هاتف\n" +
 			"{prefix}القائمة_السوداء list – عرض القائمة\n\n" +
-			"في الخاص، اختر المجموعة أولاً بـ {prefix}استخدم <اسم المجموعة>.\n" +
+			"في الخاص، اختر المجموعة بـ {prefix}استخدم 2 أو {prefix}استخدم جزء من الاسم. إن كنت تدير مجموعة واحدة فلا حاجة إلى {prefix}استخدم.\n" +
 			"للمزيد: {prefix}مساعدة الإشراف، {prefix}مساعدة المراجعات، {prefix}مساعدة الإعدادات أو {prefix}مساعدة القائمة_السوداء",
 		"cmd.help.moderation": "*الإشراف*\n" +
 			"رُدّ على الرسالة (أو أشر إلى الشخص) بـ:\n\n" +
@@ -233,10 +239,14 @@ var commandTexts = Catalog{
 		"cmd.help.settings": "*الإعدادات*\n" +
 			"{prefix}حالة – إعداد هذه المجموعة\n" +
 			"{prefix}اعدادات – أهم الإعدادات\n" +
-			"{prefix}نمط standard – درجة الصرامة: relaxed أو standard أو strict أو ask\n" +
+			"{prefix}نمط standard – درجة الصرامة: relaxed أو standard أو strict\n" +
+			"{prefix}نمط ask – حذف السبام فوراً، وسؤال المشرفين قبل الحظر\n" +
 			"{prefix}وضع enforce – التصرف مع السبام\n" +
 			"{prefix}وضع shadow – المراقبة فقط: أسجّل ما كنت سأفعله\n" +
 			"{prefix}وضع pause – التوقف حتى تعيد التشغيل\n" +
+			"{prefix}اسأل_المشرفين delete – حذف السبام فوراً، وسؤال المشرفين قبل الحظر\n" +
+			"{prefix}اسأل_المشرفين before – إبقاء الرسالة حتى يقرر أحد المشرفين\n" +
+			"{prefix}اسأل_المشرفين off – التصرف تلقائياً\n" +
 			"{prefix}منع links – حذف نوع من الرسائل (وأيضاً invites وimages وvideos…)\n" +
 			"{prefix}سماح stickers – السماح بنوع من جديد\n\n" +
 			"أي إعداد باسمه: {prefix}عرض review.timeout، {prefix}ضبط review.timeout 12h",
@@ -248,8 +258,8 @@ var commandTexts = Catalog{
 			"تُقبل الأرقام بأي صيغة: 0551234567 أو 00966… أو بالأرقام العربية أو روابط wa.me.",
 		"cmd.help_unknown": "لا توجد صفحة مساعدة باسم \"{topic}\". جرّب {prefix}مساعدة الإشراف أو {prefix}مساعدة المراجعات أو {prefix}مساعدة الإعدادات أو {prefix}مساعدة القائمة_السوداء.",
 
-		"cmd.groups":        "*مجموعاتك*\n{groups}",
-		"cmd.pick_group":    "*أي مجموعة؟* أرسل {prefix}استخدم <اسم المجموعة>.\n{groups}",
+		"cmd.groups":        "*مجموعاتك*\n{groups}\n\nاختر واحدة بـ {prefix}استخدم 1 أو جزء من اسمها.",
+		"cmd.pick_group":    "*أي مجموعة؟* أرسل {prefix}استخدم 1 أو جزءاً من اسمها.\n{groups}",
 		"cmd.using":         "أعمل الآن على *{group}* لمدة ساعة.",
 		"cmd.login":         "سجّل الدخول من هنا: {url}",
 		"cmd.login_no_site": "تسجيل الدخول ليس جزءاً من هذا الإصدار. أرسل {prefix}مساعدة لعرض الأوامر.",
@@ -293,7 +303,7 @@ var commandTexts = Catalog{
 		"cmd.pending":                    "*بانتظار القرار* ({n})\n{items}\n\nللبتّ: .مراجعة <الرمز> ban أو .مراجعة <الرمز> ok",
 		"cmd.pending_none":               "لا شيء بانتظار القرار.",
 		"cmd.reviewgroup_protected":      "لا يمكن للمجموعة المحمية أن تراجع نفسها. أرسل \u200e.reviewgroup here في مجموعة منفصلة للمشرفين فقط.",
-		"cmd.reviewgroup_pick":           "أي مجموعة ستراجعها هذه المحادثة؟ أرسل \u200e{prefix}reviewgroup here <اسم المجموعة>.\n*مجموعاتك*\n{groups}",
+		"cmd.reviewgroup_pick":           "أي مجموعة ستراجعها هذه المحادثة؟ أرسل {prefix}مجموعة_المراجعة here 1 أو جزءاً من اسمها.\n*مجموعاتك*\n{groups}",
 		"cmd.reviewgroup_set":            "✔ تستقبل هذه المحادثة الآن حالات المراجعة لـ *{group}*. تفاعل أو رُدّ على كل حالة للبتّ فيها.",
 		"cmd.reviewgroup_off":            "لم تعد *{group}* ترسل الحالات إلى مجموعة مراجعة. تنتظرك الآن: أرسل .معلق لعرضها.",
 		"cmd.reviewgroup_outsiders":      "⚠️ {n} أشخاص هنا ليسوا مشرفين في {group} وسيرون الأدلة في المراجعات.",
@@ -312,12 +322,12 @@ var commandTexts = Catalog{
 		"cmd.usage.set":            "أرسل الإعداد وقيمته:\n\u200e.set review.timeout 12h – انتظار القرار ١٢ ساعة",
 		"cmd.usage.get":            "أرسل اسم الإعداد:\n\u200e.get review.timeout – عرض مدة انتظار القرار",
 		"cmd.usage.mode":           "اختر الوضع:\n.وضع enforce – التصرف مع السبام\n.وضع shadow – المراقبة فقط دون أي تغيير\n.وضع pause – التوقف حتى تعيد التشغيل",
-		"cmd.usage.preset":         "اختر درجة الصرامة:\n.نمط relaxed – التصرف مع السبام الواضح فقط\n.نمط standard – الإعداد الافتراضي\n.نمط strict – التصرف أسرع\n.نمط ask – سؤال المشرفين قبل الحظر",
+		"cmd.usage.preset":         "اختر درجة الصرامة:\n.نمط relaxed – التصرف مع السبام الواضح فقط\n.نمط standard – الإعداد الافتراضي\n.نمط strict – التصرف أسرع\n.نمط ask – حذف السبام فوراً، وسؤال المشرفين قبل الحظر",
 		"cmd.usage.toggle":         "أضف on أو off، مثلاً .صامت on",
 		"cmd.usage.policy":         "اختر ما يحدث للرسائل المخالفة لقواعد المجموعة:\n.سياسة delete – حذفها\n.سياسة ask – سؤال المشرفين\n.سياسة ban – الحذف والحظر",
 		"cmd.usage.content":        "اذكر نوعاً من الرسائل:\n.منع links – حذف الروابط\n.سماح stickers – السماح بالملصقات من جديد\n*الأنواع:* links, invites, channels, contacts, images, videos, stickers, documents, audio, polls, locations, events, view_once",
 		"cmd.usage.autoban":        ".حظر_تلقائي – عرض جدول الحظر التلقائي\n.حظر_تلقائي links auto – حظر سبام الروابط المعروف دون سؤال\n.حظر_تلقائي links ask – سؤال المشرفين أولاً\nإجراءات أخرى: delete و allow",
-		"cmd.usage.askadmins":      "اختر متى أسأل المشرفين:\n.اسأل_المشرفين off – أتصرف بنفسي\n.اسأل_المشرفين delete – أحذف أولاً ثم أسأل عن الحظر\n.اسأل_المشرفين before – أسأل قبل أي إجراء",
+		"cmd.usage.askadmins":      "اختر متى أسأل المشرفين:\n.اسأل_المشرفين delete – حذف السبام فوراً، وسؤال المشرفين قبل الحظر\n.اسأل_المشرفين before – إبقاء الرسالة حتى يقرر أحد المشرفين\n.اسأل_المشرفين off – التصرف تلقائياً",
 		"cmd.usage.ban":            "رُدّ على الرسالة (أو أشر إلى الشخص) بـ:\n.حظر سبام – الحظر وحفظها كسبام\n.حظر أخرى – الحظر لسبب آخر",
 		"cmd.usage.kick":           "رُدّ على الرسالة (أو أشر إلى الشخص) بـ:\n.طرد – إزالته مع السماح بعودته",
 		"cmd.usage.unban":          "أرسل الرقم، أو رُدّ على رسالته:\n.فك_الحظر \u200e+966551234567 – رفع الحظر",

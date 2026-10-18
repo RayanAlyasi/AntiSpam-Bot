@@ -4,7 +4,7 @@
 #   docker compose up -d        # release image; from a source checkout: docker compose up -d --build
 #
 # Postgres holds everything: the WhatsApp session (whatsmeow store), settings, detections and
-# the action queue. Back up the `pgdata` volume (see README); losing it means pairing again.
+# the action queue. Back up the database (wiki: "Back up and restore"); losing it means pairing again.
 name: antispam
 
 services:

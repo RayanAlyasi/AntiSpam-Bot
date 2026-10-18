@@ -1,5 +1,5 @@
-# AntiSpam Bot on Coolify: the root docker-compose.yml, adapted (see "Deploying on Coolify" in
-# the README).
+# AntiSpam Bot on Coolify: the root docker-compose.yml, adapted (see the wiki page "Install on
+# Coolify").
 #
 # - The release image, no build.
 # - No host ports: the healthcheck runs inside the container, and a published 8080 can clash
@@ -11,7 +11,7 @@
 # - Every ${VAR:-} below is an editable variable in Coolify; env.example documents them all.
 #   Set PAIR_PHONE to pair by a code shown in the Logs tab, and clear it once paired.
 #
-# Postgres holds everything, the WhatsApp session included. Back it up (see the README).
+# Postgres holds everything, the WhatsApp session included. Back it up (wiki: "Back up and restore").
 
 services:
   bot:

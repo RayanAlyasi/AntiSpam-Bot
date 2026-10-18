@@ -1,8 +1,8 @@
 # Corpus import format
 
 `antispam corpus import` reads a labeled spam dataset and adds it to the confirmed-spam corpus
-(DESIGN.md §7.8). This page describes the file. The README's "Importing a spam dataset" section
-shows how to run the command.
+(DESIGN.md §7.8). This page describes the file. The wiki's "Import a spam dataset" page shows
+how to run the command.
 
 ```
 antispam corpus import <file|-> --scope instance|group:<jid> [--holdout 0.2] [--holdout-clusters FILE] [--allow-ham] [--dry-run]

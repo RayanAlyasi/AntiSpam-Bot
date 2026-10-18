@@ -150,7 +150,7 @@ func (g chatGroups) Name(ctx context.Context, group wa.JID) (string, error) {
 
 // AdminGroups lists the tracked groups where person is an admin, including ones still waiting
 // for the bot to be made admin: an admin can switch a group to shadow mode before the bot gets
-// the rights to act there (README "Try it in shadow mode first"). A community's own entry and
+// the rights to act there (wiki "Protect your first group"). A community's own entry and
 // its announcement group are left out: nobody but admins posts there.
 func (g chatGroups) AdminGroups(ctx context.Context, person wa.JID) ([]chat.GroupRef, error) {
 	p, ok, err := g.ws.ids.MatchPerson(ctx, person)

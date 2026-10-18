@@ -1,17 +1,21 @@
-<!-- Title: a Conventional Commit, e.g. "feat: add phone-number blacklist command". It becomes the squash commit. -->
+<!--
+Title: a Conventional Commit, imperative and specific, e.g. "fix: keep the manager off a device
+until pairing finishes". It becomes the squash commit.
 
-## Summary
-
-<!-- What this changes, in two or three sentences. -->
-
-## Why
-
-<!-- The problem or requirement, with docs/DESIGN.md sections if relevant. -->
+Start with one to three sentences: what this changes and why, for someone who hasn't followed the
+work. Add a few bullets only if the change has several distinct parts. Keep it short.
+-->
 
 ## Testing
 
-<!-- What was run and what it shows: tests added, tests run, manual checks. -->
+<!-- What you ran and what it showed. -->
 
-## Notes for reviewers
+<!--
+Optional. Only if there's a behaviour change, risk or trade-off to flag (three bullets at most):
 
-<!-- Trade-offs, follow-ups, anything that deserves a closer look. -->
+## Notes
+
+-
+
+Follow-ups go in GitHub issues, not here. End with "Fixes #N" or "For #N" if there's an issue.
+-->

@@ -51,7 +51,22 @@ release-please reads these to write the changelog and pick the next version, so 
 - **Body:** after a blank line, what changed and why, wrapped at 72 characters. Put the feature ID in a
   footer: `Feature: F-012`.
 - **PRs:** the title uses the same format (feature PRs are squash-merged, so the title becomes the
-  commit). The body follows `.github/pull_request_template.md`.
+  commit). The body follows `.github/pull_request_template.md` and reads like a short note from
+  one engineer to another:
+  - Open with one to three sentences of plain prose: what changes and why, for a reader who
+    hasn't followed the work. The why is the part the diff can't show.
+  - Add a few bullets only when the change has several distinct parts. Name the notable
+    changes, not every file or function: the diff already shows those.
+  - **Testing:** what you ran and what it showed, in a few lines (`make check` green, the new
+    test and what it covers, a manual check). Don't list every test case.
+  - **Notes** is optional: at most three bullets, only for a behaviour change, a risk or a
+    trade-off the reviewer must weigh. Leave the section out when there's nothing to say.
+  - Follow-ups go in GitHub issues (`gh issue create`), linked with `For #N`, never in the PR
+    body. Close issues with `Fixes #N` on its own line at the end.
+  - Keep it short: a few lines for a small PR, about 250 words at most for a large one.
+  - Leave out the process: judge rounds, stamps, sessions, gates, "the maintainer", what you
+    tried first. Also no headings on a small PR, no bold on every line, no nested bullet trees,
+    no emoji, no hedging or salesy words ("robust", "comprehensive", "seamlessly").
 - **Docs:** if a change alters behaviour, configuration, commands or deployment, update the
   user-facing docs (README, `docs/`) in the same PR.
 - No `Co-Authored-By` trailers, no "Generated with" lines, and no mention of AI or agents.

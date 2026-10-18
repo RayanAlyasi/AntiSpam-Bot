@@ -50,29 +50,6 @@ func (q *Queries) DetectionExists(ctx context.Context, arg DetectionExistsParams
 	return found, err
 }
 
-const getCorpusMessage = `-- name: GetCorpusMessage :one
-SELECT m.entry_id
-FROM app.corpus_messages m
-JOIN app.corpus_entries e ON e.id = m.entry_id
-WHERE m.group_jid = $1 AND m.msg_id = $2 AND e.status <> 'retracted'
-ORDER BY m.entry_id DESC
-LIMIT 1
-`
-
-type GetCorpusMessageParams struct {
-	GroupJid string
-	MsgID    string
-}
-
-// The newest entry from a message that hasn't been retracted yet: an overturn retracts them one by
-// one until none is left.
-func (q *Queries) GetCorpusMessage(ctx context.Context, arg GetCorpusMessageParams) (int64, error) {
-	row := q.db.QueryRow(ctx, getCorpusMessage, arg.GroupJid, arg.MsgID)
-	var entry_id int64
-	err := row.Scan(&entry_id)
-	return entry_id, err
-}
-
 const insertCorpusAllow = `-- name: InsertCorpusAllow :exec
 INSERT INTO app.corpus_allow (group_jid, simhash, minhash, tokens)
 VALUES ($1, $2, $3, $4)
@@ -320,23 +297,5 @@ SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))
 // the same redelivered event can't both act on it (DESIGN.md §4.1).
 func (q *Queries) LockMessage(ctx context.Context, messageKey string) error {
 	_, err := q.db.Exec(ctx, lockMessage, messageKey)
-	return err
-}
-
-const putCorpusMessage = `-- name: PutCorpusMessage :exec
-INSERT INTO app.corpus_messages (group_jid, msg_id, entry_id)
-VALUES ($1, $2, $3)
-ON CONFLICT DO NOTHING
-`
-
-type PutCorpusMessageParams struct {
-	GroupJid string
-	MsgID    string
-	EntryID  int64
-}
-
-// Records a corpus entry confirmed from a message. Every confirmation's entry is kept.
-func (q *Queries) PutCorpusMessage(ctx context.Context, arg PutCorpusMessageParams) error {
-	_, err := q.db.Exec(ctx, putCorpusMessage, arg.GroupJid, arg.MsgID, arg.EntryID)
 	return err
 }

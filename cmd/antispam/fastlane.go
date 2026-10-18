@@ -26,6 +26,7 @@ import (
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/policy"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/review"
 	reviewpg "github.com/RayanAlyasi/AntiSpam-Bot/internal/review/pgstore"
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/review/queue"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/review/reviewjobs"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/store"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/wa"
@@ -68,7 +69,8 @@ func checkHashKey(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, lo
 
 // newFastlane assembles the fast lane. getenv reads the AI API key.
 func newFastlane(cfg config.Config, key []byte, pool *pgxpool.Pool, getenv func(string) string, logs *logging.Loggers, ws *waStack, lids *lidSwitch,
-	reg prometheus.Registerer, metrics *fastlane.Metrics) (*fastlaneStack, error) {
+	reg prometheus.Registerer, metrics *fastlane.Metrics,
+) (*fastlaneStack, error) {
 	clk := clock.Real{}
 	log := logs.For("fastlane").Hook(fastlane.CallerHook{})
 	var verifier *gateway.Verifier
@@ -101,7 +103,7 @@ func newFastlane(cfg config.Config, key []byte, pool *pgxpool.Pool, getenv func(
 	evidence := reviewpg.Evidence{DB: pool}
 	learning := review.NewLearning(review.LearningDeps{
 		Evidence: evidence,
-		Corpus:   &fastlane.CorpusLearning{Pool: pool, Clock: clk, Hasher: hasher, Key: key, Index: corpus, Log: log},
+		Corpus:   &fastlane.CorpusLearning{Pool: pool, Clock: clk, Hasher: hasher, Key: key, Index: corpus, Persons: queue.IdentityPersons{Service: ws.ids}, Log: log},
 		Standing: noStanding{},
 		Clock:    clk,
 	})
@@ -155,6 +157,9 @@ func newFastlane(cfg config.Config, key []byte, pool *pgxpool.Pool, getenv func(
 	})
 	cs := newChatSink(pool, ws, settings, reviews.Service, learning, reviews.Queue, cfg.OperatorPhones)
 	cs.log, cs.metrics = logs.For("chat").Hook(fastlane.CallerHook{}), metrics
+	// wp-k's blacklist (§9.8), set before any per-bot handler is built from cs.deps.
+	cs.deps.Blacklist = newBlacklist(pool, key, ws, lids, settings, reviews.Service, reviews.Queue, chatNotifier{sink: cs, ws: ws, lids: lids}, clk)
+	cs.deps.Normalize = reviewpg.PhoneNormalizer{}
 	return &fastlaneStack{lanes: lanes, chat: cs, corpus: corpus, reviews: reviews, evidence: evidence, pool: pool, settings: settings, log: log}, nil
 }
 

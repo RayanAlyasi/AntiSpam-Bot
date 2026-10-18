@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/policy"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/review"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/wa"
 )
@@ -24,5 +25,8 @@ func (p PolicySettings) Blacklist(ctx context.Context, group wa.JID) (GroupSetti
 	if err != nil {
 		return GroupSettings{}, fmt.Errorf("load settings %s: %w", group, err)
 	}
-	return GroupSettings{UseInstance: true, Mode: review.EnforcementMode(s.Enforcement.Mode), DefaultCountry: p.DefaultCountry}, nil
+	return GroupSettings{
+		UseInstance: true, Mode: review.EnforcementMode(s.Enforcement.Mode), DefaultCountry: p.DefaultCountry,
+		Inactive: s.Mode != policy.ModeEnforce,
+	}, nil
 }

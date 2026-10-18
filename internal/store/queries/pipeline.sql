@@ -26,22 +26,6 @@ LIMIT @row_limit;
 SELECT count(*) FROM app.actions
 WHERE bot = @bot AND (status = 'running' OR (status = 'pending' AND not_before < @due_before));
 
--- name: PutCorpusMessage :exec
--- Records a corpus entry confirmed from a message. Every confirmation's entry is kept.
-INSERT INTO app.corpus_messages (group_jid, msg_id, entry_id)
-VALUES (@group_jid, @msg_id, @entry_id)
-ON CONFLICT DO NOTHING;
-
--- name: GetCorpusMessage :one
--- The newest entry from a message that hasn't been retracted yet: an overturn retracts them one by
--- one until none is left.
-SELECT m.entry_id
-FROM app.corpus_messages m
-JOIN app.corpus_entries e ON e.id = m.entry_id
-WHERE m.group_jid = @group_jid AND m.msg_id = @msg_id AND e.status <> 'retracted'
-ORDER BY m.entry_id DESC
-LIMIT 1;
-
 -- name: ListMatchableCorpusTexts :many
 -- The near-duplicate index's input in one query: live active or promoted entries with their
 -- stored (redacted) normalized text. Provisional entries are never hard evidence (§7.5).

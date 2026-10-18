@@ -121,6 +121,9 @@ func subject(p Person) review.Subject {
 // actOn bans a listed member, or opens a review item when the entry is instance-wide and the
 // group asks its admins. It reports what it did: "ban", "review" or "".
 func (s *Service) actOn(ctx context.Context, group wa.JID, gs GroupSettings, e Entry, p Person, actor wa.JID, msg *wa.MessageRef) (string, string, error) {
+	if gs.Inactive {
+		return "", "", nil
+	}
 	if e.Scope == ScopeInstance && gs.Mode.AskMode() {
 		if !s.memo.take(group, subject(p).Person, s.now()) || s.d.Reviews == nil {
 			return "", "", nil
@@ -167,6 +170,9 @@ func (s *Service) onJoinRequests(ctx context.Context, group wa.JID, people []Per
 	gs, err := s.d.Settings.Blacklist(ctx, group)
 	if err != nil {
 		return nil, fmt.Errorf("blacklist settings %s: %w", group, err)
+	}
+	if gs.Inactive {
+		return nil, nil
 	}
 	var rejected []wa.JID
 	for _, p := range people {
@@ -228,6 +234,9 @@ func (s *Service) onMessage(ctx context.Context, group wa.JID, msg wa.MessageRef
 	gs, err := s.d.Settings.Blacklist(ctx, group)
 	if err != nil {
 		return true, fmt.Errorf("blacklist settings %s: %w", group, err)
+	}
+	if gs.Inactive {
+		return true, nil
 	}
 	askInstance := e.Scope == ScopeInstance && gs.Mode.AskMode()
 	var errs []error

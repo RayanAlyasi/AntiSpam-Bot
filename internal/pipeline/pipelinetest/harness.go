@@ -4,7 +4,6 @@ package pipelinetest
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -165,7 +164,9 @@ func New(t testing.TB, opts Options) *Harness {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		if err := exec.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		// Any error after cleanup's cancel is the shutdown: pgx reports a write cut short by the
+		// cancel as a plain i/o timeout, not context.Canceled.
+		if err := exec.Run(ctx); err != nil && ctx.Err() == nil {
 			t.Errorf("pipelinetest: executor stopped: %v", err)
 		}
 	}()

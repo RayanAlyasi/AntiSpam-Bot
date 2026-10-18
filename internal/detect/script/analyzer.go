@@ -13,7 +13,8 @@ import (
 const (
 	// CodeMixedScript: words that mix look-alike scripts.
 	CodeMixedScript = "text.mixed_script"
-	// CodeInvisible: invisible or combining-flood characters stripped from the text.
+	// CodeInvisible: invisible, combining-flood and decorative characters
+	// stripped from the text (normalize.Result.Stripped).
 	CodeInvisible = "text.invisible_chars"
 )
 
@@ -73,7 +74,7 @@ func (*Analyzer[P]) Analyze(_ context.Context, e *envelope.Envelope, _ *detect.S
 	if w := invisibleWeight(stripped); w > 0 {
 		out = append(out, detect.Signal{
 			Code: CodeInvisible, Weight: w,
-			Evidence: fmt.Sprintf("%d hidden characters removed from the text", stripped),
+			Evidence: fmt.Sprintf("%d hidden or decorative characters removed from the text", stripped),
 		})
 	}
 	return out, nil

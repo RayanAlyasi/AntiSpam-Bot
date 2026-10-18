@@ -80,10 +80,50 @@ docker compose exec bot /antispam pair
 On a headless server you can pair by code instead: add `-phone +<the bot's number>` and enter
 the 8-character code it prints under Linked devices → Link with phone number.
 
+Without a shell (on Coolify, say), set `PAIR_PHONE=+<the bot's number>` in `.env` and run
+`docker compose up -d` instead (a plain restart doesn't re-read `.env`). While no number is
+paired yet, the bot logs a line starting `pairing code`: enter that code on the bot's phone
+under Linked devices → Link with phone number. A code lasts about two minutes; when one
+expires unused, a new one is logged after a pause that grows from 30 seconds to 10 minutes,
+and after 10 codes the bot stops asking until it is restarted. Once a number is paired,
+`PAIR_PHONE` does nothing, so remove it then.
+
 Pairing sends no messages. It sets the bot's "about" text to the appeal line, so removed
 members know how to appeal, and lets anyone add the bot to groups. A running bot picks up a
-newly paired number within 10 seconds. Give the number a neutral name and picture (e.g. "Group
+newly paired number within 10 seconds, once pairing has finished with it. Pairing a number that
+a running bot has connected is refused. Give the number a neutral name and picture (e.g. "Group
 Assistant").
+
+## Deploying on Coolify
+
+[`deploy/coolify/docker-compose.yml`](deploy/coolify/docker-compose.yml) is the same stack for
+[Coolify](https://coolify.io): it runs the release image, publishes no host port (the
+healthcheck runs inside the container), and lets Coolify generate the secrets. Every other
+variable from [`env.example`](env.example) that it uses, such as `OPERATOR_PHONES`, shows up
+under Environment Variables.
+
+1. **Deploy it.** Create a Docker Compose resource (paste the file as "Docker Compose Empty", or
+   point a Git-based resource at `deploy/coolify/docker-compose.yml`) and deploy.
+   `POSTGRES_PASSWORD` comes from `SERVICE_PASSWORD_POSTGRES` and `HASH_KEY` from
+   `SERVICE_PASSWORD_64_HASHKEY`: Coolify generates both on the first deploy, keeps them across
+   deploys and shows them under Environment Variables.
+2. **Back up `HASH_KEY`.** Copy `SERVICE_PASSWORD_64_HASHKEY` from the Environment Variables
+   page into your password manager. If it's lost or changes, blacklisted and corpus numbers
+   stop matching.
+3. **Pair.** Set `PAIR_PHONE` to the bot's number under Environment Variables and redeploy,
+   then read the `pairing code` line in the bot's Logs tab and enter it on the phone (see
+   [Pair the number](#quick-start)). Once it logs `paired`, clear `PAIR_PHONE` and redeploy.
+   From a terminal on the server, `docker exec <bot container> /antispam pair` still works.
+4. **Back up Postgres yourself.** Coolify's scheduled backups cover standalone databases and
+   databases inside a Service, but not Git-based Docker Compose applications
+   ([coollabsio/coolify#7528](https://github.com/coollabsio/coolify/issues/7528)). Whatever
+   you used, check that the backup actually runs, or add a nightly cron job on the server:
+   ```
+   0 3 * * * docker exec <postgres container> pg_dump -U antispam antispam | gzip > /root/backups/antispam-$(date +\%F).sql.gz
+   ```
+   (create `/root/backups` first; `docker ps` shows the container names, and `%` must be
+   escaped in a crontab). Copy the dumps off the server too.
+5. **Start in shadow mode,** as below.
 
 ## Try it in shadow mode first
 

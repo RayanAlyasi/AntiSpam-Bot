@@ -104,6 +104,7 @@ type waStack struct {
 	manager   *connector.Manager // nil without the connector role
 	connected *atomic.Int64
 	pacing    config.Pacing                                               // the action executors' pacing (config.yaml "pacing")
+	pairPhone string                                                      // PAIR_PHONE: pair by code at startup while no bot is paired
 	moderate  inbox.Sink                                                  // the detection fast lane (F-088); nil: moderated rows are only marked processed
 	chat      inbox.Sink                                                  // commands, DMs and review votes (wp-k's chat handler); nil: not handled
 	hooks     *groupHooks                                                 // wp-k: blacklist on joins and join requests, onboarding DMs; nil: none
@@ -139,6 +140,7 @@ func newWAStack(pool *pgxpool.Pool, getenv func(string) string, logs *logging.Lo
 	return &waStack{
 		pool: pool, clk: clk, logs: logs, notifier: notifier, ids: ids,
 		groups: identity.NewPostgresGroupStore(pool), connected: connected,
+		pairPhone: strings.TrimSpace(getenv("PAIR_PHONE")),
 	}, lids
 }
 
@@ -199,7 +201,8 @@ func (s *waStack) connectorRole(databaseURL string, reg prometheus.Registerer, l
 			}
 			return nil // profile changes: the profile cache comes with enrichment
 		})
-		mgr, err = connector.NewManager(connector.NewWhatsmeowBackend(container, log), store.NewBots(s.pool),
+		backend := connector.NewWhatsmeowBackend(container, log)
+		mgr, err = connector.NewManager(backend, store.NewBots(s.pool),
 			botRegistry{store.NewBots(s.pool)}, sink, connector.Options{Owner: leaseOwner(), Log: log})
 		if err != nil {
 			return err
@@ -216,6 +219,11 @@ func (s *waStack) connectorRole(databaseURL string, reg prometheus.Registerer, l
 		wg.Go(func() { _ = health.Run(ctx) })
 		wg.Go(func() { _ = runner.Run(ctx) })
 		wg.Go(func() { s.syncGroups(ctx, mgr, tracker, log) })
+		wg.Go(func() {
+			s.autoPair(ctx, backend, func(ctx context.Context, opts connector.PairOptions) (wa.JID, error) {
+				return connector.Pair(ctx, container, opts)
+			}, log)
+		})
 		if s.hooks != nil {
 			wg.Go(func() { s.hooks.run(ctx, mgr.Self) })
 			wg.Go(func() { s.hooks.pollJoinRequests(ctx, s.groups, mgr.Client) })
@@ -225,6 +233,21 @@ func (s *waStack) connectorRole(databaseURL string, reg prometheus.Registerer, l
 		s.connected.Store(0)
 		return err
 	}}
+}
+
+// autoPair pairs the first bot by code when PAIR_PHONE is set and nothing is paired yet, through
+// the same path as `antispam pair -phone`; the Manager connects the bot once it is paired.
+func (s *waStack) autoPair(ctx context.Context, devices connector.DeviceLister, pair connector.PairFunc, log zerolog.Logger) {
+	err := connector.AutoPair(ctx, devices, pair, connector.AutoPairOptions{
+		Phone: s.pairPhone,
+		Lease: pairLease{store.NewBots(s.pool)},
+		Owner: leaseOwner(), // not the Manager's, so it waits for pairing to release the bot
+		Clock: s.clk,
+		Log:   log,
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("PAIR_PHONE is set but unusable; not pairing")
+	}
 }
 
 // groupInfo fetches a group's info through the bot that is in it.

@@ -13,6 +13,8 @@ import (
 	"go.mau.fi/whatsmeow/types"
 	waLog "go.mau.fi/whatsmeow/util/log"
 
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/clock"
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/logging"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/wa"
 )
 
@@ -31,23 +33,37 @@ type PairOptions struct {
 	ShowQR func(code string, expires time.Duration)
 	// ShowCode receives the pairing code to type into the phone (code pairing).
 	ShowCode func(code string)
-	// Lease and Owner, when set, take the new bot's lease before the profile is set, so a
-	// running connector doesn't connect the same session at the same time (StreamReplaced).
+	// Lease and Owner, when set, hold the new bot's lease from just before the device is saved
+	// until pairing is done with it, so a running connector doesn't connect the same session at
+	// the same time (StreamReplaced). A number whose lease another process holds is refused.
 	Lease Lease
 	Owner string
 	Log   zerolog.Logger
 }
 
+// ErrPairTimeout means the login connection closed before the QR code was scanned or the
+// pairing code entered: the codes ran out (after about 160 s) or the connection dropped, and
+// pairing must start again.
+var ErrPairTimeout = errors.New("pair: timed out before the code was used")
+
 // Pair links a new bot number to the whatsmeow store by QR or pairing code, then sets its about
 // text and its "who can add me to groups" privacy setting to everyone (DESIGN.md §13.6 step 2).
 // It sends no message. It returns the new bot's JID.
 func Pair(ctx context.Context, container *sqlstore.Container, opts PairOptions) (wa.JID, error) {
-	phone := digits(opts.Phone)
-	if opts.Phone != "" && (len(phone) < 8 || len(phone) > 15) {
-		return "", fmt.Errorf("pair: %q is not an international phone number", opts.Phone)
+	phone, err := pairPhone(opts.Phone)
+	if err != nil {
+		return "", err
 	}
 	dev := container.NewDevice()
 	cli := whatsmeow.NewClient(dev, waLog.Zerolog(opts.Log.With().Str("module", "whatsmeow").Logger()))
+	var hold *pairHold
+	if opts.Lease != nil {
+		hold = &pairHold{lease: opts.Lease, owner: opts.Owner, clk: clock.Real{}, log: opts.Log, lost: cli.Disconnect}
+		// whatsmeow calls this just before it saves the device, the moment a Manager could see it.
+		cli.PrePairCallback = func(j types.JID, _, _ string) bool { return hold.take(ctx, jid(j)) }
+		// Deferred before Disconnect, so it runs after it: the lease outlives this client's session.
+		defer hold.release(context.WithoutCancel(ctx))
+	}
 	qr, err := cli.GetQRChannel(ctx)
 	if err != nil {
 		return "", fmt.Errorf("pair: QR channel: %w", err)
@@ -75,7 +91,11 @@ func Pair(ctx context.Context, container *sqlstore.Container, opts PairOptions) 
 			}
 		case item.Event == "code":
 		case item == whatsmeow.QRChannelSuccess:
-			return finishPair(ctx, cli, opts)
+			return finishPair(ctx, cli, opts, hold)
+		case item == whatsmeow.QRChannelTimeout:
+			return "", ErrPairTimeout
+		case item.Event == "error" && hold != nil && hold.err() != nil:
+			return "", fmt.Errorf("pair: refused: %w", hold.err())
 		case item.Event == "error":
 			return "", fmt.Errorf("pair: %w", item.Error)
 		default:
@@ -85,28 +105,15 @@ func Pair(ctx context.Context, container *sqlstore.Container, opts PairOptions) 
 	return "", errors.New("pair: QR channel closed before pairing finished")
 }
 
-func finishPair(ctx context.Context, cli *whatsmeow.Client, opts PairOptions) (wa.JID, error) {
+// finishPair sets the profile of a just-paired bot. Pair's deferred calls then disconnect the
+// client and only after that give up the lease held since before the save.
+func finishPair(ctx context.Context, cli *whatsmeow.Client, opts PairOptions, hold *pairHold) (wa.JID, error) {
 	if cli.Store.ID == nil {
 		return "", errors.New("pair: paired, but the device has no JID")
 	}
 	bot := jid(*cli.Store.ID)
-	if opts.Lease != nil {
-		ok, err := opts.Lease.Acquire(ctx, bot, opts.Owner, DefaultLeaseTTL)
-		if err != nil {
-			return bot, fmt.Errorf("pair: take lease: %w", err)
-		}
-		if !ok {
-			opts.Log.Warn().Str("bot", mask(bot)).Msg("paired; a running connector already owns the bot, so its profile was not set")
-			return bot, nil
-		}
-		defer func() {
-			// Disconnect before giving the lease up, so the connector never connects while this
-			// client is still online (StreamReplaced).
-			cli.Disconnect()
-			if err := opts.Lease.Release(context.WithoutCancel(ctx), bot, opts.Owner); err != nil {
-				opts.Log.Error().Err(err).Msg("release pairing lease")
-			}
-		}()
+	if hold != nil && hold.held() != bot {
+		return bot, errors.New("pair: paired, but its lease is not held, so its profile was not set; set it by pairing again later")
 	}
 	if !cli.WaitForConnection(30 * time.Second) {
 		return bot, errors.New("pair: paired, but the reconnect after pairing timed out; set the profile by pairing again later")
@@ -134,6 +141,15 @@ func setupProfile(ctx context.Context, cli profileSetter, about string) error {
 		return fmt.Errorf("set group-add privacy: %w", err)
 	}
 	return nil
+}
+
+// pairPhone returns the digits of a pairing phone number; empty stays empty (QR pairing).
+func pairPhone(s string) (string, error) {
+	phone := digits(s)
+	if s != "" && (len(phone) < 8 || len(phone) > 15) {
+		return "", fmt.Errorf("pair: %s is not an international phone number", logging.Phone(s))
+	}
+	return phone, nil
 }
 
 func digits(s string) string {

@@ -1,0 +1,76 @@
+# AntiSpam Bot on Coolify: the root docker-compose.yml, adapted (see "Deploying on Coolify" in
+# the README).
+#
+# - The release image, no build.
+# - No host ports: the healthcheck runs inside the container, and a published 8080 can clash
+#   with another app on the server.
+# - Coolify generates the secrets on the first deploy and keeps them across deploys:
+#   SERVICE_PASSWORD_POSTGRES (32 letters and digits, so it is URL-safe in DATABASE_URL) and
+#   SERVICE_PASSWORD_64_HASHKEY (64). Back HASH_KEY up from the Environment Variables page: if
+#   it changes, stored blacklist and corpus numbers stop matching.
+# - Every ${VAR:-} below is an editable variable in Coolify; env.example documents them all.
+#   Set PAIR_PHONE to pair by a code shown in the Logs tab, and clear it once paired.
+#
+# Postgres holds everything, the WhatsApp session included. Back it up (see the README).
+
+services:
+  bot:
+    # Pin a minor (":0.1") or an exact version, never "latest" (DESIGN.md §23.4).
+    image: ghcr.io/rayanalyasi/antispam-bot:0.1
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://antispam:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/antispam?sslmode=disable
+      HASH_KEY: ${SERVICE_PASSWORD_64_HASHKEY}
+      HTTP_ADDR: ":8080"
+      TZ: UTC
+      PAIR_PHONE: ${PAIR_PHONE:-}
+      OPERATOR_PHONES: ${OPERATOR_PHONES:-}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_TIMEOUT: ${AI_TIMEOUT:-}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+      ALERT_TELEGRAM_TOKEN: ${ALERT_TELEGRAM_TOKEN:-}
+      ALERT_TELEGRAM_CHAT_ID: ${ALERT_TELEGRAM_CHAT_ID:-}
+      ALERT_SMTP_ADDR: ${ALERT_SMTP_ADDR:-}
+      ALERT_EMAIL_FROM: ${ALERT_EMAIL_FROM:-}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+      ALERT_SMTP_USER: ${ALERT_SMTP_USER:-}
+      ALERT_SMTP_PASSWORD: ${ALERT_SMTP_PASSWORD:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # The image is distroless (no shell or curl), so the binary probes its own /healthz.
+      test: ["CMD", "/antispam", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    # Enough time to finish the WhatsApp action in flight and close the session cleanly.
+    stop_grace_period: 30s
+
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: antispam
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      POSTGRES_DB: antispam
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      # Postgres 18 images keep their data under /var/lib/postgresql/<major>.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U antispam -d antispam"]
+      interval: 5s
+      timeout: 3s
+      start_period: 10s
+      retries: 10
+
+volumes:
+  pgdata:

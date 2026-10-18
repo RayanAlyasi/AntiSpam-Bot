@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -127,8 +128,12 @@ func (q *Queue) Enqueue(ctx context.Context, a review.Action) error {
 		}
 		return errors.Join(errs...)
 	case review.Send:
-		key := fmt.Sprintf("send:%s:%s:%d:%s", a.Chat, a.Purpose, a.ReviewID, short(a.Message.Text))
-		if a.ReviewID == 0 {
+		key := fmt.Sprintf("send:%s:%s:%s", a.Chat, a.Purpose, short(a.Message.Text))
+		if a.ReviewID != 0 {
+			// The review ID leads the key, so OnFinished can map the sent message to its review
+			// from the action alone, even after a restart.
+			key = reviewKeyPrefix + strconv.FormatInt(a.ReviewID, 10) + ":" + key
+		} else {
 			key += ":" + q.occurrence()
 		}
 		return q.put(ctx, a.Chat, actions.KindSend, actions.P3, actions.Payload{
@@ -174,6 +179,10 @@ func (q *Queue) put(ctx context.Context, chat wa.JID, kind actions.Kind, p actio
 			return fmt.Errorf("existing %s action %d: %w", kind, res.ID, err)
 		}
 		if !prev.Status.Final() || prev.Status == actions.StatusDone || prev.Status == actions.StatusCancelled {
+			break
+		}
+		if prev.Status == actions.StatusExpired && (kind == actions.KindRevoke || kind == actions.KindEdit) {
+			// Past WhatsApp's delete or edit window: another try would only waste a write.
 			break
 		}
 		k = fmt.Sprintf("%s:retry%d", key, attempt+1)
@@ -300,6 +309,38 @@ func (q *Queue) unban(ctx context.Context, u review.Unban) error {
 			return fmt.Errorf("forget blacklist ban: %w", err)
 		}
 	}
+	return nil
+}
+
+// reviewKeyPrefix starts the dedupe key of a review post: "review:<id>:send:…".
+const reviewKeyPrefix = "review:"
+
+// reviewOf returns the review a send action posted, from its dedupe key.
+func reviewOf(a actions.Action) (int64, bool) {
+	rest, ok := strings.CutPrefix(a.DedupeKey, reviewKeyPrefix)
+	if !ok || a.Kind != actions.KindSend {
+		return 0, false
+	}
+	idText, _, _ := strings.Cut(rest, ":")
+	id, err := strconv.ParseInt(idText, 10, 64)
+	return id, err == nil && id > 0
+}
+
+// OnFinished is the action queue's completion hook (actions.Deps.OnFinished): a review post
+// that went out is mapped to its review, so reactions and replies on it find the review
+// (§9.5 review_messages). It runs on the executor goroutine and is quick; a repeat call is
+// harmless because RecordPosted ignores a message it already knows.
+func (q *Queue) OnFinished(ctx context.Context, a actions.Action) error {
+	id, ok := reviewOf(a)
+	if !ok || a.Status != actions.StatusDone || a.Result.MessageID == "" || q.Posted == nil {
+		return nil
+	}
+	if err := q.Posted(ctx, review.Posted{ReviewID: id, Chat: a.Chat, ID: a.Result.MessageID, SentAt: a.UpdatedAt}); err != nil {
+		return err // Sweep still has it and tries again
+	}
+	q.mu.Lock()
+	delete(q.posting, a.ID)
+	q.mu.Unlock()
 	return nil
 }
 

@@ -1,0 +1,23 @@
+{
+ "feature": "WP-K",
+ "branch": "feat/wp-k-wiring",
+ "category": null,
+ "core": null,
+ "harness_version": "2b4b2b9023da",
+ "commit": "ca019e3",
+ "gate_runs": 12,
+ "gate_first_pass": true,
+ "gate_failed_steps": [],
+ "acceptance_first_pass": true,
+ "judge_rounds": 2,
+ "judge_first_verdict": "FAIL",
+ "judge_final_verdict": "PASS",
+ "tamper_hits": 0,
+ "guard_blocks": 5,
+ "test_change_requests": 0,
+ "cost_usd": null,
+ "turns": null,
+ "mutation_score": null,
+ "human_verdict": null,
+ "ts": "2026-10-17T20:37:25Z"
+}

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/clock"
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/envelope"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/wa"
 )
 
@@ -40,10 +41,13 @@ type Confirmation struct {
 	Message   wa.MessageRef // Message.Sender is the spammer
 	Text      string        // the raw text; the corpus redacts it on save
 	Thumbnail *wa.Image
-	Admin     wa.JID
-	Source    string // review | command
-	ReviewID  int64
-	At        time.Time
+	// Envelope is the whole message when the caller has it (links, media hashes, contacts);
+	// without it the corpus is built from Text alone.
+	Envelope *envelope.Envelope
+	Admin    wa.JID
+	Source   string // review | command
+	ReviewID int64
+	At       time.Time
 }
 
 // FingerprintAllow is an allow-list entry for an overturned message: only its fingerprint is

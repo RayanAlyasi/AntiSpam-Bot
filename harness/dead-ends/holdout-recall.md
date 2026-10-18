@@ -1,0 +1,4 @@
+- 2026-10-18 holdout-recall — tried a shared-term floor of 4 for Related — failed because it contradicted the contract's Jaccard rule on short texts (made link-describing words noise terms instead)
+- 2026-10-18 holdout-recall — tried cleaning terms from the neardup.Key skeleton — failed because it maps digits to letters and alef to Latin l (clean per word on normalized text before the key)
+- 2026-10-18 holdout-recall — tried trusting redact.Text spans as phone numbers in the contact analyzer — failed because it masks any 9+ digits, so dates, times and year lists counted
+- 2026-10-18 holdout-recall — tried naming a word list stopWords — failed because gosec G101 reads "pW" as a credential (use noiseWords)

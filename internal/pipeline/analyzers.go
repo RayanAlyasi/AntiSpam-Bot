@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/detect/blacklist"
+	"github.com/RayanAlyasi/AntiSpam-Bot/internal/detect/contact"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/detect/domain"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/detect/exact"
 	"github.com/RayanAlyasi/AntiSpam-Bot/internal/detect/neardup"
@@ -30,8 +31,8 @@ type AnalyzerSet struct {
 }
 
 // Analyzers returns the T0/T1 analyzers: keyword, regex and fuzzy phrase rules, script
-// anomalies, domain lists, exact hashes and advertised numbers, the manual blacklist (F-127)
-// and the corpus near-duplicate matcher.
+// anomalies, offered contact channels, domain lists, exact hashes and advertised numbers, the
+// manual blacklist (F-127) and the corpus near-duplicate matcher.
 func (a AnalyzerSet) Analyzers() []Analyzer {
 	src := ruleview.Source{Rules: a.Rules, Settings: a.viewOptions}
 	out := []Analyzer{
@@ -39,6 +40,7 @@ func (a AnalyzerSet) Analyzers() []Analyzer {
 		textrules.NewRegex[policy.Settings](src),
 		textrules.NewFuzzy[policy.Settings](src),
 		script.New[policy.Settings](),
+		contact.New[policy.Settings](),
 		domain.New[policy.Settings](src),
 		exact.New[policy.Settings](src, a.Hash),
 		blacklist.New[policy.Settings](src, a.Hash),

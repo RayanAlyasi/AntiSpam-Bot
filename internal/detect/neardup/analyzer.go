@@ -16,15 +16,23 @@ const (
 	// CodeLoose is related to confirmed spam but outside the tight limits: a rules signal that
 	// only sends the message on to the AI, or to admins without one (DESIGN.md §7.3).
 	CodeLoose = "corpus.similar"
+	// CodeRelated shares its wording with confirmed spam (match terms; see Terms) without being
+	// similar as a whole: a weak rules signal that only adds up with other evidence, such as an
+	// offered contact channel.
+	CodeRelated = "corpus.related"
 )
 
 // Default weights. A loose match on its own must reach T_review (0.60 under the default bias of
 // -3.0: sigmoid(-3.0 + 3.5) ≈ 0.62), because "a looser match … sends the message to the AI"
 // (DESIGN.md §7.5). A group that raises T_review above 0.62 makes a lone loose match clean. It
 // can't delete or ban: only known evidence or an AI verdict does.
+//
+// A related match is weaker: 2.5 alone gives p ≈ 0.38, clean, and reaches T_review only with
+// at least +0.9 of other evidence, such as contact.advertised (+1.0).
 const (
 	WeightCertain = 4.0
 	WeightLoose   = 3.5
+	WeightRelated = 2.5
 )
 
 // minTextRunes skips surfaces too short to say anything ("ok", "👍"): a two-letter reply that
@@ -79,8 +87,9 @@ func (a *Analyzer[P]) Tier() detect.Tier { return detect.T1 }
 func (a *Analyzer[P]) Applies(e *envelope.Envelope, _ *P) bool { return len(e.Texts) > 0 }
 
 // Analyze implements detect.Analyzer. It emits at most one signal: the closest match over all
-// surfaces and indexes, certain before loose. Surfaces are matched by Key(Norm), so entries must
-// be fingerprinted with FingerprintText (or Compute(Key(norm))).
+// surfaces and indexes, certain before loose before related. Surfaces are matched by
+// FingerprintNorm, so entries must be fingerprinted with FingerprintText or FingerprintNorm (an
+// entry from Compute(Key(norm)) has no match terms and never matches as related).
 func (a *Analyzer[P]) Analyze(ctx context.Context, e *envelope.Envelope, _ *detect.State) ([]detect.Signal, error) {
 	type candidate struct {
 		source string
@@ -89,12 +98,12 @@ func (a *Analyzer[P]) Analyze(ctx context.Context, e *envelope.Envelope, _ *dete
 	var cands []candidate
 	for _, t := range e.Texts {
 		if len([]rune(t.Norm)) >= minTextRunes {
-			cands = append(cands, candidate{t.Source, Compute(Key(t.Norm))})
+			cands = append(cands, candidate{t.Source, FingerprintNorm(t.Norm)})
 		}
 	}
 	if a.whole != nil {
 		if w := a.whole(e); len([]rune(w)) >= minTextRunes {
-			cands = append(cands, candidate{"message", Compute(Key(w))})
+			cands = append(cands, candidate{"message", FingerprintNorm(w)})
 		}
 	}
 	indexes := a.indexes(e.Group)
@@ -125,6 +134,9 @@ func (a *Analyzer[P]) Analyze(ctx context.Context, e *envelope.Envelope, _ *dete
 		return []detect.Signal{{Code: CodeCertain, Weight: WeightCertain, Known: true, Evidence: evidence(best, source)}}, nil
 	case Loose:
 		return []detect.Signal{{Code: CodeLoose, Weight: WeightLoose, Evidence: evidence(best, source)}}, nil
+	case Related:
+		return []detect.Signal{{Code: CodeRelated, Weight: WeightRelated, Evidence: fmt.Sprintf(
+			"%s shares %.0f%% of its wording with confirmed spam %s", source, best.Containment*100, best.EntryID)}}, nil
 	default:
 		return nil, nil
 	}

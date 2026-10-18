@@ -123,6 +123,6 @@ func (c *Corpus) addExtra(group wa.JID, texts []string) {
 		ix = c.groups[group]
 	}
 	for i, t := range texts {
-		ix.Add(fmt.Sprintf("extra-%d", i), neardup.Compute(neardup.Key(t)))
+		ix.Add(fmt.Sprintf("extra-%d", i), neardup.FingerprintNorm(t))
 	}
 }

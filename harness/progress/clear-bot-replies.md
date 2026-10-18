@@ -35,8 +35,9 @@ Branch `feat/clear-bot-replies`, PR into `staging`.
 - `cmd.autoban_ai_refused` mentions a track record, but production has no track-record source,
   so `ai` is always refused for now; reword when F-112's store is wired.
 
-- Move the built-in catalogue into `locales/` (DESIGN §22.2) once the test-change request
-  `harness/test-change-requests/replies-pinned-texts.md` is decided.
+- Move the built-in catalogue into `locales/` (DESIGN §22.2). The test-change request was
+  approved; card labels, setting keys and the group name are now bold, and `messages` in
+  `locales/*.yaml` is empty.
 - Command aliases exist twice: `chat.Aliases` (live) and `locales/*.yaml` `commands` (unused),
   and they differ (e.g. `.معلق` is only in code, `.المعلقة` in both). Same for the review reply
   keywords in `internal/review/votes.go` vs `locales` `keywords` (`تمام` is only in the yaml).

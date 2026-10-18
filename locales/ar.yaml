@@ -1,15 +1,9 @@
-# النصوص العربية (DESIGN.md §22.2). Arabic texts: same keys and {placeholders} as en.yaml.
-# v0.1 sends its Arabic replies from internal/review/catalog.go and catalog_cmd.go (see en.yaml).
+# أسماء الأوامر وكلمات الرد العربية (DESIGN.md §22.2): same keys as en.yaml.
+# The Arabic texts the bot sends live in internal/review/catalog.go and catalog_cmd.go.
 lang: ar
 dir: rtl
 
-messages:
-  onboarding.protection_on:
-    - "✅ الحماية مفعّلة في \"{group}\" ({preset})، وأبقى صامتاً هناك. أرسل .معلق لعرض الحالات غير المؤكدة، أو .مجموعة_المراجعة here في مجموعة منفصلة للمشرفين فقط لتصلك أولاً بأول."
-    - "✅ أصبحت \"{group}\" محمية ({preset}، صامت). الحالات غير المؤكدة تنتظرك: أرسل .معلق لعرضها، أو .مجموعة_المراجعة here في مجموعة للمشرفين فقط."
-  command.done:
-    - "تم."
-    - "تم ✔"
+messages: {}
 
 # أسماء الأوامر (DESIGN.md §13.7): Arabic aliases. The English names work in every language.
 commands:

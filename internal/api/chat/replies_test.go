@@ -40,7 +40,7 @@ func TestRepliesWithoutWebsite(t *testing.T) {
 	if len(sends) != 2 {
 		t.Fatalf("after START: %d sends, want the promotion notice and the setup steps", len(sends))
 	}
-	for i, want := range []string{"Protection is on in Riyadh Cars Market", "Three steps"} {
+	for i, want := range []string{"Protection is on in *Riyadh Cars Market*", "Three steps"} {
 		got := sends[i].Message.Text
 		if !strings.Contains(got, want) || !strings.Contains(got, ".pending") || !strings.Contains(got, ".reviewgroup here") {
 			t.Errorf("onboarding %d = %q, want %q and both ways to see uncertain cases (.pending, .reviewgroup here)", i, got, want)
@@ -53,8 +53,8 @@ func TestRepliesWithoutWebsite(t *testing.T) {
 
 	for _, tt := range []struct{ cmd, want string }{
 		{".login", "isn't part of this version"},
-		{".settings", "review.destination: no review group (cases wait for .pending)"},
-		{".status", "review.destination: no review group"},
+		{".settings", "*review.destination:* no review group (cases wait for .pending)"},
+		{".status", "*review.destination:* no review group"},
 		{".حالة", "تنتظر .معلق"},
 		{".review dashboard", ".pending"},
 		{".review dm", ".pending"},

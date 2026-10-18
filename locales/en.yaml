@@ -1,20 +1,12 @@
-# English texts (DESIGN.md §22.2). Every key here must exist in every other locale file with the
-# same {placeholders}; the locales tests fail otherwise. Bot messages have several variants, so
-# the bot never sends the same text over and over (§10.3). Placeholders are {lowercase_names}.
+# English command names and review keywords (DESIGN.md §22.2). Every key here must exist in every
+# other locale file; the locales tests fail otherwise.
 #
-# v0.1 sends its replies, review cards and help pages from the built-in catalogue in
-# internal/review/catalog.go and catalog_cmd.go, which is their only source. The messages below
-# are the variant templates the locales tests check; none of them duplicates a sent text.
+# The texts the bot sends (replies, review cards, help pages, onboarding) live only in the
+# built-in catalogue in internal/review/catalog.go and catalog_cmd.go, so `messages` is empty.
 lang: en
 dir: ltr
 
-messages:
-  onboarding.protection_on:
-    - "✅ Protection is on in \"{group}\" ({preset}). I stay silent there. Send .pending to see uncertain cases, or .reviewgroup here in a separate admins-only group to get them as they come in."
-    - "✅ \"{group}\" is now protected ({preset}, silent). Uncertain cases wait for you: send .pending to see them, or .reviewgroup here in an admins-only group."
-  command.done:
-    - "Done."
-    - "Done ✔"
+messages: {}
 
 # Command names (DESIGN.md §13.7): canonical name → the words that invoke it in this language.
 commands:

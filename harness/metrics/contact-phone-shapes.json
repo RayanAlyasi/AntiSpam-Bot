@@ -1,0 +1,23 @@
+{
+ "feature": "contact-phone-shapes",
+ "branch": "feat/contact-phone-shapes",
+ "category": null,
+ "core": null,
+ "harness_version": "fb19b08dbbbd",
+ "commit": "e8cf31c",
+ "gate_runs": 7,
+ "gate_first_pass": true,
+ "gate_failed_steps": [],
+ "acceptance_first_pass": true,
+ "judge_rounds": 2,
+ "judge_first_verdict": "FAIL",
+ "judge_final_verdict": "PASS",
+ "tamper_hits": 0,
+ "guard_blocks": 10,
+ "test_change_requests": 0,
+ "cost_usd": null,
+ "turns": null,
+ "mutation_score": null,
+ "human_verdict": null,
+ "ts": "2026-10-18T17:37:07Z"
+}

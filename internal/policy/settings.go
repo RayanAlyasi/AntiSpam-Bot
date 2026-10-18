@@ -106,6 +106,7 @@ type Settings struct {
 	Preset        Preset          `json:"preset"`
 	Mode          Mode            `json:"mode"`
 	Silent        bool            `json:"silent"`
+	Shadow        Shadow          `json:"shadow"`
 	Enforcement   Enforcement     `json:"enforcement"`
 	Uncertain     Uncertain       `json:"uncertain"`
 	Policy        ViolationPolicy `json:"policy"`
@@ -124,6 +125,14 @@ type Settings struct {
 	Network       Network         `json:"network"`
 	Intel         Intel           `json:"intel"`
 	Limits        Limits          `json:"limits"`
+}
+
+// Shadow configures what shadow mode shows in the group (DESIGN.md §8.4).
+type Shadow struct {
+	// Reactions: react to each message shadow mode caught, even while the group is silent: ❌
+	// when the bot would act without asking, ❓ when it would ask the admins. Nothing else is
+	// posted, deleted or banned.
+	Reactions bool `json:"reactions"`
 }
 
 // Enforcement decides who bans and when (DESIGN.md §8.3, §9.2).

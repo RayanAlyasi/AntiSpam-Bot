@@ -16,6 +16,7 @@ import (
 // documents (app.group_settings, DESIGN.md §12.1) without importing the policy package, which
 // enqueues through this one:
 //   - a group with a settings document is protected, and silent unless "silent" is false;
+//     shadow reactions are allowed when its "mode" is shadow and "shadow.reactions" is true;
 //   - a group named as some group's review group ("review.review_group") isn't protected;
 //   - any other group is unknown, and treated as protected and silent: nothing is posted there.
 //
@@ -36,10 +37,10 @@ func (g PGGroups) Posting(ctx context.Context, chat wa.JID) (Posting, error) {
 		return Posting{}, nil
 	}
 	q := db.New(g.DB)
-	silent, err := q.GroupPosting(ctx, string(chat))
+	row, err := q.GroupPosting(ctx, string(chat))
 	switch {
 	case err == nil:
-		return Posting{Protected: true, Silent: silent}, nil
+		return Posting{Protected: true, Silent: row.Silent, ShadowReactions: row.ShadowReactions}, nil
 	case !errors.Is(err, pgx.ErrNoRows):
 		return Posting{}, fmt.Errorf("posting rules of %s: %w", chat, err)
 	}

@@ -84,12 +84,14 @@ func (e *Executor) execute(ctx context.Context, picked Action) error {
 		// never be missed (DESIGN.md §9.7).
 		p, perr := e.d.Groups.Posting(ctx, a.Chat)
 		e.postings[a.Chat] = postingEntry{p: p, err: perr, at: now}
-		switch {
-		case perr != nil:
+		if perr != nil {
 			return e.refuse(sctx, a, fmt.Sprintf("group state unknown, post refused: %v", perr))
-		case p.Protected && p.Silent:
-			return e.refuse(sctx, a, "silent: the bot never posts in a silent protected group")
-		case p.Protected:
+		}
+		refusal, paced := p.rule(a)
+		if refusal != "" {
+			return e.refuse(sctx, a, refusal)
+		}
+		if paced {
 			if d := e.postWindow(a.Chat).wait(now); d > 0 {
 				return e.retry(sctx, a.ID, RetryInfo{NotBefore: now.Add(d)})
 			}

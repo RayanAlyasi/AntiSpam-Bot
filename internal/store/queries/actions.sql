@@ -89,8 +89,11 @@ UPDATE app.action_controls SET state = @state, updated_at = @now WHERE scope = @
 
 -- name: GroupPosting :one
 -- Whether the bot may post in a group (actions.Groups): a group with a settings document is
--- protected; a missing "silent" key counts as silent.
-SELECT COALESCE((doc->>'silent')::boolean, true)::boolean AS silent
+-- protected; a missing "silent" key counts as silent. Shadow reactions are allowed only in
+-- shadow mode with "shadow.reactions" on; a missing key counts as off (policy.Defaults).
+SELECT COALESCE((doc->>'silent')::boolean, true)::boolean AS silent,
+       (COALESCE(doc->>'mode', '') = 'shadow'
+        AND COALESCE(doc->'shadow'->'reactions' = 'true'::jsonb, false))::boolean AS shadow_reactions
 FROM app.group_settings WHERE group_jid = @group_jid;
 
 -- name: IsReviewGroup :one

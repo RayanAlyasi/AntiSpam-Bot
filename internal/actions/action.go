@@ -89,6 +89,7 @@ const (
 	PurposeReview  Purpose = "review"  // review items and their follow-ups (DESIGN.md §9.5)
 	PurposeNotice  Purpose = "notice"  // admin and operator notifications
 	PurposeWarning Purpose = "warning" // optional warnings (ladder, silent off)
+	PurposeShadow  Purpose = "shadow"  // react: shadow mode's judgement on a message (DESIGN.md §8.4)
 )
 
 // Status is where an action is in its life.
@@ -149,7 +150,7 @@ type Payload struct {
 	Image    *wa.Image      `json:",omitempty"` // send: optional image; the text is its caption
 	Emoji    string         `json:",omitempty"` // react: empty removes the reaction
 	On       bool           `json:",omitempty"` // announce, join_approval
-	Purpose  Purpose        `json:",omitempty"` // send
+	Purpose  Purpose        `json:",omitempty"` // send; react: PurposeShadow for a shadow-mode reaction
 }
 
 // Result is what an executed action returned.
@@ -191,14 +192,18 @@ const (
 	RevokeWindow         = 48 * time.Hour
 	DefaultEditWindow    = 15 * time.Minute // WhatsApp allows edits for about 20 minutes
 	DefaultWarningWindow = 10 * time.Minute // an optional warning older than this is pointless
-	DefaultLockdownTTL   = time.Hour
-	DefaultTTL           = 24 * time.Hour
+	// DefaultShadowReactWindow: a shadow-mode reaction is only worth showing while the message
+	// is fresh; a late one is dropped, never sent.
+	DefaultShadowReactWindow = 10 * time.Minute
+	DefaultLockdownTTL       = time.Hour
+	DefaultTTL               = 24 * time.Hour
 )
 
 // DefaultDeadline is the deadline an action gets when it's enqueued without one, at now:
 //   - revoke: MessageTime (or now, if unset) plus RevokeWindow;
 //   - edit: now plus DefaultEditWindow;
 //   - a send with PurposeWarning: now plus DefaultWarningWindow;
+//   - a react with PurposeShadow: now plus DefaultShadowReactWindow;
 //   - lockdown kinds: now plus DefaultLockdownTTL;
 //   - everything else: now plus DefaultTTL.
 func DefaultDeadline(a Action, now time.Time) time.Time {
@@ -213,6 +218,8 @@ func DefaultDeadline(a Action, now time.Time) time.Time {
 		return now.Add(DefaultEditWindow)
 	case a.Kind == KindSend && a.Payload.Purpose == PurposeWarning:
 		return now.Add(DefaultWarningWindow)
+	case a.Kind == KindReact && a.Payload.Purpose == PurposeShadow:
+		return now.Add(DefaultShadowReactWindow)
 	case a.Kind.Lockdown():
 		return now.Add(DefaultLockdownTTL)
 	default:
@@ -223,6 +230,12 @@ func DefaultDeadline(a Action, now time.Time) time.Time {
 // RevokeKey is the dedupe key of the delete of message id in chat (DESIGN.md §10.4). A REVOKE
 // event from the sender cancels the action with this key.
 func RevokeKey(chat wa.JID, id wa.MessageID) string { return fmt.Sprintf("revoke:%s:%s", chat, id) }
+
+// ShadowReactKey is the dedupe key of shadow mode's reaction to message id in chat: one per
+// message, so an edit never gets a second reaction.
+func ShadowReactKey(chat wa.JID, id wa.MessageID) string {
+	return fmt.Sprintf("shadow-react:%s:%s", chat, id)
+}
 
 // KickKey is the dedupe key of the removal of jid from group because of cause (a ban or
 // detection ID), so a later, separate ban of the same person is not mistaken for a duplicate.
